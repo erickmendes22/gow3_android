@@ -66,14 +66,15 @@ def compile_patches(xml, names, app_version, segments):
 
 
 PATCHES_DIR=Path(__file__).resolve().parent.parent/'patches'
-# Built-in patch file per game, the app version its addresses are for and, when known, the
-# sha256 of the only eboot.bin they were checked against (another build of the same version has
-# its code elsewhere: byte writes there corrupt it).
+# Built-in patch file per game. Each entry is
+#   (title IDs, XML, app version, eboot sha256, patch-site original bytes or None).
+# The version-specific eboot SHA-256 and/or the expected original bytes at every patch site
+# gate the byte writes: another build of the same version has its code elsewhere and the writes
+# would corrupt it. An Android entry must provide at least one of the two (sha256 and/or sites).
+# patch_sites is {offset: bytes} read from the game's eboot.bin; every site must match for the
+# profile to be "validated" (design: "Add a title/version/hash and original-byte profile").
 GAMES=[({'CUSA01623'},PATCHES_DIR/'God_of_War_III_Remastered.xml','01.02',
-        'd85c8135d330c3b601bf5dc3f1dd86bd6119fb8a9fce372bed2c9785f9a79299')]
-# Recognized builds without patch support yet, so the launcher can name them instead of a generic
-# mismatch. The full 01.02 update has this eboot for both CUSA01623 and CUSA01715.
-UNPORTED_BUILDS={'6e72330e9092e5164049b865e5568f2d450904001a73fe0a2f4b39194c195b3c':'full 01.02 update'}
+        'd85c8135d330c3b601bf5dc3f1dd86bd6119fb8a9fce372bed2c9785f9a79299', None)]
 DMEM_RETAIL_MB=5056  # runtime_memory.c POOL_SIZE default
 
 
@@ -86,36 +87,71 @@ def game_title_id(game):
 
 
 def game_profile(title_id):
-    """(title IDs, built-in XML, app version, eboot sha256 or None) for a known game, else None."""
+    """(title IDs, built-in XML, app version, eboot sha256 or None, patch sites or None)
+    for a known game, else None."""
     return next((g for g in GAMES if title_id in g[0]),None)
-
-
-def eboot_sha256(game):
-    import hashlib
-    try:
-        return hashlib.sha256((Path(game)/'eboot.bin').read_bytes()).hexdigest()
-    except (OSError, TypeError):
-        return None
 
 
 def eboot_matches(game, profile):
     """Whether the game's eboot.bin is the build the profile's patches were checked against."""
     if not profile or not profile[3]:
         return True
-    return eboot_sha256(game)==profile[3]
-
-
-def unported_build(game):
-    """Name of a recognized eboot.bin build that has no patch support yet, else None."""
-    return UNPORTED_BUILDS.get(eboot_sha256(game)) if game else None
-
-
-def game_patchable(game):
-    """Whether the built-in patches apply to this game folder: a known game, version and build."""
-    if not game:
+    import hashlib
+    try:
+        return hashlib.sha256((Path(game)/'eboot.bin').read_bytes()).hexdigest()==profile[3]
+    except OSError:
         return False
-    profile=game_profile(game_title_id(game))
-    return bool(profile) and game_app_version(game)==profile[2] and eboot_matches(game,profile)
+
+
+def patch_sites_bytes_match(game, profile):
+    """Whether the game's eboot.bin holds the expected original bytes at every patch site.
+
+    A profile without patch-site expectations (None) trivially matches. This is the per-site
+    gate Android profiles use when a whole-eboot hash cannot be reused across dumps.
+    """
+    sites = profile[4] if len(profile) > 4 else None
+    if not sites:
+        return True
+    try:
+        data=(Path(game)/'eboot.bin').read_bytes()
+    except OSError:
+        return False
+    return all(data[offset:offset+len(expected)] == expected for offset, expected in sites.items())
+
+
+def patch_profile_status(game):
+    """Return safe, non-mutating evidence for the built-in patch profile.
+
+    The result is intentionally useful to launch diagnostics as well as the patch compiler.
+    It never treats an unknown title or an unreadable eboot as patchable, and it reports the
+    explicit reason (no-patch fallback) instead of silently skipping.
+    """
+    title = game_title_id(game)
+    version = game_app_version(game)
+    profile = game_profile(title)
+    result = {'title_id': title, 'app_version': version, 'supported': bool(profile),
+              'eboot_sha256': None, 'eboot_matches': None, 'patch_sites_match': None,
+              'reason': None}
+    try:
+        import hashlib
+        result['eboot_sha256'] = hashlib.sha256((Path(game) / 'eboot.bin').read_bytes()).hexdigest()
+    except OSError:
+        result['reason'] = 'missing-or-unreadable-eboot'
+        return result
+    if not profile:
+        result['reason'] = 'unsupported-title'
+    elif version != profile[2]:
+        result['reason'] = 'unsupported-app-version'
+    else:
+        result['eboot_matches'] = eboot_matches(game, profile)
+        result['patch_sites_match'] = patch_sites_bytes_match(game, profile)
+        if result['eboot_matches'] and result['patch_sites_match']:
+            result['reason'] = 'validated'
+        elif not result['eboot_matches']:
+            result['reason'] = 'eboot-hash-mismatch'
+        else:
+            result['reason'] = 'patch-site-byte-mismatch'
+    return result
 
 
 # God of War III notes: the texture fix and the resolution patches both resize the video arena;
@@ -222,7 +258,7 @@ def main():
         write_patches(a.out,[])
         print(f'Patches: no patch profile for {title}: none applied')
         return
-    ids,xml,needed,_sha=profile
+    ids,xml,needed,_sha,_sites=profile
     # The patches are byte writes at the addresses of one game build: on another they would
     # corrupt code, so such a game runs unpatched.
     version=game_app_version(a.game_dir)
@@ -232,11 +268,7 @@ def main():
         return
     if not eboot_matches(a.game_dir,profile) and not os.environ.get('GOW3_FORCE_PATCHES'):
         write_patches(a.out,[])
-        build=unported_build(a.game_dir)
-        if build:
-            print(f'Patches: eboot.bin is the {build}, which has no patch support yet: none applied')
-        else:
-            print(f'Patches: eboot.bin is not the build {xml.name} was checked against: none applied')
+        print(f'Patches: eboot.bin is not the build {xml.name} was checked against: none applied')
         return
     names=selected_patches(xml,needed,a.extra,os.environ.get('GOW3_PATCHES_ONLY')=='1')
     segments=eboot_segments((a.out/'eboot.elf').read_bytes())

@@ -1,218 +1,341 @@
-# God of War III Remastered for PC
+# 战神 III 重制版 PC 移植版（God of War III Remastered for PC）
 
-**English** | [Português (Brasil)](README.pt-BR.md)
+**简体中文** | [Português (Brasil)](README.pt-BR.md)
 
-A native port of **God of War III Remastered** (PlayStation 4) to Windows 10/11 and Linux
-(including the Steam Deck).
+> 本文件为中文翻译与整理版；上游项目原始 README 为英文版。
 
-The CPU side is native: the game's original executable runs directly on the PC's processor (the
-PS4 uses the same x86-64 architecture), and a runtime written for this game replaces the PS4
-system libraries, so there is no emulator. The graphics are translated: they run on the
-[shadPS4](https://github.com/shadps4-emu/shadPS4) video core, which converts the PS4 GPU commands
-and shaders to Vulkan, with the God of War III rendering fixes from
-[cuesta4's `eltutz` branch](https://github.com/cuesta4/shadPS4/tree/eltutz). Running the game code
-directly on the CPU is also how shadPS4 works; what this project changes is the system layer and
-the game-specific work (patches, background shader cache, launcher and in-game menu).
-It is a fork of [Supermedo's Windows port](https://github.com/Supermedo/bloodborne_pc) of
-[deadinside28's bloodborne_pc](https://github.com/deadinside28/bloodborne_pc) (see
-[Credits](#credits)).
+《**战神 III 重制版**》（God of War III Remastered，PlayStation 4）向 Windows 10/11 与
+Linux（含 Steam Deck）的**原生移植**。
 
-> **No game files are included.** You need a dump from your own PS4 (CUSA01623, version 01.02).
-> This project is not affiliated with Sony Interactive Entertainment or Santa Monica Studio.
-> God of War is a trademark of Sony Interactive Entertainment.
+游戏原本的可执行文件可以直接跑在 PC 处理器上（PS4 使用的同样是 x86-64 架构）。一套为本作
+专门编写的运行时替代了 PS4 的系统库，图形部分则被翻译为 Vulkan。它不是通用模拟器：整个
+项目只服务这一款游戏。本项目 fork 自 [Supermedo 的 Windows 移植版](https://github.com/Supermedo/bloodborne_pc)，
+后者基于 [deadinside28 的 bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)，
+并合入了 [cuesta4 的 shadPS4 分支](https://github.com/cuesta4/shadPS4) 中针对战神 III 的修复
+（见[致谢](#致谢)）。
 
-On the test machine (AMD Radeon RX 6700 XT, Ryzen 5 5600X, 32 GB) the game runs at 144 FPS on
-average (55 to 240) at 1080p with the 240 FPS engine frame rate, and at 108 FPS on average at 4K
-with FSR 1.
+> **本项目不包含任何游戏文件。** 你需要从自己的 PS4 导出的 dump（CUSA01623，版本 01.02）。
+> 本项目与 Sony Interactive Entertainment、Santa Monica Studio 无关。
+> God of War 是 Sony Interactive Entertainment 的商标。
 
-**Tested and playable from start to finish** at native 1080p with the 240 FPS engine frame
-rate. At other render resolutions some textures look broken; a fix is in progress.
+开发进度（以葡萄牙语记录）见 [docs/gow3/ROADMAP.md](docs/gow3/ROADMAP.md)。
 
-Progress is tracked (in Portuguese) in [docs/gow3/ROADMAP.md](docs/gow3/ROADMAP.md).
+## 性能表现
 
-## What works
+在测试机（AMD Radeon RX 6700 XT、Ryzen 5 5600X、32 GB 内存）上：
 
-- Opening, menus, video cutscenes (H.264) and gameplay.
-- Audio: music, voices and effects (ATRAC9 and MP3).
-- Controller (DualSense, Xbox and others, through SDL3) and keyboard at the same time, both
-  remappable.
-- Saving and loading: the save list is shown on screen, as on the PS4. Autosave works too. The
-  launcher backs the saves up before every start.
-- Patches: render resolution of 480p, 720p, 1440p, 1800p or 4K, corrupted texture fix and skip
-  videos with the X button (community); engine frame rate of 120 FPS (kvicken) or 240 FPS
-  (adapted by Felipe Prado).
-- **Instant start:** the saved shader cache loads in the background while you play, and new
-  shaders compile in the background too, so the game does not stop to build them.
-- **Launcher** in the game's colors, in English with partial translations: quick settings on the home page, display,
-  performance, game folder and save backups, patches, mods (order, presets and conflicts),
-  controls with PlayStation or Xbox button icons, updates and diagnostics.
-- **In-game menu** (Insert on the keyboard, R3+L2 on the controller), with four tabs:
-  - **Game:** cheats (infinite health, magic, item meter, Rage of Sparta, max red orbs);
-    multipliers from 0.1x to 100x for red, green (health), blue (magic) and gold (Rage of
-    Sparta) orbs and for damage dealt and taken; an enemy health bar.
-  - **Image:** display mode (windowed, borderless, fullscreen), VSync, FSR 1 upscaling and
-    RCAS sharpening.
-  - **Performance:** frame rate limit (30 to unlimited), frames queued, background shader
-    compiling; render resolution, engine frame rate and GPU readback options apply with one
-    "Apply and restart" button.
-  - **Overlay:** a performance overlay with FPS, frametime, upscaler, GPU (name and use), CPU,
-    RAM and VRAM, each optional, with font size, corner, background opacity and layout. The
-    numbers are the game's own use, not the whole system's.
+- 1080p、引擎帧率 240 FPS：平均 **144 FPS**（区间 55～240）。
+- 4K、FSR 1：平均 **108 FPS**。
 
-## Download and play
+**已在原生 1080p、引擎 240 FPS 下从头到尾完整测试并可正常通关。** 在其他渲染分辨率下
+部分贴图会出现异常，修复工作正在进行中。
 
-**You need**
-- Windows 10 (1903 or newer) or Windows 11, 64-bit.
-- A graphics card with Vulkan 1.3 and an up-to-date driver.
-- Your own copy of God of War III Remastered: **CUSA01623 with the 01.02 update**, as a folder
-  that contains `eboot.bin`, `sce_module` and `sce_sys`. No game files are included in this
-  download.
+## 已实现功能
 
-**Steps**
-1. Download `gow3-windows.zip` from the
-   [Releases page](https://github.com/FelipePrado0/gow3_pc/releases/latest).
-2. Extract it to a folder of your choice, for example `C:\Games\gow3-windows`. Do not run it from
-   inside the zip.
-3. Open **`God of War III.exe`**. If Windows shows "Windows protected your PC", click
-   **More info**, then **Run anyway**: the program is not digitally signed.
-4. Click **Choose the game folder**. It takes you to the **Game** page. Next to **Game folder**,
-   click **Browse…** and select the folder with `eboot.bin`.
-5. Back on **Home**, the cover art and "CUSA01623 · version 01.02" appear. Adjust **Quick
-   settings** if you like: display mode, frame rate limit, render resolution and engine frame
-   rate.
-6. Click **PLAY**. The first start takes a little longer while the game image is prepared. The
-   next starts are quick.
+- 启动流程、菜单、视频过场动画（H.264）以及实际游玩。
+- 音频：音乐、语音与音效（ATRAC9 与 MP3）。
+- 手柄（DualSense、Xbox 等，经由 SDL3）与键盘可同时使用，且两者均可自定义按键。
+- 存档与读档：存档列表在画面上显示，与 PS4 上相同；自动存档同样可用。启动器会在每次启动
+  前备份存档。
+- 补丁：渲染分辨率 480p / 720p / 1440p / 1800p / 4K、损坏贴图修复、按 X 跳过视频（社区贡献）；
+  引擎帧率 120 FPS（kvicken）或 240 FPS（由 Felipe Prado 适配）。
+- **秒进：** 已保存的着色器缓存在后台加载，新着色器同样在后台编译，游戏不会停下来等待构建。
+- **启动器：** 采用游戏本身的配色，英文界面并带部分翻译。首页提供快捷设置，另有显示、性能、
+  游戏目录与存档备份、补丁、模组（排序、预设与冲突）、按键（可切换 PlayStation 或 Xbox 键位
+  图标）、更新与诊断等页面。
+- **游戏内菜单**（键盘 `Insert`，手柄 `R3 + L2`），四个标签页：
+  - **Game：** 修改器（无限生命、魔力、道具槽、斯巴达之怒、红色魂珠最大化）；红色（EXP）、
+    绿色（生命）、蓝色（魔力）、金色（斯巴达之怒）魂珠以及输出/承受伤害的倍率调节，范围
+    0.1x～100x；敌人血条。
+  - **Image：** 显示模式（窗口、无边框、全屏）、垂直同步、FSR 1 放大与 RCAS 锐化。
+  - **Performance：** 帧率限制（30～不限制）、排队帧数、后台着色器编译开关；渲染分辨率、
+    引擎帧率与 GPU 回读选项在点击一次「Apply and restart」后生效。
+  - **Overlay：** 性能叠加层，显示 FPS、帧时间、放大器、GPU（型号与占用）、CPU、内存与显存，
+    每项均可单独开关，并可调整字号、位置角落、背景不透明度与排版。数字取自游戏自身占用，
+    而非整机占用。
 
-Patches and fixes are included and applied automatically: texture fix, skip videos with X and
-120 FPS are on by default. Change the resolution and frame rate on **Home** or **Performance**.
+## 系统要求
 
-**While playing**
-- **Insert** on the keyboard, or **R3 + L2** on the controller, opens the port's menu: cheats,
-  multipliers, image, performance and the performance overlay.
-- Saved shaders load in the background. A small "Loading shader cache" note in the corner shows
-  the progress.
+- Windows 10（1903 或更高版本）或 Windows 11，64 位。
+- 支持 Vulkan 1.3 的显卡，且驱动为较新版本。
+- 你自己的游戏副本：**CUSA01623 并已应用 01.02 更新**（包含 `eboot.bin`、`sce_module`、
+  `sce_sys` 的目录）。下载包中不包含任何游戏文件。
 
-**Next time**
-- **`Play God of War III.exe`** starts the game straight away with your saved settings. You can
-  make a desktop shortcut to it, or add it to Steam with **Add a Non-Steam Game**.
-- Your saves, shader cache and log are in the `user` folder next to `God of War III.exe`. Keep
-  that folder when you update.
-- **Advanced → Check for updates** downloads and installs a new version. Your saves and settings
-  are kept.
+### 补丁与游戏内功能的适用性
 
-**If something goes wrong**
-- Black screen at start: **Advanced → Clear shader cache**, then start again.
-- The game does not open: check the **Log** page, or send `user\last_run.log` with your report.
+补丁只会应用在与其校验过的 `eboot.bin` 完全一致的文件上
+（sha256 `d85c8135d330c3b601bf5dc3f1dd86bd6119fb8a9fce372bed2c9785f9a79299`）；游戏内 hook
+（修改器、倍率、血条）也只会在被改写代码的字节符合预期时注入。否则游戏仍可启动，只是相关
+功能不会出现，日志与菜单中会说明原因。
 
-## Linux and Steam Deck
+### 源码构建依赖
 
-There is a native Linux build too — the same probe and `run.sh`, no launcher GUI. On the Steam
-Deck it runs from Desktop Mode. Full notes: [docs/LINUX.md](docs/LINUX.md).
+[MSYS2](https://www.msys2.org) 与 [Python 3](https://www.python.org)（需安装 Pillow：
+`pip install pillow`，用于生成游戏图标与封面图）。
 
-**Download and play (release)**
-1. Download `gow3-linux-x86_64.tar.gz` from the releases and extract it anywhere.
-2. Put your game folder (the one with `eboot.bin`, e.g. `CUSA01623`) inside the extracted
-   folder, next to `bin/`.
-3. Run `start-gow3.sh` (any Linux), or `start-gow3-deck.sh` / double-click `God of War III.desktop`
-   on the Steam Deck.
+## 下载与游玩（Windows）
 
-The game folder is found automatically; saves, the shader cache and `gow3.ini` go to
-`~/.local/share/gow3`. The first launch compiles shaders (a minute or two). Nothing is installed
-system-wide and the host's Vulkan driver is used.
+### 操作步骤
 
-**Build from source:** see [docs/LINUX.md](docs/LINUX.md). Dependencies are local under `.deps/`
-(no root); `bash build.sh` then `GOW3_GAME_DIR=/path/to/CUSA01623 bash run.sh`.
+1. 从 [Releases 页面](https://github.com/FelipePrado0/gow3_pc/releases/latest) 下载
+   `gow3-windows.zip`。
+2. 解压到任意目录，例如 `C:\Games\gow3-windows`。不要在压缩包内直接运行。
+3. 打开 **`God of War III.exe`**。如果 Windows 弹出「Windows 已保护你的电脑」，点击
+   **更多信息**，再点 **仍要运行**：该程序没有数字签名。
+4. 点击 **Choose the game folder**，进入 **Game** 页面。在 **Game folder** 一栏点击
+   **Browse…**，选择包含 `eboot.bin` 的目录。
+5. 回到 **Home** 页面，此时会显示封面图以及「CUSA01623 · version 01.02」。可按需调整
+   **Quick settings**：显示模式、帧率限制、渲染分辨率与引擎帧率。
+6. 点击 **PLAY**。首次启动需要稍长时间，用于准备游戏镜像；之后的启动会很快。
 
-## Requirements
+补丁与修复已内置并自动生效：贴图修复、按 X 跳过视频与 120 FPS 默认开启。分辨率与帧率可在
+**Home** 或 **Performance** 页面调整。
 
-- Windows 10 (1903 or newer) or Windows 11, 64-bit.
-- A graphics card with Vulkan 1.3 and a current driver.
-- Your copy of the game: CUSA01623 with the 01.02 update applied (the folder with `eboot.bin`,
-  `sce_module` and `sce_sys`).
-- The patches are applied only to the `eboot.bin` they were checked against byte by byte
-  (sha256 `d85c8135d330c3b601bf5dc3f1dd86bd6119fb8a9fce372bed2c9785f9a79299`), and the in-game
-  hooks (cheats, multipliers, health bar) only where the code they change has the expected
-  bytes. Otherwise the game starts without them, and the log and the menu say why.
-- To build from source: [MSYS2](https://www.msys2.org) and [Python 3](https://www.python.org) with Pillow
-  (`pip install pillow`, used for the game's icon and cover art).
+### 游玩过程中
 
-## Building from source
+- 按键盘 **Insert** 或手柄 **R3 + L2** 打开移植版菜单：修改器、倍率、画面、性能与性能叠加层。
+- 已保存的着色器在后台加载，角落会出现一条小提示「Loading shader cache」显示进度。
 
-Development happens on the `gow3` branch; `main` receives tested merges.
+### 下次启动
 
-1. Install MSYS2 (`winget install MSYS2.MSYS2`) and, in the **MSYS2 CLANG64** shell, the
-   packages listed in [packaging/windows/README.md](packaging/windows/README.md).
-2. Clone the repository with its submodules and build:
+- **`Play God of War III.exe`** 会直接按已保存的设置启动游戏。可以为它创建桌面快捷方式，或用
+  **Add a Non-Steam Game** 添加到 Steam。
+- 存档、着色器缓存与日志位于 `God of War III.exe` 同级的 `user` 目录。更新时请保留该目录。
+- **Advanced → Check for updates** 会下载并安装新版本，存档与设置都会保留。
+
+### 遇到问题时
+
+- 启动黑屏：**Advanced → Clear shader cache**，然后重新启动。
+- 游戏无法启动：查看 **Log** 页面，或在反馈问题时附上 `user\last_run.log`。
+
+## Linux 与 Steam Deck
+
+同样提供原生 Linux 构建 —— 使用相同的 probe 与 `run.sh`，但没有启动器图形界面。在 Steam Deck
+上需从桌面模式运行。完整说明见 [docs/LINUX.md](docs/LINUX.md)。
+
+**下载与游玩（发行版）**
+
+1. 从 Releases 下载 `gow3-linux-x86_64.tar.gz` 并解压到任意位置。
+2. 把游戏目录（包含 `eboot.bin` 的目录，例如 `CUSA01740`）放进解压后的目录中，与 `bin/` 同级。
+3. 任意 Linux 上运行 `start-gow3.sh`；在 Steam Deck 上运行 `start-gow3-deck.sh`，或直接双击
+   `God of War III.desktop`。
+
+游戏目录会被自动识别；存档、着色器缓存与 `gow3.ini` 存放在 `~/.local/share/gow3`。首次启动会
+编译着色器（约一两分钟）。本项目不会向系统全局安装任何内容，直接使用宿主机的 Vulkan 驱动。
+
+**从源码构建：** 见 [docs/LINUX.md](docs/LINUX.md)。依赖位于本地 `.deps/`（无需 root 权限）；
+执行 `bash build.sh`，然后 `GOW3_GAME_DIR=/path/to/CUSA01623 bash run.sh`。
+
+## Android 移植（开发中）
+
+本仓库同时包含一个 **Android / ARM64 移植**。游戏的 x86-64 代码运行在 **FEXCore** 之上
+（`cpu/`，`libgow3cpu.so`），图形路径使用 shadPS4 图形核心的 ARM64 构建（`libgow3gpu.so`）。
+Android 移植目前仍在真机上验证中。
+
+上面记录的桌面版构建目标是 `CUSA01623 v01.02`。当前用于 Android 测试的 dump 是
+`CUSA01740 v01.02`，其更新后的 eboot 以 `CUSA01740-patch` 的形式单独保存在手机上。ARM64
+加载器无需游戏补丁即可准备并运行它；针对 `CUSA01740` 的分辨率、FPS 与修改器补丁尚未做字节级
+校验。
+
+架构说明与完整设计笔记见 [`docs/ANDROID_PORT.md`](docs/ANDROID_PORT.md)。
+
+### Android 构建快速开始（macOS Apple Silicon）
+
+在仓库根目录执行以下命令。这是标准流程；除非某个构建目标或依赖发生变化，否则不要重复执行
+其中的 GPU / CPU 单独构建命令。
+
+#### 1. 一次性准备依赖
+
+仓库中必须已包含 FEX 与 ARM64 依赖。若 FEX 已放在 `third_party/FEX`，继续使用该 checkout：
+
+```bash
+cd /Users/zhengmiao/mygitworks/gow3_android
+git submodule update --init --recursive
+```
+
+Android rootfs/sysroot 与头文件依赖也必须已存在于 `.local-deps/android` 与 `.local-deps/root`
+下。如果缺失，参见 [`docs/ANDROID_PORT.md`](docs/ANDROID_PORT.md)。
+
+#### 2. 只复制准备加载器所需的游戏文件
+
+完整游戏留在手机上。电脑上只需要四个小文件：
+
+```text
+game/CUSA01740/eboot.bin                         # 来自 CUSA01740-patch
+game/CUSA01740/sce_sys/param.sfo                 # 来自 CUSA01740-patch
+game/CUSA01740/sce_module/libc.prx               # 来自 CUSA01740
+game/CUSA01740/sce_module/libSceFios2.prx        # 来自 CUSA01740
+```
+
+测试期间手机上的目录结构如下：
+
+```bash
+mkdir -p game/CUSA01740/sce_module game/CUSA01740/sce_sys
+adb pull "/sdcard/Download/games/ps4/GOW3 ROM/CUSA01740-patch/eboot.bin" \
+  game/CUSA01740/eboot.bin
+adb pull "/sdcard/Download/games/ps4/GOW3 ROM/CUSA01740-patch/sce_sys/param.sfo" \
+  game/CUSA01740/sce_sys/param.sfo
+adb pull "/sdcard/Download/games/ps4/GOW3 ROM/CUSA01740/sce_module/libc.prx" \
+  game/CUSA01740/sce_module/libc.prx
+adb pull "/sdcard/Download/games/ps4/GOW3 ROM/CUSA01740/sce_module/libSceFios2.prx" \
+  game/CUSA01740/sce_module/libSceFios2.prx
+```
+
+#### 3. 准备游戏镜像
+
+```bash
+python3 scripts/prepare.py game/CUSA01740 --out out
+python3 scripts/link_modules.py game/CUSA01740 --out out
+python3 scripts/content_profile.py game/CUSA01740 --out out --sku full
+```
+
+预期产物包括 `out/eboot.elf`、`out/boot.bin`、`out/boot-linked.bin` 与 `out/content.bin`。
+`prepare.py` 输出的 `Unavailable non-loadable metadata headers` 属于提示信息，并非失败。
+
+#### 4. 构建 ARM64 原生组件与调试版 APK
+
+在当前 shell 中一次性设置工具链路径：
+
+```bash
+export GOW3_LLVM_PREFIX=/opt/homebrew/opt/llvm
+export PATH="$GOW3_LLVM_PREFIX/bin:/opt/homebrew/bin:$PATH"
+export GOW3_AR="$GOW3_LLVM_PREFIX/bin/llvm-ar"
+export GOW3_FEX_SOURCE="$PWD/third_party/FEX"
+```
+
+构建原生 CPU/GPU/probe 组件。由于当前 `CUSA01740` 测试的游戏专用补丁地址尚未通过校验，
+必须设置 `GOW3_SKIP_GAME_PATCH_PARTS=1`：
+
+```bash
+GOW3_SKIP_GAME_PATCH_PARTS=1 \
+bash tools/android/build/build_android_runtime.sh
+```
+
+该命令同时会构建 release 版 Turnip 与 LSFG，产出：
+
+```text
+out/arm64/gpu/libgow3gpu.so
+out/arm64/fex/libgow3cpu.so
+out/arm64/gow3-probe
+out/arm64/bundle/
+```
+
+在原生组件已存在的前提下，使用 debug 汇编器构建调试版 APK。它会复用本地 Turnip/LSFG 产物，
+不会重新构建它们：
+
+```bash
+GOW3_REBUILD_DEBUG_RUNTIME=1 \
+GOW3_DEBIAN_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian \
+GOW3_KEYSTORE_PASSWORD=android \
+GOW3_KEY_ALIAS=gow3 \
+GOW3_KEY_PASSWORD=android \
+bash tools/android/debug/build_debug_apk.sh
+```
+
+APK 输出在 `out/debug/` 下。若 `out/debug/runtime.tar.gz` 已存在且原生组件没有变化，可去掉
+`GOW3_REBUILD_DEBUG_RUNTIME=1` 以直接复用。
+
+#### 5. 安装、清理旧缓存与查看日志
+
+```bash
+adb install -r out/debug/God\ of\ War\ III-debug-*.apk
+adb shell run-as com.gow3.android sh -c '
+  rm -rf files/gow3port/user/cache
+  rm -rf files/gow3port/user/shader
+'
+adb exec-out run-as com.gow3.android \
+  sh -c 'tail -f files/gow3port/logs/android-game.log'
+```
+
+若设备已连接，也可直接按序列号读取日志（请把 `SERIAL` 换成 `adb devices` 显示的值）：
+
+```bash
+SERIAL=HA2EFNGR
+APP=com.gow3.android
+
+adb -s "$SERIAL" shell run-as "$APP" \
+  cat /data/user/0/$APP/files/gow3port/logs/android-game.log
+```
+
+完整 `CUSA01740` 游戏保留在设备上，例如 `Download/games/ps4/GOW3 ROM/CUSA01740`。当前
+Android 端的游戏选择器只接受一个游戏目录；如果设备上基础版游戏与 `CUSA01740-patch` 是分开
+存放的，必须在运行时向其呈现一个合并后的游戏视图，才能正常完整启动。
+
+#### 各构建脚本的作用
+
+```text
+build_arm64.sh                 仅构建 CPU + GPU + 原生 probe
+build_android_runtime.sh       原生组件 + release Turnip/LSFG + release 运行时
+build_debug_apk.sh             debug 运行时归档 + debug APK；复用本地 Turnip/LSFG
+```
+
+常规重新构建时不要分别执行三个原生命令。完整运行时用 `build_android_runtime.sh`；原生组件
+已经是最新的情况下用 `build_debug_apk.sh`。
+
+## 从源码构建（Windows）
+
+开发在 `gow3` 分支上进行；`main` 分支接收经过测试的合并。
+
+1. 安装 MSYS2（`winget install MSYS2.MSYS2`），并在 **MSYS2 CLANG64** shell 中安装
+   [packaging/windows/README.md](packaging/windows/README.md) 列出的软件包。
+2. 递归克隆仓库并构建：
 
    ```bash
    git clone --recursive https://github.com/FelipePrado0/gow3_pc
    cd gow3_pc
-   git checkout gow3   # the newest work; skip it to build main
+   git checkout gow3   # 最新进展在此分支；跳过则构建 main
    bash build.sh
    ```
 
-3. Start the launcher (in PowerShell, in the project folder):
+3. 在项目目录中用 PowerShell 启动启动器：
 
    ```powershell
    python launcher/gow3_launcher_win.py
    ```
 
-4. On **Game**, choose the game folder. Adjust **Display**, **Performance** and **Patches** if
-   you like, then press **PLAY**.
+4. 在 **Game** 页面选择游戏目录。按需调整 **Display**、**Performance** 与 **Patches**，
+   然后点击 **PLAY**。
 
-To play with the saved settings without opening the launcher's window (for a shortcut or Steam):
+若希望直接按已保存的设置启动、不弹出启动器窗口（用于快捷方式或 Steam）：
 
 ```powershell
 python launcher/gow3_launcher_win.py --play
 ```
 
-Or without the launcher at all:
+或者完全不使用启动器：
 
 ```powershell
 $env:GOW3_GAME_DIR = 'D:\path\CUSA01623'
 python run.py
 ```
 
-Settings are kept in `gow3.ini` (the game and the in-game menu) and in
-`%APPDATA%\gow3-launcher\settings.json` (the launcher). Saves, the shader cache and
-`last_run.log` go to the project's `user` folder.
+设置保存在 `gow3.ini`（游戏与游戏内菜单使用）与 `%APPDATA%\gow3-launcher\settings.json`
+（启动器使用）中。存档、着色器缓存与 `last_run.log` 位于项目的 `user` 目录。
 
-On **Performance → GPU data → Stream buffer memory**, choose **System RAM (cached, default)**,
-**System RAM (uncached)** or **GPU memory (previous behavior)**. System RAM can improve frame
-rates on NVIDIA laptops. The choice is saved and applies on the next game launch, including
-when using `Play God of War III.exe` or `--play`. Choose GPU memory to restore the previous
-allocation behavior. For direct launches without the launcher, `GOW3_STREAM_MEMORY` accepts
-`cached`, `host` or `device`; the launcher's saved choice takes precedence when using it.
+### 键盘操作
 
-### Keyboard controls
+以下为默认按键，可在启动器的 **Controls** 页面修改。
 
-Defaults; change them on the launcher's **Controls** page.
+| 按键          | 手柄按键                    |
+| ------------- | --------------------------- |
+| WASD          | 左摇杆                      |
+| 方向键        | 右摇杆（视角）              |
+| Space         | 叉（Cross）                 |
+| Left Shift    | 圈（Circle）                |
+| E             | 方（Square）                |
+| Q             | 三角（Triangle）            |
+| 1 / 3         | L1 / R1                     |
+| R / F         | L2 / R2                     |
+| Z / C         | L3 / R3                     |
+| I、K、J、L     | 方向键（d-pad）             |
+| Enter         | Options                     |
+| Tab           | 触摸板                      |
+| Insert        | 移植版菜单（手柄上为 R3+L2） |
 
-| Key | Button |
-|---|---|
-| WASD | left stick |
-| Arrows | right stick (camera) |
-| Space | Cross |
-| Left Shift | Circle |
-| E | Square |
-| Q | Triangle |
-| 1 and 3 | L1 and R1 |
-| R and F | L2 and R2 |
-| Z and C | L3 and R3 |
-| I, K, J, L | d-pad |
-| Enter | Options |
-| Tab | left touchpad click (photo mode) |
-| Backspace | right touchpad click (pause menu) |
-| Insert | the port's menu (R3+L2 on the controller) |
+菜单中：L1/R1 或 Q/E 切换标签页。存档列表中：方向键或十字键选择，Enter 或叉键确认，
+Esc 或圈键取消。
 
-On a controller without a touchpad (Xbox and others), View opens the pause menu (the right
-touchpad click) and L1 + View opens photo mode (the left click). On a DualSense the touchpad
-works as on the PS4, and Share/Create works like View.
-
-In the menu: L1/R1 or Q/E switch tabs. In the save list: arrows or the d-pad choose, Enter or
-Cross confirm, Esc or Circle cancel.
-
-## Tests
+## 测试
 
 ```bash
 python -m unittest discover -s tests
@@ -224,60 +347,55 @@ out/gpu/warmup-inbox-test.exe
 out/gpu/graphics-settings-test.exe
 ```
 
-The C++ tests are targets in [gpu/CMakeLists.txt](gpu/CMakeLists.txt); the ones that check the
-game's code take the prepared executable (`out/eboot.elf`) as their argument.
+C++ 测试是 [gpu/CMakeLists.txt](gpu/CMakeLists.txt) 中的构建目标；其中校验游戏代码的测试需要
+把准备好的可执行文件（`out/eboot.elf`）作为参数传入。
 
-To check that every system function the game uses is implemented, without starting the game:
+若要在不启动游戏的前提下，检查游戏用到的每个系统函数是否都已实现：
 
 ```bash
 out/gow3-probe.exe out/boot-linked.bin --app0 <game folder> --check-imports
 ```
 
-## How it works
+## 工作原理
 
-| Part | Where | What it does |
-|---|---|---|
-| Preparation | `scripts/` | Reads `eboot.bin`, applies its relocations and links the game's own `libc` and `libSceFios2` into one image |
-| Loader | `src/probe.c` | Loads the image, installs the validated hooks (cheats, multipliers, health bar) and starts the game's original code |
-| Runtime | `src/runtime_*.c` | Reimplements the PS4 system functions: memory, threads, files, audio, video, controller, saves and services |
-| GPU | `gpu/shadps4/` | The shadPS4 video core, translating the PS4 GPU commands and shaders to Vulkan, with cuesta4's God of War III fixes (`eltutz` branch) and this port's speed work (background shader cache, deferred readbacks) |
-| In-game menu | `gpu/shim/gow3_overlay.cpp` | The Dear ImGui menu and performance overlay; settings in `gpu/shim/gow3_settings.cpp` |
-| Patches | `patches/God_of_War_III_Remastered.xml`, `scripts/patches.py` | Applied in memory at start, without changing the game files |
-| Launcher | `launcher/gow3_launcher_win.py` | Settings, patches, mods, controls and the play button |
+| 模块     | 位置                                                             | 作用                                                                                              |
+| -------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 准备     | `scripts/`                                                        | 读取 `eboot.bin`，应用重定位，并把游戏自带的 `libc` 与 `libSceFios2` 链接为单一镜像              |
+| 加载器   | `src/probe.c`                                                     | 加载镜像、安装经过校验的 hook（修改器、倍率、血条），并启动游戏原始代码                           |
+| 运行时   | `src/runtime_*.c`                                                 | 重新实现 PS4 系统函数：内存、线程、文件、音频、视频、手柄、存档与服务                             |
+| GPU      | `gpu/shadps4/`                                                    | shadPS4 图形核心，将 PS4 GPU 指令翻译为 Vulkan，并包含本移植的性能优化（后台着色器缓存、延迟回读） |
+| 游戏内菜单 | `gpu/shim/gow3_overlay.cpp`                                     | Dear ImGui 菜单与性能叠加层；设置位于 `gpu/shim/gow3_settings.cpp`                                 |
+| 补丁     | `patches/God_of_War_III_Remastered.xml`、`scripts/patches.py`     | 启动时在内存中应用，不修改游戏文件                                                                 |
+| 启动器   | `launcher/gow3_launcher_win.py`                                   | 设置、补丁、模组、按键与开始游戏按钮                                                               |
 
-More documentation: [mods](docs/MODS.md), [frame map and upscaler](docs/upscaler.md),
-[parallel GPU work](docs/parallel_gpu.md) and the [roadmap](docs/gow3/ROADMAP.md).
+更多文档：[模组](docs/MODS.md)、[帧图与放大器](docs/upscaler.md)、[GPU 并行工作](docs/parallel_gpu.md)
+与[路线图](docs/gow3/ROADMAP.md)。
 
-## Credits
+## 致谢
 
-This project is a fork of Supermedo's Windows port, which builds on deadinside28's original:
+本项目 fork 自 Supermedo 的 Windows 移植版，后者又源自 deadinside28 的原创项目：
 
-- **deadinside28**: [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc), the original
-  native port.
-- **Supermedo** (Mohammed Albarghouthi): [bloodborne_pc for Windows](https://github.com/Supermedo/bloodborne_pc),
-  the fork this project comes from.
-- **cuesta4**: [shadPS4 fork focused on God of War III Remastered](https://github.com/cuesta4/shadPS4/tree/eltutz)
-  (branch `eltutz`). The game's rendering in this port depends on its fixes: the GNM blend
-  rewrite, depth/stencil state and image aliasing. cuesta4 is also a co-author of the
-  resolution, texture fix, 120 FPS and skip videos patches (below). If you play on shadPS4,
-  this is the build to use for God of War III.
-- **shadPS4 team**: the [shadPS4](https://github.com/shadps4-emu/shadPS4) video core, which does
-  all the GPU and shader translation to Vulkan in this port.
+- **deadinside28**：[bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)，最初的原生移植。
+- **Supermedo**（Mohammed Albarghouthi）：[bloodborne_pc for Windows](https://github.com/Supermedo/bloodborne_pc)，
+  本项目所基于的分支。
+- **cuesta4**：[专注于 God of War III Remastered 的 shadPS4 分支](https://github.com/cuesta4/shadPS4)
+  （分支 `eltutz`）。本移植使用了其中的 GNM 混合重写、深度/模板状态与图像别名修复。
+- **shadPS4 团队**：[shadPS4](https://github.com/shadps4-emu/shadPS4) 渲染器。
 
-Patches: kvicken and cuesta4 (resolution, texture fix, 120 FPS and skip videos, building on the
-PS3 patches by illusion0001), published for shadPS4 in
-[shadps4-emu/ps4_cheats#145](https://github.com/shadps4-emu/ps4_cheats/pull/145) and adapted to
-this executable. The 240 FPS patch was adapted by Felipe Prado from the 120 FPS patch.
-Cheats: adapted from Celogamez's [GoldHEN cheats](https://github.com/GoldHEN/GoldHEN_Cheat_Repository).
+补丁：kvicken 与 cuesta4（分辨率、贴图修复、120 FPS 与跳过视频，基于 illusion0001 的 PS3
+补丁），发布于 shadPS4 的
+[shadps4-emu/ps4_cheats#145](https://github.com/shadps4-emu/ps4_cheats/pull/145)，并针对本可执行
+文件做了适配。240 FPS 补丁由 Felipe Prado 从 120 FPS 补丁改编而来。修改器改编自 Celogamez 的
+[GoldHEN cheats](https://github.com/GoldHEN/GoldHEN_Cheat_Repository)。
 
-Also used: [LibAtrac9](https://github.com/Thealexbarney/LibAtrac9), [FFmpeg](https://ffmpeg.org),
-[SDL3](https://github.com/libsdl-org/SDL), [Dear ImGui](https://github.com/ocornut/imgui),
-[sirit](https://github.com/shadps4-emu/sirit), [magic_enum](https://github.com/Neargye/magic_enum),
-[miniz](https://github.com/richgel999/miniz), [xbyak](https://github.com/herumi/xbyak),
-[Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator),
-[FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) and the AMD FidelityFX SDK,
-[MSYS2](https://www.msys2.org), [LLVM](https://llvm.org) and [Pillow](https://python-pillow.org).
+此外还使用了：[LibAtrac9](https://github.com/Thealexbarney/LibAtrac9)、[FFmpeg](https://ffmpeg.org)、
+[SDL3](https://github.com/libsdl-org/SDL)、[Dear ImGui](https://github.com/ocornut/imgui)、
+[sirit](https://github.com/shadps4-emu/sirit)、[magic_enum](https://github.com/Neargye/magic_enum)、
+[miniz](https://github.com/richgel999/miniz)、[xbyak](https://github.com/herumi/xbyak)、
+[Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)、
+[FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) 与 AMD FidelityFX SDK、
+[MSYS2](https://www.msys2.org)、[LLVM](https://llvm.org) 以及 [Pillow](https://python-pillow.org)。
 
-## License
+## 许可证
 
-GNU GPL v2 or later ([LICENSE](LICENSE)). Third-party components keep their own licenses.
+GNU GPL v2 或更高版本（见 [LICENSE](LICENSE)）。第三方组件保留各自的许可证。

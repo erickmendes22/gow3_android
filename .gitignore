@@ -25,3 +25,8 @@ perf.data
 mods.json
 patches.json
 !launcher/gow3.png
+.local-deps/
+.gradle
+local.properties
+.idea
+game

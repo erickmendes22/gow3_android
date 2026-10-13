@@ -3,6 +3,17 @@
 Linux support on top of the upstream Windows-focused port. See `docs/LINUX.md` for the details
 and the commits for the exact changes.
 
+## Android
+
+### Fixed
+- **游戏画面比屏幕更大、菜单文字被切掉**。真机上画面宽高都超出屏幕，右侧和底部的 UI 完全看
+  不到。原因不在游戏内部分辨率，而在于送显链路上的尺寸不一致：guest 请求 1920×1080 的窗口，
+  Xvfb 屏幕是 1280×720，而 display bridge 只做 1:1 裁剪拷贝、既不缩放也不补黑边，于是 1920×1080
+  的帧被裁成左上角 1280×720 后再被拉伸铺满。窗口尺寸现在改为**不超过当前显示尺寸**
+  （`Gow3Graphics::ResolveWindowSize`）：放得下就保持原样，放不下就退到显示尺寸；显示尺寸查不
+  到或非法时回退到原来的 1920×1080 并记录日志。桌面/Linux 在不小于 1920×1080 的显示上行为
+  不变。`Xvfb` 启动参数、runtime 契约、bridge 二进制与触控映射均未改动。
+
 ## Linux
 
 ### Added
@@ -13,6 +24,8 @@ and the commits for the exact changes.
 - `packaging/linux.sh` — a self-contained Linux/Steam Deck package (bundled libraries, `RPATH`,
   no system install) with `start-gow3.sh` (general) and `start-gow3-deck.sh` (writes the
   `packaging/gow3-deck.ini` preset: 720p + engine 60 + FSR 1).
+- `Resolution Patch - 800p` — 1280×800. Note the game's projection is 16:9, so this **stretches
+  vertically** to fill the Steam Deck's 16:10 panel; 720p letterboxes with the correct aspect.
 - `docs/LINUX.md`; CI (build + tests + the Steam Deck package).
 
 ### Performance

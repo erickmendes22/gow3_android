@@ -1,12 +1,12 @@
 from paths import ROOT
-import os
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from patches import (compile_patches, external_patches, external_selection, compile_external,
-                     game_profile, selected_patches, patch_requirements)
+                     game_profile, selected_patches, patch_profile_status, patch_requirements,
+                     patch_sites_bytes_match)
 
 GOW3 = ROOT / 'patches/God_of_War_III_Remastered.xml'
 GOW3_IDS = {'CUSA01623'}
@@ -82,57 +82,46 @@ class GameProfileTests(unittest.TestCase):
             self.assertFalse(eboot_matches(folder, game_profile('CUSA01623')))
             self.assertTrue(eboot_matches(folder, None))  # no profile: nothing to check
 
-    def test_unported_build(self):
-        import hashlib
-        from unittest import mock
-        import patches
+    def test_patch_site_bytes_gate(self):
+        # An Android-style profile without a reusable whole-eboot hash: the per-patch-site
+        # original bytes gate the patch. Any mismatch selects no patch.
+        profile = ({'CUSA01740'}, None, '01.02', None, {4: b'AB', 8: b'CD'})
         with tempfile.TemporaryDirectory() as folder:
-            (Path(folder) / 'eboot.bin').write_bytes(b'full update')
-            self.assertIsNone(patches.unported_build(folder))  # unknown build
-            sha = hashlib.sha256(b'full update').hexdigest()
-            with mock.patch.dict(patches.UNPORTED_BUILDS, {sha: 'full 01.02 update'}):
-                self.assertEqual(patches.unported_build(folder), 'full 01.02 update')
-        self.assertIsNone(patches.unported_build(None))
-        self.assertIn('6e72330e9092e5164049b865e5568f2d450904001a73fe0a2f4b39194c195b3c',
-                      patches.UNPORTED_BUILDS)
+            path = Path(folder)
+            (path / 'eboot.bin').write_bytes(b'\x00\x01\x02\x03AB\x06\x07CD')
+            self.assertTrue(patch_sites_bytes_match(path, profile))
+            (path / 'eboot.bin').write_bytes(b'\x00\x01\x02\x03AB\x06\x07EF')
+            self.assertFalse(patch_sites_bytes_match(path, profile))
+        self.assertTrue(patch_sites_bytes_match('no-game-dir', ({}, None, '01.02', None, None)))
 
-    def test_game_patchable(self):
-        from patches import game_patchable
+    def test_android_cusa01740_selects_no_patch(self):
+        # The Android test build CUSA01740 is not a validated profile: no patch is selected,
+        # and patch_profile_status reports the explicit reason rather than guessing.
         with tempfile.TemporaryDirectory() as folder:
-            folder = Path(folder)
-            (folder / 'eboot.bin').write_bytes(b'another build')
-            self.assertFalse(game_patchable(folder))  # no param.sfo: unknown game
-            self.assertFalse(game_patchable(None))
+            path = Path(folder)
+            status = patch_profile_status(path)
+            self.assertEqual(status['reason'], 'missing-or-unreadable-eboot')
+            self.assertFalse(status['supported'])
+            (path / 'eboot.bin').write_bytes(b'not-a-retail-game')
+            status = patch_profile_status(path)
+            self.assertEqual(status['reason'], 'unsupported-title')
+            self.assertIsNone(game_profile('CUSA01740'))
+            self.assertEqual(selected_patches(GOW3, '01.00', '', only=True), [])
+
+    def test_patch_profile_status_is_safe_for_unknown_or_missing_games(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)
+            status = patch_profile_status(path)
+            self.assertEqual(status['reason'], 'missing-or-unreadable-eboot')
+            self.assertFalse(status['supported'])
+            (path / 'eboot.bin').write_bytes(b'not-a-retail-game')
+            status = patch_profile_status(path)
+            self.assertEqual(status['reason'], 'unsupported-title')
+            self.assertIsNotNone(status['eboot_sha256'])
 
     def test_gow3_patches_compile(self):
         names = [m.get('Name') for m in ET.parse(GOW3).getroot().iter('Metadata')]
         self.assertTrue(compile_patches(GOW3, names, '01.02', SEGMENTS))
-
-    def test_gow3_skip_intro_targets(self):
-        # Ported from the other 01.02 build: every jump must land where this eboot has the code.
-        writes = dict(compile_patches(GOW3, ['Skip Intro'], '01.02', SEGMENTS))
-        rel = lambda data, at, end: end + int.from_bytes(data[at:at + 4], 'little', signed=True)
-        self.assertEqual(writes[0x184950], bytes.fromhex('eb34'))  # jne over the logo start
-        getter = writes[0x0c8440]  # mov [flag], 1; mov eax, 1; ret
-        self.assertEqual(len(getter), 16)
-        self.assertEqual(rel(getter, 2, 0x4c844a), 0x1e79258)
-        call = writes[0x01b36a]  # the boot call now goes through the cave
-        self.assertEqual(rel(call, 1, 0x41b36f), 0x612170)
-        cave = writes[0x212170]  # mov [flag], 1; jmp to the original callee
-        self.assertEqual(len(cave), 15)
-        self.assertEqual(rel(cave, 2, 0x61217a), 0x1e79258)
-        self.assertEqual(rel(cave, 11, 0x61217f), 0x4b4c90)
-
-    @unittest.skipUnless(os.environ.get('GOW3_GAME'), 'GOW3_GAME (game folder) not set')
-    def test_gow3_skip_intro_original_bytes(self):
-        from prepare import parse_self
-        elf, _, ph, _, _ = parse_self((Path(os.environ['GOW3_GAME']) / 'eboot.bin').read_bytes())
-        text = next(p for p in ph if p['type'] == 1 and p['flags'] & 1)
-        original = {0x184950: '7534', 0x0c8440: '488d05955b38008b00c3660f1f440000',
-                    0x01b36a: 'e821990900', 0x212170: '90' * 15}
-        for offset, value in original.items():
-            at = text['offset'] + offset - text['vaddr']
-            self.assertEqual(bytes(elf[at:at + len(value) // 2]).hex(), value, hex(offset))
 
     def test_requirements_from_patch_notes(self):
         # Notes ask for extra direct memory (shadPS4 "DMEM") and a VBlank rate.

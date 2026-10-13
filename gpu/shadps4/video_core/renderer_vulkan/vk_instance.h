@@ -46,6 +46,9 @@ public:
     bool IsStorageImageWriteWithoutFormatEnabled() const {
         return features.shaderStorageImageWriteWithoutFormat;
     }
+    bool IsMultisampleStorageImageSupported() const {
+        return features.shaderStorageImageMultisample;
+    }
     bool IsShaderFloat16Enabled() const {
         return vk12_features.shaderFloat16;
     }

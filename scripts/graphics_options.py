@@ -10,7 +10,7 @@ never did, the next start goes back to the last confirmed values.
 import json
 from pathlib import Path
 
-RESOLUTIONS = ('native', '480p', '720p', '1440p', '1800p', '4K')
+RESOLUTIONS = ('native', '480p', '720p', '800p', '1440p', '1800p', '4K')
 ENGINE_FPS = (60, 120, 240)
 DEFAULTS = {'render_resolution': 'native', 'engine_fps': '120', 'deferred_readback': '1',
             'stale_readback': '1', 'async_shaders': '1'}
@@ -99,11 +99,6 @@ def patch_names(names, options, texture_fix_available=True):
     if options['engine_fps'] != '60':
         names.append(f'{FPS_PREFIX} - {options["engine_fps"]} FPS')
     return names
-
-
-def applied_engine_fps(names):
-    """The engine rate the applied patch list gives: 60 without a frame rate patch."""
-    return max((int(n.split(' - ')[1].split()[0]) for n in names if n.startswith(f'{FPS_PREFIX} - ')), default=60)
 
 
 def environment(options):

@@ -18,11 +18,30 @@ WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}
         UNREACHABLE_MSG("Failed to initialize SDL video: {}", SDL_GetError());
     }
     SDL_PropertiesID props = SDL_CreateProperties();
+    // gow3: the Android display bridge copies each frame into the surface 1:1 and crops the
+    // overflow, so the window must not be larger than the display it is presented on.
+    int display_w = 0, display_h = 0;
+    const SDL_DisplayMode* display = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+    if (display) {
+        display_w = display->w;
+        display_h = display->h;
+    }
+    const Gow3Graphics::Size wanted{width_, height_};
+    const Gow3Graphics::Size window_size =
+        Gow3Graphics::ResolveWindowSize(wanted, Gow3Graphics::Size{display_w, display_h});
+    if (display_w <= 0 || display_h <= 0) {
+        LOG_WARNING(Frontend, "Display size {}x{} unusable ({}); window {}x{} -> {}x{}", display_w,
+                    display_h, display ? "reported by SDL" : SDL_GetError(), wanted.width,
+                    wanted.height, window_size.width, window_size.height);
+    } else if (window_size.width != wanted.width || window_size.height != wanted.height) {
+        LOG_INFO(Frontend, "Window {}x{} does not fit the display {}x{}; creating {}x{}", wanted.width,
+                 wanted.height, display_w, display_h, window_size.width, window_size.height);
+    }
     SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title);
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED);
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, width_);
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height_);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, window_size.width);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, window_size.height);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_VULKAN_BOOLEAN, true);
     base_title = title;

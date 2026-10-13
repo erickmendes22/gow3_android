@@ -27,13 +27,11 @@ def derive(game, config, state_path, env):
                    GOW3_STALE_READBACK, GOW3_ASYNC_SHADERS, GOW3_UPSCALER, GOW3_READBACK_LINEAR)
       patch_names: the selected patch names, resolution and frame rate included
       dmem, vblank: MiB / Hz the selected patches need, or None
-      engine_fps:  the engine rate the applied patch list gives (60 without a frame rate patch)
-      requested_engine_fps: the rate gow3.ini asked for, for the "patch unavailable" hint
       reverted:    a restart never reached the game; the last good options were restored
     """
     sys.path.insert(0, str(PORT / 'scripts'))
     import graphics_options
-    from patches import game_profile, game_title_id, patch_requirements, selected_patches
+    from patches import game_profile, game_title_id, patch_profile_status, patch_requirements, selected_patches
 
     graphics, reverted = graphics_options.prepare(config, state_path)
     updates = dict(graphics_options.environment(graphics))
@@ -42,18 +40,38 @@ def derive(game, config, state_path, env):
     for key, default in (('GOW3_UPSCALER', 'none'), ('GOW3_READBACK_LINEAR', '1')):
         if key not in env:
             updates[key] = default
+        updates[f'{key}_SOURCE'] = 'override' if key in env else 'android-safe-default'
 
     names, dmem, vblank = [], None, None
-    profile = game_profile(game_title_id(game))
-    if profile:
-        names = selected_patches(profile[1], profile[2], env.get('GOW3_PATCHES', ''),
-                                 env.get('GOW3_PATCHES_ONLY') == '1')
-        # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).
-        names = graphics_options.patch_names(names, graphics)
-        dmem, vblank = patch_requirements(profile[1], names, profile[2])
+    identity = patch_profile_status(game)
+    profile = game_profile(identity['title_id'])
+    reason = identity['reason'] or 'unknown'
+    if identity['reason'] != 'validated':
+        # An unknown Android build must never inherit desktop patch names through an env override.
+        if profile is None or identity['eboot_matches'] is False:
+            updates['GOW3_PATCH_STATUS'] = identity['reason']
+    if profile and identity['reason'] == 'validated':
+        try:
+            names = selected_patches(profile[1], profile[2], env.get('GOW3_PATCHES', ''),
+                                     env.get('GOW3_PATCHES_ONLY') == '1')
+        except ValueError:
+            # Two resolution patches (or another exclusivity violation) cannot both apply.
+            names, reason = [], 'patch-conflict'
+        if names:
+            # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).
+            names = graphics_options.patch_names(names, graphics)
+            dmem, vblank = patch_requirements(profile[1], names, profile[2])
+            # The retail pool plus the patches' extra DMEM must fit the device (design: gate
+            # values by device/runtime capability and fail with a clear log, not an OOM kill).
+            device_mem = env.get('GOW3_DEVICE_MEM_MB')
+            if dmem and device_mem and str(device_mem).isdigit() and dmem > int(device_mem):
+                names, dmem, vblank, reason = [], None, None, 'insufficient-memory-budget'
+    updates.update({'GOW3_GAME_TITLE': identity['title_id'] or 'unknown',
+                    'GOW3_GAME_VERSION': identity['app_version'] or 'unknown',
+                    'GOW3_EBOOT_SHA256': identity['eboot_sha256'] or 'unavailable',
+                    'GOW3_PATCH_STATUS': reason})
     return {'updates': updates, 'patch_names': names, 'dmem': dmem, 'vblank': vblank,
-            'engine_fps': graphics_options.applied_engine_fps(names),
-            'requested_engine_fps': graphics['engine_fps'], 'reverted': reverted}
+            'reverted': reverted, 'identity': identity}
 
 
 def _quote(value):
@@ -82,7 +100,6 @@ def main(argv):
         exports['GOW3_DMEM_MB'] = str(plan['dmem'])
     if plan['vblank']:
         exports['GOW3_VBLANK_HZ'] = str(plan['vblank'])
-    exports['GOW3_ENGINE_FPS'] = str(plan['engine_fps'])
     for key, value in exports.items():
         print(f'export {key}={_quote(str(value))}')
     return 0

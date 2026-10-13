@@ -16,8 +16,8 @@
 #endif
 #include "common/assert.h"
 #include "gow3_toggles.h"
-#include "gow3_settings.h"
 #include "gow3_graphics.h"
+#include "gow3_settings.h"
 #include "video_core/renderer_vulkan/vk_frame_capture.h"
 #include "common/debug.h"
 #include "common/thread.h"
@@ -661,9 +661,9 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
     // and the uncapped presets keep their fixed limit.
     const bool fixed_limit = std::getenv("GOW3_FPS_LIMIT") || EmulatorSettings.GetVblankFrequency() == 480;
     const auto current_limit = [&] {
-        const auto& s = Gow3Settings::Get();
         return fixed_limit ? EmulatorSettings.GetFrameLimit()
-                           : u32(Gow3Graphics::PresentLimit(s.fps_limit, s.applied_engine_fps));
+                           : u32(Gow3Graphics::PresentLimit(Gow3Settings::Get().fps_limit.load(),
+                                                            Gow3Settings::Get().applied_engine_fps.load()));
     };
     u32 frame_limit = current_limit();
     auto frame_period = frame_limit ? std::chrono::nanoseconds(1000000000 / frame_limit)
