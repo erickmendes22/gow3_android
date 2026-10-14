@@ -834,6 +834,12 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
     // vk_scheduler.h exposes only the no-arg WaitSubmitted (it waits for all currently submitted
     // work, which is what we want here; the Bloodborne version took an explicit tick).
     static const bool present_layer = std::getenv("GOW3_LSFG") != nullptr;
+    static const bool present_layer_logged = (LOG_INFO(Render_Vulkan,
+        "gow3: LSFG hook in present path: {} (GOW3_LSFG={}); lsfg-vk's own init messages "
+        "appear above this line when the layer is loaded",
+        present_layer ? "ENABLED" : "off",
+        present_layer ? "1" : "(unset)"), true);
+    (void)present_layer_logged;
     if (present_layer) {
         scheduler.WaitSubmitted();
     }

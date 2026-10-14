@@ -178,13 +178,30 @@ fi
 
 # Vulkan/Turnip must initialize before the game claims texture integrity: a driver failure here
 # must reach the launcher/log and must not be reported as validated. The self-check is the same
-# probe --vulkan-only the launcher's "vulkan" mode runs.
+# probe --vulkan-only the launcher's "vulkan" mode runs. We capture stderr so that lsfg-vk's
+# own init messages ("lsfg-vk: ...") are visible in the game log when the check fails.
+#
+# The smoke test (src/vulkan_smoke.c) calls vkCreateDevice with pNext=NULL, which the lsfg-vk
+# device layer rejects ("No layer creation info found in pNext chain" -> VK_ERROR_INITIALIZATION_FAILED).
+# That throw is not a driver failure; the real probe --vulkan-only check is meaningful only
+# against the bare driver, not the LSFG layer. Set DISABLE_LSFG=1 in the child only (the layer's
+# disable_environment) so the smoke can validate Turnip without lsfg-vk on its pNext.
 vulkan_status=unknown
-if "$loader" "$probe" --vulkan-only >/dev/null 2>&1; then
+vulkan_log="$out/.vulkan-check.log"
+if DISABLE_LSFG=1 "$loader" "$probe" --vulkan-only >"$vulkan_log" 2>&1; then
     vulkan_status=ok
+    rm -f "$vulkan_log"
 else
     vulkan_status=failed
     echo "Graphics: Vulkan/Turnip initialization FAILED (turnip=${turnip}, icd=${icd##*/}); texture integrity is NOT validated" >&2
+    # Surface the last 40 lines of the Vulkan check (typically lsfg-vk's "lsfg-vk: ..." messages
+    # or the driver stack) so the player can see what the layer did. We never write the game's
+    # own texture assets here; only Vulkan / lsfg-vk / driver output.
+    if [ -f "$vulkan_log" ]; then
+        echo "Vulkan check output (last 40 lines):" >&2
+        tail -n 40 "$vulkan_log" >&2 || true
+        mv -f "$vulkan_log" "$out/vulkan-check-last.log"
+    fi
 fi
 export GOW3_VULKAN_STATUS="$vulkan_status"
 # A driver failure is fatal: the game cannot present, and the log must say so distinctly. Write a
