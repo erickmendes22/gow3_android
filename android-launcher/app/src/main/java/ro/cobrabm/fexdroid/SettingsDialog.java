@@ -29,8 +29,9 @@ import java.util.Map;
  *  size, upscaler, the game's effect patches). Other lines and comments of the file are kept. */
 final class SettingsDialog {
     /** Scene sizes of the presets at the Thor's 1280x720 output (run-gow3.sh). */
-    private static final String[] PRESETS={"Native (1280×720)","Quality (854×480)","Balanced (752×424)",
-        "Performance (640×360)","Ultra performance (426×240)"};
+    private static final String[] PRESETS={"Native (1280×720)","Quality (854×480)",
+        "Performance (640×360)","Ultra Performance (426×240)"};
+    private static final String[] PRESET_VALUES={"0","1","3","4"};
     private static final String[][] EFFECTS={
         {"effect_chromatic_aberration","Chromatic aberration","1"},
         {"effect_dof","Depth of field","1"},
@@ -178,12 +179,10 @@ final class SettingsDialog {
         // FSR 4 / 4.1.1 在 Adreno 740 上约 470ms 一帧且黑屏（run-gow3.sh 实测）；taa 需要 native
         // guest 目标的实时路径、dlss 需要 gow3_dlss.dll/nvngx_dlss.dll，都是桌面 N 卡路径，在本
         // 移植上不成立。要加新升采样器前，先确认它在这套 Vulkan/Turnip 上真能出画面。
-        heading(box,"Upscaling (to 1280×720)");
+        heading(box,"FSR 3.1 (output fixed at 1280×720)");
         final RadioGroup upscalers=choices(box,UPSCALER_NAMES,indexOf(UPSCALER_VALUES,get("upscaler","fsr3"),1));
-        heading(box,"Render resolution");
-        int preset=0;
-        try { preset=Math.max(0,Math.min(4,Integer.parseInt(get("preset","3")))); } catch (NumberFormatException ignored) { preset=3; }
-        final RadioGroup presets=choices(box,PRESETS,preset);
+        heading(box,"FSR input quality (output fixed at 1280×720)");
+        final RadioGroup presets=choices(box,PRESETS,indexOf(PRESET_VALUES,get("preset","3"),2));
         // FSR 3.1 frame generation (frame_generation=1) is not wired: shadps4 has no
         // GOW3_FRAME_GEN consumer and no FSR 3.1 frame-gen patch on this tree, so the
         // option would have been a no-op. LSFG is the only frame-generation path here;
@@ -214,6 +213,11 @@ final class SettingsDialog {
         box.addView(sharpness);
         sharpen.setOnCheckedChangeListener((b,on) -> sharpness.setEnabled(on)); sharpness.setEnabled(sharpen.isChecked());
         final Switch fps=toggle(box,"Show FPS","1".equals(get("show_fps","0")));
+        // effect_dynamic_shadows is consumed by launch_env.py to select the
+        // SHA-gated Disable Dynamic Shadows eboot patch on the next launch.
+        heading(box,"Game effects");
+        final Switch dynamicShadows=toggle(box,"Dynamic shadows",
+            "1".equals(get("effect_dynamic_shadows","1")));
 
         // FPS 上限入口：取值域必须与运行时 FPS_LIMITS（gow3_graphics.h 的 FpsLimits：30/60/120/
         // 240/0）完全一致——ParseFpsLimit 把表外的值（例如旧版提供的 40/45）一律当成 0（不限制），
@@ -265,7 +269,10 @@ final class SettingsDialog {
                 Map<String,String> changed=new LinkedHashMap<>();
                 changed.put("upscaler",UPSCALER_VALUES[Math.max(0,checkedIndex(upscalers))]);
                 changed.put("fps_limit",FPS_VALUES[Math.max(0,checkedIndex(fpsLimit))]);
-                changed.put("preset",String.valueOf(Math.max(0,checkedIndex(presets))));
+                changed.put("preset",PRESET_VALUES[Math.max(0,checkedIndex(presets))]);
+                changed.put("output_res","1280x720");
+                changed.put("render_resolution","720p");
+                changed.put("effect_dynamic_shadows",dynamicShadows.isChecked() ? "1" : "0");
                 changed.put("sharpen",sharpen.isChecked() ? "1" : "0");
                 changed.put("sharpness",String.format(Locale.ROOT,"%.2f",sharpness.getProgress()/100f));
                 changed.put("show_fps",fps.isChecked() ? "1" : "0");

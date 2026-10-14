@@ -296,6 +296,11 @@ bool TemporalUpscaler::OnFrameStart() {
     const bool active = Active();
     const bool jitter_on = active && settings.jitter && !Gow3Toggle::Disabled(1u << 25);
     const int upscaler = settings.upscaler.load();
+    // Android's Vulkan/PS4 output stays at 720p. Only the FSR scene-input
+    // preset is selectable; ignore legacy 1080p/4K output_res from menus.
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) {
+        settings.output_res.store(0); // OutputWidths[0] = 1280
+    }
     const int output = settings.output_res.load();
     const bool output_changed = !scaled_session && applied_output != output;
     if (output_changed) {

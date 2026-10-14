@@ -154,9 +154,15 @@ end_stage "libgow3cpu.so"
 begin "libgow3gpu.so (shadPS4 video core)"
 if [[ ! -f $out/gpu/build.ninja ]]; then
     echo "    cmake: gpu/"
+    fmt_config="$sysroot/usr/lib/aarch64-linux-gnu/cmake/fmt"
+    if [[ ! -f "$fmt_config/fmt-config.cmake" ]]; then
+        echo "ARM64 fmt CMake config missing: $fmt_config (install libfmt-dev in sysroot)" >&2
+        exit 1
+    fi
     cmake -S gpu -B "$out/gpu" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$toolchain" \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo -DGOW3_PGO=off -DGOW3_LTO=OFF \
         -DGOW3_ARM64_HEADER_PREFIX="$headers" \
+        -Dfmt_DIR="$fmt_config" \
         -Dtsl-robin-map_DIR="$headers/share/cmake/tsl-robin-map" \
         -DVulkanMemoryAllocator_DIR="$headers/share/cmake/VulkanMemoryAllocator" \
         -DBoost_DIR="$boost_dir" \
@@ -165,6 +171,12 @@ fi
 if ! build_ninja "$out/gpu" gow3gpu "$out/gpu-build.log"; then
     echo "    GPU build failed (full log: $out/gpu-build.log)" >&2
     grep -v '^\[' "$out/gpu-build.log" | tail -40 >&2
+    exit 1
+fi
+# Fail during CI, not on the phone: headers generated for fmt::v12 must
+# never be combined with the Debian ARM64 runtime fmt::v10/v11 library.
+if llvm-readelf --dyn-syms --wide "$out/gpu/libgow3gpu.so" | grep -qE 'UND.*_ZN3fmt3v12'; then
+    echo 'FATAL: ARM64 libgow3gpu.so refers to fmt::v12; verify fmt_DIR/sysroot compiler includes' >&2
     exit 1
 fi
 end_stage "libgow3gpu.so"

@@ -53,7 +53,10 @@ def main():
             if name in seen:
                 continue
             seen.add(name)
-            if name in have and name not in OURS and name not in FFMPEG:
+            # A bundled fmt must match the cross-compiled libgow3gpu ABI.
+            # fexdroid may carry a different fmt SONAME/implementation from
+            # the one found by the ARM64 sysroot's CMake fmt-config.cmake.
+            if name in have and name not in OURS and name not in FFMPEG and not name.startswith('libfmt.so.'):
                 continue
             ship[name] = find(name)
             queue.append(ship[name])

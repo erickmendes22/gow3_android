@@ -1,0 +1,75 @@
+"""Prevent packaging regressions in GoW3 Android graphics settings."""
+import sys
+import tempfile
+import unittest
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+import launch_env
+import patches
+
+
+class AndroidFsrIntegrationTests(unittest.TestCase):
+    def test_fsr_has_fixed_output_and_input_presets_only(self):
+        ini = (ROOT / "tools/android/config/gow3-default.ini").read_text()
+        ui = (ROOT / "android-launcher/app/src/main/java/com/gow3/android/data/LaunchParams.kt").read_text()
+        java = (ROOT / "android-launcher/app/src/main/java/ro/cobrabm/fexdroid/SettingsDialog.java").read_text()
+        self.assertIn("output_res=1280x720", ini)
+        self.assertIn("render_resolution=720p", ini)
+        self.assertNotIn('key = "output_res"', ui)
+        self.assertNotIn('key = "render_resolution"', ui)
+        for number in ("0", "1", "3", "4"):
+            self.assertIn('LaunchOption("' + number + '",', ui)
+        self.assertIn('private static final String[] PRESET_VALUES={"0","1","3","4"}', java)
+        self.assertIn('settings.output_res.store(0)', (
+            ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp").read_text())
+
+    def test_verified_shadow_patch_exists(self):
+        metas = ET.parse(ROOT / "patches/God_of_War_III_Remastered.xml").getroot().iter("Metadata")
+        matching = [meta for meta in metas if meta.get("Name") == "Disable Dynamic Shadows"]
+        self.assertEqual(len(matching), 1)
+        lines = list(matching[0].iter("Line"))
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0].get("Address"), "0x005b739b")
+        self.assertEqual(lines[0].get("Value"), "eb32")
+
+    def test_android_launch_gates_shadows_and_enables_fsr(self):
+        verified = "6e72330e9092e5164049b865e5568f2d450904001a73fe0a2f4b39194c195b3c"
+        fixture = ROOT / "patches/God_of_War_III_Remastered.xml"
+        profile = ({"CUSA01715"}, fixture, "01.02", "God of War III")
+        def identity(sha):
+            return {"reason": "validated", "title_id": "CUSA01715",
+                    "app_version": "01.02", "eboot_sha256": sha,
+                    "eboot_matches": True}
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "gow3.ini"
+            state = Path(tmp) / "graphics_state.json"
+            config.write_text("upscaler=fsr3\npreset=3\noutput_res=1920x1080\n"
+                              "render_resolution=480p\neffect_dynamic_shadows=0\n")
+            env = {"GOW3_ANDROID_FSR_FIXED_OUTPUT": "1"}
+            with patch.object(patches, "patch_profile_status", return_value=identity(verified)), \
+                    patch.object(patches, "game_profile", return_value=profile):
+                result = launch_env.derive(Path(tmp), config, state, env)
+            self.assertEqual(result["updates"]["GOW3_UPSCALER"], "fsr3")
+            self.assertEqual(result["updates"]["GOW3_OUTPUT_RES"], "1280x720")
+            self.assertEqual(result["updates"]["GOW3_UPSCALER_SOURCE"], "gow3.ini")
+            self.assertIn("Disable Dynamic Shadows", result["patch_names"])
+            text = config.read_text()
+            self.assertIn("render_resolution=720p", text)
+            self.assertIn("output_res=1280x720", text)
+            with patch.object(patches, "patch_profile_status", return_value=identity("0"*64)), \
+                    patch.object(patches, "game_profile", return_value=profile):
+                not_verified = launch_env.derive(Path(tmp), config, state, env)
+            self.assertNotIn("Disable Dynamic Shadows", not_verified["patch_names"])
+            config.write_text(config.read_text().replace("upscaler=fsr3", "upscaler=off"))
+            with patch.object(patches, "patch_profile_status", return_value=identity(verified)), \
+                    patch.object(patches, "game_profile", return_value=profile):
+                off = launch_env.derive(Path(tmp), config, state, env)
+            self.assertEqual(off["updates"]["GOW3_UPSCALER"], "none")
+
+
+if __name__ == "__main__":
+    unittest.main()

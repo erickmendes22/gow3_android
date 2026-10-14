@@ -34,13 +34,29 @@ def derive(game, config, state_path, env):
     from patches import game_profile, game_title_id, patch_profile_status, patch_requirements, selected_patches
 
     graphics, reverted = graphics_options.prepare(config, state_path)
+    android_fixed_output = env.get('GOW3_ANDROID_FSR_FIXED_OUTPUT') == '1'
+    if android_fixed_output:
+        # Upgrade pre-existing gow3.ini installations silently: the output is
+        # never a selectable setting on Android, and the 720p game patch is
+        # independent of the FSR scene-input preset.
+        fixed = {'render_resolution': '720p', 'output_res': '1280x720'}
+        ini_before = graphics_options.read_ini(config)
+        if any(ini_before.get(key) != value for key, value in fixed.items()):
+            graphics_options.write_keys(config, fixed)
+        graphics['render_resolution'] = '720p'
+    ini = graphics_options.read_ini(config)
     updates = dict(graphics_options.environment(graphics))
-    # The temporal upscalers and motion vectors are not calibrated for this game yet; linear
-    # image readbacks fix its corrupted textures. Defaults only: an explicit value wins.
-    for key, default in (('GOW3_UPSCALER', 'none'), ('GOW3_READBACK_LINEAR', '1')):
-        if key not in env:
-            updates[key] = default
-        updates[f'{key}_SOURCE'] = 'override' if key in env else 'android-safe-default'
+    # Do not disable temporal FSR unconditionally on Android: it made the FSR
+    # menu a no-op. Explicit environment overrides still win.
+    if 'GOW3_UPSCALER' not in env:
+        requested = ini.get('upscaler', 'fsr3')
+        updates['GOW3_UPSCALER'] = ('none' if requested == 'off' else 'fsr3') if android_fixed_output else 'none'
+    updates['GOW3_UPSCALER_SOURCE'] = 'override' if 'GOW3_UPSCALER' in env else ('gow3.ini' if android_fixed_output else 'desktop-safe-default')
+    if 'GOW3_READBACK_LINEAR' not in env:
+        updates['GOW3_READBACK_LINEAR'] = '1'
+    updates['GOW3_READBACK_LINEAR_SOURCE'] = 'override' if 'GOW3_READBACK_LINEAR' in env else 'android-safe-default'
+    if android_fixed_output:
+        updates['GOW3_OUTPUT_RES'] = '1280x720'
 
     names, dmem, vblank = [], None, None
     identity = patch_profile_status(game)
@@ -60,6 +76,12 @@ def derive(game, config, state_path, env):
         if names:
             # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).
             names = graphics_options.patch_names(names, graphics)
+            # This exact-address patch belongs only to the supplied and
+            # verified eboot revision. Other builds retain their shadows.
+            shadow_reference = '6e72330e9092e5164049b865e5568f2d450904001a73fe0a2f4b39194c195b3c'
+            if (ini.get('effect_dynamic_shadows', '1') == '0' and
+                    identity['eboot_sha256'] == shadow_reference):
+                names.append('Disable Dynamic Shadows')
             dmem, vblank = patch_requirements(profile[1], names, profile[2])
             # The retail pool plus the patches' extra DMEM must fit the device (design: gate
             # values by device/runtime capability and fail with a clear log, not an OOM kill).
