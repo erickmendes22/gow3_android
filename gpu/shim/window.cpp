@@ -196,7 +196,22 @@ bool WindowSDL::PollEvents() {
             break;
         }
     }
+    UpdateCursor();
     return is_open;
+}
+
+// The X11 window fills the display, so only the window cursor is visible; SDL_HideCursor()
+// gives the window an empty cursor. Debounced: SDL APIs are called only on state changes.
+void WindowSDL::UpdateCursor() {
+    const bool hide = !Gow3Settings::Get().overlay_mouse.load();
+    if (hide != cursor_hidden) {
+        if (hide) {
+            SDL_HideCursor();
+        } else {
+            SDL_ShowCursor();
+        }
+        cursor_hidden = hide;
+    }
 }
 
 } // namespace Frontend

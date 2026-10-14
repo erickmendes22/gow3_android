@@ -10,6 +10,11 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../../.."
 die() { echo "build_turnip: $*" >&2; exit 1; }
+# Per-stage progress (same style as build_android_runtime.sh). ninja output stays in build.log
+# to avoid the 600+ line compile scroll; only the stage name and elapsed time surface.
+step=0; total=6; _t0=0
+begin()    { step=$((step + 1)); _t0=$(date +%s); printf '\n==> [%d/%d] %s\n' "$step" "$total" "$*"; }
+end_stage(){ local sec=$(( $(date +%s) - _t0 )); printf '    %s (%dm%02ds)\n' "$*" "$((sec / 60))" "$((sec % 60))"; }
 if [[ -n ${GOW3_LLVM_PREFIX:-} && -d $GOW3_LLVM_PREFIX/bin ]]; then
     export PATH="$GOW3_LLVM_PREFIX/bin:$PATH"
 fi
@@ -98,12 +103,16 @@ if [[ ! -d $src/.git ]]; then
     git init -q "$src"
     git -C "$src" remote add origin "$repo"
 fi
+begin "Mesa commit $MESA_COMMIT ($repo)"
 if git -C "$src" cat-file -e "$MESA_COMMIT^{commit}" 2>/dev/null; then
     echo "Using cached Mesa commit $MESA_COMMIT for $variant"
+    end_stage "cached: skipped fetch"
 else
     git -C "$src" fetch -q --depth 1 origin "$MESA_COMMIT" ||
         die "$variant: cannot fetch pinned Mesa commit $MESA_COMMIT from $repo"
+    end_stage "fetched: $MESA_COMMIT"
 fi
+begin "apply ${#patches[@]} patch"
 git -C "$src" checkout -q --force "$MESA_COMMIT"
 git -C "$src" clean -q -fdx
 for patch in "${patches[@]}"; do
@@ -112,14 +121,28 @@ for patch in "${patches[@]}"; do
         die "$variant: patch does not apply: $patch"
     git -C "$src" apply "$PWD/$patch"
 done
+end_stage "patches applied"
 
 # cpu 'aarch64': the manifest is then freedreno_icd.aarch64.json with an absolute library_path.
 cross=$build.cross
 mkdir -p "$(dirname "$cross")"
+# Optional ccache: when installed, it caches the Turnip cross-compile across runs and finally
+# consumes the ~/.cache/ccache path CI already restores (see .github/workflows/android.yml).
+# CCACHE_BASEDIR keeps cache keys stable when the absolute source path differs between CI
+# runners and local checkouts. With ccache absent the cross-file shape is unchanged, so the
+# build is byte-identical to today.
+if command -v ccache >/dev/null 2>&1; then
+    export CCACHE_BASEDIR=${CCACHE_BASEDIR:-$PWD}
+    c_entry="['ccache', 'clang', '--target=aarch64-linux-gnu', '--sysroot=$sysroot']"
+    cpp_entry="['ccache', 'clang++', '--target=aarch64-linux-gnu', '--sysroot=$sysroot']"
+else
+    c_entry="['clang', '--target=aarch64-linux-gnu', '--sysroot=$sysroot']"
+    cpp_entry="['clang++', '--target=aarch64-linux-gnu', '--sysroot=$sysroot']"
+fi
 cat > "$cross" <<EOF
 [binaries]
-c = ['clang', '--target=aarch64-linux-gnu', '--sysroot=$sysroot']
-cpp = ['clang++', '--target=aarch64-linux-gnu', '--sysroot=$sysroot']
+c = $c_entry
+cpp = $cpp_entry
 c_ld = 'lld'
 cpp_ld = 'lld'
 ar = 'llvm-ar'
@@ -138,6 +161,7 @@ cpu = 'aarch64'
 endian = 'little'
 EOF
 rm -rf "$build" "$out"
+begin "meson setup"
 meson setup "$build" "$src" --cross-file "$cross" --prefix="$rootfs/usr" \
     --libdir=lib/aarch64-linux-gnu --wrap-mode=nofallback --buildtype=release -Db_ndebug=true \
     -Dplatforms=x11 -Dvulkan-drivers=freedreno -Dfreedreno-kmds=kgsl -Dgallium-drivers= \
@@ -145,9 +169,15 @@ meson setup "$build" "$src" --cross-file "$cross" --prefix="$rootfs/usr" \
     -Dllvm=disabled -Dvalgrind=disabled -Dlibunwind=disabled -Dlmsensors=disabled \
     -Dzstd=enabled -Dexpat=enabled -Dvulkan-layers= -Dtools= -Dbuild-tests=false \
     > "$build.log" 2>&1 || { tail -40 "$build.log" >&2; exit 1; }
+end_stage "configured $(grep -cE '^\[[0-9]+/[0-9]+\]' "$build.log" || true) targets"
+begin "ninja (Turnip cross-compile)"
 ninja -C "$build" >> "$build.log" 2>&1 || { tail -40 "$build.log" >&2; exit 1; }
+end_stage "compiled"
+begin "meson install"
 DESTDIR="$build/install" meson install -C "$build" --no-rebuild >> "$build.log" 2>&1
+end_stage "installed"
 
+begin "strip + install artifacts"
 installed=$build/install$rootfs/usr
 mkdir -p "$out"
 library=libvulkan_freedreno$suffix.so
@@ -164,4 +194,5 @@ if "$readelf_cmd" -d "$out/$library" | grep -q keysyms; then
 fi
 [[ -s $out/$library ]] || die "$variant: missing driver output $out/$library"
 [[ -s $out/$manifest ]] || die "$variant: missing ICD manifest $out/$manifest"
+end_stage "outputs: $out/$library, $out/$manifest"
 echo "Turnip $variant: $out (Mesa $(git -C "$src" rev-parse --short HEAD) + ${#patches[@]} patches)"

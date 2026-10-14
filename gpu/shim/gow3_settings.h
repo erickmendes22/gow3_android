@@ -46,6 +46,9 @@ struct Values {
     std::atomic<unsigned> overlay_items{7};
     std::atomic<int> overlay_scale{100}, overlay_corner{1}, overlay_opacity{50}, overlay_layout{0};
     std::atomic<int> menu_tab{0};
+    /// Android touch overlay mouse mapping (overlay_mouse in gow3.ini). The display cursor is
+    /// hidden while it is off, so the game picture shows no stuck X11 pointer.
+    std::atomic<bool> overlay_mouse{false};
     std::atomic<float> red_orb_multiplier{1.0f};
     std::atomic<bool> red_orbs_supported{false};
     /// Damage and orb pickup multipliers (src/damage_hook.h, src/orb_hook.h), 0.1x to 100x.

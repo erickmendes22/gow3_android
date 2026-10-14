@@ -55,6 +55,10 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.menu_tab = i >= 0 && i <= 3 ? i : 0;
         return;
     }
+    if (key == "overlay_mouse") {
+        v.overlay_mouse = i != 0;
+        return;
+    }
     const char* cheat_keys[] = {"cheat_health", "cheat_magic", "cheat_item", "cheat_rage", "cheat_orbs",
                                 "cheat_very_hard", "cheat_double_jumps"};
     for (unsigned cheat = 0; cheat < GOW3_CHEAT_COUNT; ++cheat) {
@@ -298,6 +302,7 @@ void Save() {
                  int(v.overlay_items >> 3 & 1), int(v.overlay_items >> 4 & 1), int(v.overlay_items >> 5 & 1),
                  int(v.overlay_items >> 6 & 1), v.overlay_scale.load(), v.overlay_corner.load(),
                  v.overlay_opacity.load(), v.overlay_layout.load(), v.menu_tab.load());
+    std::fprintf(file, "overlay_mouse=%d\n", int(v.overlay_mouse.load()));
     std::fprintf(file,
                  "display_mode=%s\nvsync=%d\nfps_limit=%d\nasync_shaders=%d\n"
                  "fsr1=%d\nrcas=%d\nrcas_strength=%d\nframes_queued=%d\n"

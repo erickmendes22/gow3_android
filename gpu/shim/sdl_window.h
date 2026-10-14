@@ -36,10 +36,14 @@ public:
     int PollTextInput(std::string& text);
 
 private:
+    /// Hides the OS cursor while the touch overlay mouse is off (overlay_mouse=0), so the game
+    /// picture shows no stuck X11 pointer. Called every frame; only toggles on state changes.
+    void UpdateCursor();
     std::atomic<s32> width, height;
     std::atomic<bool> is_open{true};
     std::mutex text_mutex;
     bool text_requested{}, text_active{};
+    bool cursor_hidden{}; ///< OS cursor visibility applied last (window thread)
     int display_mode = -1; ///< applied Gow3Settings display mode (window thread)
     void ApplyDisplayMode(int mode);
     int text_state{};
