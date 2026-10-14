@@ -20,8 +20,7 @@ end_stage(){ local sec=$(( $(date +%s) - _t0 )); printf '    %s (%dm%02ds)\n' "$
 # In CI this otherwise adds -L$CONDA_PREFIX/lib to clang and ld.lld selects the
 # host libgcc_s.so.1, making Meson's libatomic probe fail before any Turnip build.
 # Keep PATH intact so the host tools remain executable.
-unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH \\
-    LIBRARY_PATH CMAKE_PREFIX_PATH PKG_CONFIG_PATH
+unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH CMAKE_PREFIX_PATH PKG_CONFIG_PATH
 
 if [[ -n ${GOW3_LLVM_PREFIX:-} && -d $GOW3_LLVM_PREFIX/bin ]]; then
     export PATH="$GOW3_LLVM_PREFIX/bin:$PATH"
