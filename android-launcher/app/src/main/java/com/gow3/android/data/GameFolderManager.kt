@@ -18,14 +18,26 @@ import java.io.File
 /** 负责首次运行时的游戏目录校验、存储权限和目录选择器状态。 */
 internal class GameFolderManager(private val activity: Activity) {
     companion object {
+        // 整个 launcher 的 Activity Result request code 必须全局唯一：MainActivity.onActivityResult
+        // 依次询问各消费者，先返回 true 的会消费掉结果，因此撞码会让后到的消费者永远收不到回调。
+        // 已知占用方：1001 游戏目录、1002 存储权限、1003 Lossless.dll 导入（LosslessDllManager）、
+        // 1004/1005 存档导出/导入（SaveManager）、1006 日志导出（LogManager）。新增请取 1008 起的空位。
         const val REQUEST_GAME_FOLDER = 1001
-        const val REQUEST_UPDATE_FOLDER = 1003
+        const val REQUEST_UPDATE_FOLDER = 1007
         const val REQUEST_STORAGE = 1002
         private val SERIALS = arrayOf("CUSA01740", "CUSA00900", "CUSA00207", "CUSA00208", "CUSA00299",
             "CUSA01363", "CUSA03179", "CUSA03014", "CUSA03023")
     }
 
     private enum class Kind(val prefKey: String) { GAME("game_dir"), UPDATE("update_dir") }
+
+    /**
+     * 发起存储权限请求时正在配置的目录类型，由 [onPermissionResult] 消费一次后清空。
+     *
+     * 权限回调只带回 request code，而游戏目录和升级补丁目录共用 [REQUEST_STORAGE]，
+     * 因此必须在这里记住发起方，否则授权后无法判断该回到哪个目录流程。
+     */
+    private var pendingFolderKind: Kind? = null
 
     private fun prefs() = activity.getSharedPreferences("gow3", Activity.MODE_PRIVATE)
 
@@ -62,6 +74,7 @@ internal class GameFolderManager(private val activity: Activity) {
 
     private fun chooseFolder(kind: Kind) {
         if (activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            pendingFolderKind = kind
             activity.requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE), REQUEST_STORAGE)
         } else {
             showFolderDialog(kind)
@@ -70,8 +83,11 @@ internal class GameFolderManager(private val activity: Activity) {
 
     fun onPermissionResult(requestCode: Int, grantResults: IntArray) {
         if (requestCode != REQUEST_STORAGE) return
+        // 授权后回到发起这次请求的目录流程，而不是一律回到游戏目录。
+        val requested = pendingFolderKind
+        pendingFolderKind = null
         if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            showFolderDialog(Kind.GAME)
+            showFolderDialog(requested ?: Kind.GAME)
         } else {
             AlertDialog.Builder(activity)
                 .setTitle(activity.getString(R.string.storage_permission_title))

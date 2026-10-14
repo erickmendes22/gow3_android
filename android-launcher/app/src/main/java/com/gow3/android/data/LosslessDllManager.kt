@@ -41,7 +41,9 @@ internal sealed class RemoveResult {
 internal class LosslessDllManager(private val activity: Activity) {
 
     companion object {
-        /** 区别于 GameFolderManager 的 1001（目录）和 1002（存储权限）。 */
+        // 区别于 GameFolderManager 的 1001（游戏目录）、1002（存储权限）、1007（升级补丁目录），
+        // 以及 SaveManager 的 1004/1005 与 LogManager 的 1006：撞码会让先返回 true 的消费者
+        // 吃掉别的流程的结果（历史上 1003 就与升级补丁目录撞过）。
         const val REQUEST_LOSSESS_DLL = 1003
         const val FILE_NAME = "Lossless.dll"
     }
