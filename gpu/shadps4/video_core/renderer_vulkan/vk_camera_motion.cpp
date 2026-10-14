@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "video_core/renderer_vulkan/vk_camera_motion.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -219,6 +220,19 @@ void CameraMotion::RecordMotion(vk::CommandBuffer cmdbuf, vk::ImageView depth_vi
 }
 
 void CameraMotion::OnConstants(const float* data) {
+    // The far=3000/offset52 camera layout is inherited from Bloodborne.
+    // Do not assume GoW3 uses it: record a bounded fingerprint of the first
+    // few real G-buffer constant blocks so the layout can be established
+    // from CUSA01715 evidence (never indiscriminately dump guest memory).
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && depth_id && !frame_has_camera) {
+        static unsigned sample = 0;
+        if (sample++ < 12) {
+            std::printf("GOW3_CAMERA_CONSTANTS block=%u first=%08x,%08x,%08x,%08x,%08x,%08x\n",
+                        sample, std::bit_cast<u32>(data[0]), std::bit_cast<u32>(data[1]),
+                        std::bit_cast<u32>(data[2]), std::bit_cast<u32>(data[3]),
+                        std::bit_cast<u32>(data[4]), std::bit_cast<u32>(data[5]));
+        }
+    }
     // Scene constants: far plane 3000, 1/far, and the render size.
     if (data[0] != 3000.0f || data[4] < 64.0f || data[5] < 64.0f ||
         std::abs(data[1] * data[0] - 1.0f) > 1e-3f) {

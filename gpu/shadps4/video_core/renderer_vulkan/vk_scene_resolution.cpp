@@ -24,10 +24,22 @@ SceneTargets::SceneTargets(const Instance& i, Scheduler& s, Runtime& r, Lookup g
     runtime.scene_targets = this;
     const char* force = std::getenv("GOW3_SCENE_STENCIL_BITS");
     force_stencil_bits = force && force[0] == '1';
-    // Guest texture allocations are patched to 1280x720 on Android.
+    // For the verified CUSA01715 startup patches, the guest actually allocates
+    // the input preset (640x360 for Performance), NOT 1280x720. Both target
+    // dimensions must match until the real G-buffer confirms the allocation.
     if (const char* fixed = std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT");
         fixed && fixed[0] == '1') {
         guest_size = {1280, 720};
+        if (const char* render = std::getenv("GOW3_RENDER_RES")) {
+            unsigned w = 0, h = 0;
+            if (std::sscanf(render, "%ux%u", &w, &h) == 2 &&
+                ((w == 1280 && h == 720) || (w == 854 && h == 480) ||
+                 (w == 752 && h == 424) || (w == 640 && h == 360) ||
+                 (w == 426 && h == 240))) {
+                guest_size = {w, h};
+                size = guest_size;
+            }
+        }
     }
     CreateResampleResources();
 }
@@ -104,12 +116,13 @@ void SceneTargets::ObserveGuestScene(u32 width, u32 height) {
     // Called only for a credible 5+ MRT G-buffer depth attachment, and
     // never inferred from the configured output resolution alone.
     if (guest_scene_observed || !std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) return;
-    if (!((width == 1280 && height == 720) ||
+    if (!((width == guest_size.width && height == guest_size.height) ||
+          (width == 1280 && height == 720) ||
           (width == 1920 && height == 1080))) {
         static u32 unsupported = 0;
         if (unsupported++ < 3) {
-            std::printf("GOW3_GBUFFER_UNKNOWN size=%ux%u expected=1280x720 or 1920x1080\n",
-                        width, height);
+            std::printf("GOW3_GBUFFER_UNKNOWN size=%ux%u expected=%ux%u\n",
+                        width, height, guest_size.width, guest_size.height);
         }
         return;
     }

@@ -344,6 +344,62 @@ def compile_external(selected, segments):
     return writes
 
 
+
+# Verified directly against the CUSA01715 01.02 retail SELF (SHA-256 below), by
+# extracting its PT_LOAD segments and disassembling the original x86-64 code.
+# These are the ACTUAL instruction operand addresses in that ELF, not the old
+# shadPS4 XML's reference-build Address values. XML Pattern/At still resolves
+# each site first; then the literal original operand and site address are checked.
+CUSA01715_0102_ANDROID_SHA = '6e72330e9092e5164049b865e5568f2d450904001a73fe0a2f4b39194c195b3c'
+CUSA01715_0102_SITES = (0x005f0c5b, 0x005f0c63, 0x005f0c6c, 0x005f0c73,
+                         0x005643e3, 0x005643f0, 0x005ff889, 0x005ff88f)
+CUSA01715_0102_FIELDS = ('width', 'height', 'width', 'height',
+                          'height', 'width', 'width', 'height')
+
+
+def android_fsr_input_writes(xml, image, segments, sha, render_res, patch_names):
+    """Return exact-byte-verified CUSA01715 startup-resize overrides for this ELF.
+
+    Applies ONLY to the supplied 01.02 executable, and never silently treats
+    a selected '720p' setting as an actually applied 640x360 scene. All eight
+    dimensions were checked in disassembly; the ninth XML write adjusts DMEM
+    and is deliberately left untouched. No Bloodborne offsets are used.
+    """
+    if not render_res:
+        return {}, None
+    if sha != CUSA01715_0102_ANDROID_SHA:
+        raise ValueError('FSR startup resolution requires verified CUSA01715 01.02 eboot.bin')
+    if 'Resolution Patch - 720p' not in patch_names:
+        raise ValueError('FSR startup input patch requires the 720p resolution profile')
+    match = re.fullmatch(r'([0-9]{2,4})x([0-9]{2,4})', render_res)
+    if not match:
+        raise ValueError(f'invalid FSR input resolution {render_res!r}')
+    width, height = map(int, match.groups())
+    if (width, height) not in ((1280, 720), (854, 480), (752, 424),
+                              (640, 360), (426, 240)):
+        raise ValueError(f'unsupported verified Android FSR input preset: {render_res}')
+    template = compile_patches(xml, ['Resolution Patch - 720p'], '01.02',
+                               segments, image)
+    if len(template) != 9:
+        raise ValueError('incomplete 720p template: expected eight geometry operands and DMEM')
+    overrides = {}
+    for i, (offset, patched) in enumerate(template[:8]):
+        address = offset + EBOOT_BASE
+        expected_address = CUSA01715_0102_SITES[i]
+        if address != expected_address:
+            raise ValueError(f'FSR site {i}: got {address:#x}, expected {expected_address:#x}')
+        field = CUSA01715_0102_FIELDS[i]
+        original = (1920 if field == 'width' else 1080).to_bytes(len(patched), 'little')
+        if image[offset:offset + len(patched)] != original:
+            raise ValueError(f'FSR site {i}: unexpected original instruction operand at {address:#x}')
+        if patched != (1280 if field == 'width' else 720).to_bytes(len(patched), 'little'):
+            raise ValueError(f'FSR site {i}: 720p patch template mismatch at {address:#x}')
+        overrides[offset] = (width if field == 'width' else height).to_bytes(len(patched), 'little')
+    return overrides, {'render': f'{width}x{height}', 'output': '1280x720',
+                       'verified_eboot_sha256': sha,
+                       'verified_sites': [hex(site) for site in CUSA01715_0102_SITES]}
+
+
 def write_patches(out, writes):
     # G3PATCH2: the patch base, so the loader can rebase pointers the patches write into
     # relocated slots.
@@ -373,7 +429,29 @@ def main():
     elf=(a.out/'eboot.elf').read_bytes()
     segments=eboot_segments(elf)
     skipped={}
-    writes=compile_patches(xml,names,None,segments,eboot_image(elf),skipped)
+    image=eboot_image(elf)
+    writes=compile_patches(xml,names,None,segments,image,skipped)
+    fsr_input = os.environ.get('GOW3_PATCH_INPUT_RES', '')
+    fsr_info = None
+    if fsr_input:
+        # If the 720p patch signature fails, DO NOT report that the new input
+        # resolution was installed or allow FSR to run on mismatched buffers.
+        if 'Resolution Patch - 720p' in skipped:
+            raise ValueError('cannot apply FSR input: the 720p base patch was skipped')
+        overrides, fsr_info = android_fsr_input_writes(
+            xml,image,segments,sha,fsr_input,names)
+        unmatched = set(overrides)
+        remapped = []
+        for offset,data in writes:
+            if offset in overrides:
+                data=overrides[offset]
+                unmatched.discard(offset)
+            remapped.append((offset,data))
+        if unmatched:
+            raise ValueError(f'FSR input overrides missing from patch stream: {sorted(unmatched)}')
+        writes=remapped
+        print(f"Patches: verified CUSA01715 FSR scene input {fsr_info['render']} -> "
+              f"output {fsr_info['output']} ({len(overrides)} operand writes)")
     for name,reason in skipped.items():
         print(f'Patches: {name} skipped ({reason} in this eboot.bin)')
     if a.patches_dir and sha==REFERENCE_SHA256:
@@ -383,7 +461,8 @@ def main():
                                                     a.patches_config),segments)
     write_patches(a.out,writes)
     applied=[n for n in names if n not in skipped]
-    (a.out/'patch_status.json').write_text(json.dumps({'sha256':sha,'applied':applied,'skipped':skipped}))
+    (a.out/'patch_status.json').write_text(json.dumps({'sha256':sha,'applied':applied,
+        'skipped':skipped,'android_fsr':fsr_info}))
     print(f'Patches: {title}; {len(writes)} writes from {applied or "none"}')
 
 if __name__=='__main__':

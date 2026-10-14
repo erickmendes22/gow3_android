@@ -156,7 +156,7 @@
         Note="Turns off the dynamic shadow jobs. Experimental; only the verified CUSA01715 1.02 executable."
         Author="erickmendes22" PatchVer="1.0" AppVer="01.02" AppElf="eboot.bin" isEnabled="false">
         <PatchList>
-            <Line Type="bytes" Address="0x005b739b" Value="eb32"/>
+            <Line Type="bytes" Address="0x005b739b" Value="eb32" Pattern="83 bb 80 01 00 00 00 74 32 4c 8d 7d a8" At="7"/>
         </PatchList>
     </Metadata>
 </Patch>

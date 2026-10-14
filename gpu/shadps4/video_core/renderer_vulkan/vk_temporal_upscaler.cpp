@@ -1344,12 +1344,16 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
     // The alternate trigger is deliberately limited to a new UI depth target
     // drawn over the CURRENT LDR scene color with valid camera/depth. Generic
     // fullscreen postprocess passes reusing scene depth must not trigger FSR.
+    const bool android = std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") != nullptr;
     const bool android_hud_transition =
-        std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && !scaled_session &&
-        native_viewport && camera_motion.Ready() && ldr_target == color &&
-        depth && depth != camera_motion.Depth();
-    const bool movie = vs_hash == ui_trigger_vs || UiComposition::MovieShader(vs_hash) ||
-                       (scaled_session && native_viewport) || android_hud_transition;
+        android && native_viewport && camera_motion.Ready() &&
+        ldr_target == color && depth && depth != camera_motion.Depth();
+    // The hashes 0x34e8a281 etc. were identified in Bloodborne, not in
+    // the supplied CUSA01715 executable. Do not use them to trigger GoW3
+    // temporal dispatch. Only a camera/depth-verified HUD transition may do so.
+    const bool movie = android ? android_hud_transition
+        : (vs_hash == ui_trigger_vs || UiComposition::MovieShader(vs_hash) ||
+           (scaled_session && native_viewport));
     if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && native_viewport && !movie) {
         static unsigned candidates = 0;
         if (candidates++ < 6) {

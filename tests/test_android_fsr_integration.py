@@ -46,6 +46,8 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         header = (root / "vk_scene_resolution.h").read_text()
         raster = (root / "vk_rasterizer.cpp").read_text()
         self.assertIn('guest_size = {1280, 720}', scene)
+        self.assertIn('size = guest_size;', scene)
+        self.assertIn('(w == 640 && h == 360)', scene)
         self.assertIn('SizeDivisor(i, size, guest_size)', scene)
         self.assertIn('SizeDivisor(image.info, size, guest_size)', scene)
         self.assertIn('size != guest_size', header)
@@ -66,6 +68,14 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn('GOW3_FSR_UI_CANDIDATE', fsr)
         self.assertIn('android_hud_transition', fsr)
         self.assertIn('depth != camera_motion.Depth()', fsr)
+
+    def test_android_fsr_only_triggers_on_scene_hud_depth_transition(self):
+        root = ROOT / "gpu/shadps4/video_core/renderer_vulkan"
+        source = (root / "vk_temporal_upscaler.cpp").read_text()
+        camera = (root / "vk_camera_motion.cpp").read_text()
+        self.assertIn('android ? android_hud_transition', source)
+        self.assertIn('depth != camera_motion.Depth()', source)
+        self.assertIn('GOW3_CAMERA_CONSTANTS block=', camera)
 
     def test_shadow_toggle_semantics(self):
         from launch_env import disable_shadows_requested

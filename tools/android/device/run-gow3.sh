@@ -238,6 +238,10 @@ mem_kb=$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || true)
 # Android always presents a 720p PS4 target; preset controls FSR input quality.
 export GOW3_ANDROID_FSR_FIXED_OUTPUT=1
 eval "$(PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/launch_env.py" --game "$game" --config "$GOW3_CONFIG" --state "$out/graphics_state.json" --shell)"
+# Report what will actually be patched into the verified CUSA01715 eboot, not
+# merely the preset selected by the UI. scripts/patches.py checks the signature
+# and original bytes again before writing patches.bin.
+echo "GOW3_FSR_STARTUP: status=${GOW3_FSR_INPUT_STATUS:-unknown} input=${GOW3_RENDER_RES:-native} patch=${GOW3_PATCH_INPUT_RES:-none} output=${GOW3_OUTPUT_RES:-unspecified}"
 # The retail pool is 5056 MiB; the resolution/texture patches ask for more (7104+ for the default
 # set). On a phone RAM is the binding constraint: lower the patch set / resolution if the app is
 # killed. See docs/ANDROID_PORT.md.

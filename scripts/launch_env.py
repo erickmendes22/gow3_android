@@ -64,12 +64,31 @@ def derive(game, config, state_path, env):
     updates['GOW3_READBACK_LINEAR_SOURCE'] = 'override' if 'GOW3_READBACK_LINEAR' in env else 'android-safe-default'
     if android_fixed_output:
         updates['GOW3_OUTPUT_RES'] = '1280x720'
+        # Startup patch follows the game's own dimension operands, not a live
+        # Vulkan-only proxy. On this exact CUSA01715 01.02 ELF the patch
+        # generator validates eight locations and their original bytes.
+        # Preserve the full-resolution 720p output of the FSR composition.
+        from patches import CUSA01715_0102_ANDROID_SHA
+        verified = (identity_check := patch_profile_status(game))['eboot_sha256'] == CUSA01715_0102_ANDROID_SHA
+        if verified and identity_check['title_id'] == 'CUSA01715' and identity_check['app_version'] == '01.02':
+            preset = ini.get('preset', '3')
+            input_sizes = {'0': '1280x720', '1': '854x480', '2': '752x424',
+                           '3': '640x360', '4': '426x240'}
+            input_size = input_sizes.get(preset, '640x360')
+            if ini.get('upscaler', 'fsr3') == 'off':
+                input_size = '1280x720'
+            updates['GOW3_RENDER_RES'] = input_size
+            updates['GOW3_PATCH_INPUT_RES'] = input_size
+            updates['GOW3_FSR_INPUT_STATUS'] = 'cusa01715-verified-startup-patch'
+        else:
+            updates['GOW3_UPSCALER'] = 'none'
+            updates['GOW3_FSR_INPUT_STATUS'] = 'unsupported-eboot-no-temporal-fsr'
 
     names, dmem, vblank = [], None, None
     shadow_requested = disable_shadows_requested(ini)
     updates['GOW3_SHADOWS_REQUESTED'] = 'off' if shadow_requested else 'on'
     updates['GOW3_SHADOWS_STATUS'] = 'pending' if shadow_requested else 'enabled'
-    identity = patch_profile_status(game)
+    identity = identity_check if android_fixed_output else patch_profile_status(game)
     profile = game_profile(identity['title_id'])
     reason = identity['reason'] or 'unknown'
     if identity['reason'] != 'validated':
