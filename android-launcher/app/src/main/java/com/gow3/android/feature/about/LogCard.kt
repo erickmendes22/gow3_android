@@ -13,10 +13,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.gow3.android.R
 import com.gow3.android.ui.components.ActionButton
 import com.gow3.android.ui.components.LauncherColors
 
@@ -35,16 +37,16 @@ internal fun LogCard(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("RUNTIME LOGS", color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+        Text(stringResource(R.string.log_runtime_logs), color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                if (hasLogs) "Logs found" else "No logs yet",
+                if (hasLogs) stringResource(R.string.logs_found) else stringResource(R.string.no_logs_yet),
                 color = LauncherColors.textPrimary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                "Export the God of War III runtime logs to a .zip file for troubleshooting. The game's log (android-game.log) lives in the app's private folder.",
+                stringResource(R.string.log_description),
                 color = LauncherColors.textMuted,
                 fontSize = 11.sp,
                 lineHeight = 16.sp,
@@ -54,10 +56,10 @@ internal fun LogCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            ActionButton("EXPORT LOGS", hasLogs, Modifier.weight(1f), onExport)
+            ActionButton(stringResource(R.string.log_export), hasLogs, Modifier.weight(1f), onExport)
         }
         Text(
-            "Exporting only reads the runtime log files; it never modifies them or grabs the system logcat.",
+            stringResource(R.string.log_export_footer),
             color = LauncherColors.textMuted,
             fontSize = 11.sp,
             lineHeight = 16.sp,

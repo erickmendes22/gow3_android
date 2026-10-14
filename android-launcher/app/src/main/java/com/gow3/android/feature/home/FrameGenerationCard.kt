@@ -14,10 +14,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.gow3.android.R
 import com.gow3.android.data.LosslessDllManager
 import com.gow3.android.data.LosslessDllSource
 import com.gow3.android.data.LosslessDllState
@@ -48,7 +50,7 @@ internal fun FrameGenerationCard(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("FRAME GENERATION", color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+        Text(stringResource(R.string.frame_gen_title), color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 LosslessDllManager.FILE_NAME,
@@ -56,10 +58,9 @@ internal fun FrameGenerationCard(
                 fontSize = 13.sp,
             )
             if (installed == null) {
-                Text("Not installed", color = LauncherColors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.frame_gen_not_installed), color = LauncherColors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Frame generation needs the Lossless.dll from your own copy of Lossless Scaling. " +
-                        "Import the file here, or get it from Steam.",
+                    stringResource(R.string.frame_gen_needs_dll),
                     color = LauncherColors.textMuted,
                     fontSize = 11.sp,
                     lineHeight = 16.sp,
@@ -75,8 +76,8 @@ internal fun FrameGenerationCard(
                     // 特意写成“launcher 文件夹”而非“已下载”：导入的文件和 Steam
                     // 下载的文件在磁盘上无法区分。
                     when (installed.source) {
-                        LosslessDllSource.GAME_FOLDER -> "Beside your game folder — remove it there yourself"
-                        LosslessDllSource.APP_PRIVATE -> "In the launcher's own folder"
+                        LosslessDllSource.GAME_FOLDER -> stringResource(R.string.frame_gen_source_game_folder)
+                        LosslessDllSource.APP_PRIVATE -> stringResource(R.string.frame_gen_source_app_private)
                     },
                     color = LauncherColors.textMuted,
                     fontSize = 11.sp,
@@ -88,18 +89,17 @@ internal fun FrameGenerationCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            ActionButton("IMPORT .DLL", installed == null, Modifier.weight(1f), onImport)
-            ActionButton("GET FROM STEAM", installed == null, Modifier.weight(1f), onSteam)
+            ActionButton(stringResource(R.string.frame_gen_import_dll), installed == null, Modifier.weight(1f), onImport)
+            ActionButton(stringResource(R.string.frame_gen_get_from_steam), installed == null, Modifier.weight(1f), onSteam)
         }
         if (installed != null) {
-            ActionButton("REMOVE", false, Modifier.fillMaxWidth(), onRemove)
+            ActionButton(stringResource(R.string.frame_gen_remove), false, Modifier.fillMaxWidth(), onRemove)
         }
         if (notice != null) {
             Text(notice, color = LauncherColors.gold, fontSize = 11.sp, lineHeight = 16.sp)
         }
         Text(
-            "Imported files stay in the app's private folder and take effect the next time the game starts. " +
-                "IMPORT .DLL also works when Steam is unavailable.",
+            stringResource(R.string.frame_gen_footer),
             color = LauncherColors.textMuted,
             fontSize = 11.sp,
             lineHeight = 16.sp,

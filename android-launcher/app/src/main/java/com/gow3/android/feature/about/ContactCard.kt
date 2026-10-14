@@ -21,11 +21,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import com.gow3.android.R
 import com.gow3.android.ui.components.ActionButton
 import com.gow3.android.ui.components.LauncherColors
 
@@ -43,7 +45,7 @@ internal fun ContactCard() {
 
     fun copy(label: String, value: String) {
         copyToClipboard(context, label, value)
-        Toast.makeText(context, "$value copied", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.copied_fmt, value), Toast.LENGTH_SHORT).show()
     }
 
     /** 用 QQ 打开群卡片；未安装 QQ 返回 false。 */
@@ -68,7 +70,7 @@ internal fun ContactCard() {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            "AUTHOR & SUPPORT",
+            stringResource(R.string.contact_title),
             color = LauncherColors.gold,
             fontFamily = FontFamily.Serif,
             fontSize = 11.sp,
@@ -76,26 +78,26 @@ internal fun ContactCard() {
             letterSpacing = 0.8.sp
         )
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            ContactRow("Author", AUTHOR)
-            ContactRow("QQ group", QQ_GROUP, "OPEN") {
+            ContactRow(context.getString(R.string.contact_author_label), AUTHOR)
+            ContactRow(context.getString(R.string.contact_qq_label), QQ_GROUP, context.getString(R.string.contact_open)) {
                 if (!openQqGroup(context, QQ_GROUP)) {
-                    copyToClipboard(context, "QQ group", QQ_GROUP)
+                    copyToClipboard(context, context.getString(R.string.contact_qq_label), QQ_GROUP)
                     Toast.makeText(
                         context,
-                        "QQ not installed, group number copied",
+                        context.getString(R.string.contact_qq_not_installed),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
             }
-            ContactRow("Telegram", TELEGRAM_HANDLE, "OPEN") {
+            ContactRow(context.getString(R.string.contact_telegram_label), TELEGRAM_HANDLE, context.getString(R.string.contact_open)) {
                 if (!openUrl(context, TELEGRAM_URL)) {
-                    Toast.makeText(context, "No app can open $TELEGRAM_URL", Toast.LENGTH_SHORT)
+                    Toast.makeText(context, context.getString(R.string.contact_no_app_fmt, TELEGRAM_URL), Toast.LENGTH_SHORT)
                         .show()
                 }
             }
         }
         Text(
-            "Bug reports, crashes and feature requests are all welcome — attach the exported logs when you report an issue so it can be reproduced.",
+            stringResource(R.string.contact_description),
             color = LauncherColors.textMuted,
             fontSize = 11.sp,
             lineHeight = 16.sp,

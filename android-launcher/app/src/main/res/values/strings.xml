@@ -1,3 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Gow3Launcher</string>
+
+    <!-- 品牌与关键动作按钮：双语同值，不翻译 -->
+    <string name="title_god_of_war_iii">GOD OF WAR III</string>
+    <string name="title_remastered">REMASTERED</string>
+    <string name="launch_button">LAUNCH</string>
+    <string name="start_game_button">START GAME</string>
+
+    <!-- 导航 -->
+    <string name="nav_home">HOME</string>
+    <string name="nav_about">ABOUT</string>
+
+    <!-- Home 页 -->
+    <string name="settings_save_failed">Settings could not be saved</string>
+    <string name="home_imported_fmt">Imported %1$s (%2$s)</string>
+    <string name="home_removed_game_folder_copy">Removed the launcher copy. The Lossless.dll beside the game folder is yours to delete.</string>
+    <string name="home_removed_fmt">%1$s removed</string>
+
+    <!-- 启动参数 -->
+    <string name="launch_parameters_title">LAUNCH PARAMETERS</string>
+    <string name="launch_parameters_group_game">GAME</string>
+    <string name="game_folder_label">Game folder</string>
+    <string name="game_folder_not_selected">Not selected</string>
+    <string name="game_folder_hint">Tap to choose a different folder</string>
+    <string name="update_folder_label">Update folder</string>
+    <string name="update_folder_not_set">Not set (use the game folder as-is)</string>
+    <string name="update_folder_description">Optional: the game\'s update (patch) folder, e.g. CUSA01740-patch. Laid over the game at start.</string>
+    <string name="change_button">CHANGE  ›</string>
+    <string name="launch_parameters_footer">Changes are saved to gow3.ini immediately and take effect at the next launch.</string>
+    <string name="param_group_display">DISPLAY</string>
+    <string name="param_group_performance">PERFORMANCE</string>
+    <string name="param_group_startup">STARTUP</string>
+    <string name="dialog_ok">OK</string>
+
+    <!-- 启动参数：参数名 -->
+    <string name="param_upscaler">Upscaler</string>
+    <string name="param_resolution">Resolution</string>
+    <string name="param_fps_limit">FPS limit</string>
+    <string name="param_engine_fps">Engine FPS</string>
+    <string name="param_vsync">VSync</string>
+    <string name="param_frames_queued">Frames queued</string>
+    <string name="param_offline_start">Offline start</string>
+    <string name="param_skip_intros">Skip intros</string>
+    <string name="param_free_camera">Free camera</string>
+
+    <!-- 启动参数：选项名 -->
+    <string name="param_option_off_720p">Off (render at 1280×720)</string>
+    <string name="param_option_fsr31">FSR 3.1</string>
+    <string name="param_option_native">Native</string>
+    <string name="param_option_480p">480p</string>
+    <string name="param_option_720p">720p</string>
+    <string name="param_option_800p">800p</string>
+    <string name="param_option_1440p">1440p</string>
+    <string name="param_option_1800p">1800p</string>
+    <string name="param_option_4k">4K</string>
+    <string name="param_option_30">30</string>
+    <string name="param_option_60">60</string>
+    <string name="param_option_120">120</string>
+    <string name="param_option_240">240</string>
+    <string name="param_option_unlimited">Unlimited</string>
+    <string name="param_option_engine_60">60 (the game\'s own)</string>
+    <string name="param_option_on">ON</string>
+    <string name="param_option_off">OFF</string>
+    <string name="param_option_frames_1">1 (lowest latency)</string>
+    <string name="param_option_frames_2">2</string>
+
+    <!-- 启动参数：说明 -->
+    <string name="param_desc_upscaler">Renders the game at a lower internal resolution and then uses FSR 3.1 to scale the image up to your screen, so you get more performance while keeping a sharp picture. Off renders at a fixed 1280×720.</string>
+    <string name="param_desc_engine_fps">How fast the game engine itself updates the game world, separate from the display. 60 is the game\'s original speed; higher values make motion smoother but use more power.</string>
+    <string name="param_desc_vsync">Syncs the game\'s frames with your screen\'s refresh rate to stop visual tearing. Leave it ON unless you see tearing or stutter.</string>
+    <string name="param_desc_frames_queued">How many frames the game prepares ahead of what the screen shows. Lower numbers cut input lag; higher numbers can improve smoothness on weaker hardware.</string>
+    <string name="param_desc_free_camera">Lets you move the camera freely around the world for exploring or testing, instead of following the gameplay camera. Meant for experimentation, not normal play.</string>
+
+    <!-- 帧生成卡片 -->
+    <string name="frame_gen_title">FRAME GENERATION</string>
+    <string name="frame_gen_not_installed">Not installed</string>
+    <string name="frame_gen_needs_dll">Frame generation needs the Lossless.dll from your own copy of Lossless Scaling. Import the file here, or get it from Steam.</string>
+    <string name="frame_gen_source_game_folder">Beside your game folder — remove it there yourself</string>
+    <string name="frame_gen_source_app_private">In the launcher\'s own folder</string>
+    <string name="frame_gen_import_dll">IMPORT .DLL</string>
+    <string name="frame_gen_get_from_steam">GET FROM STEAM</string>
+    <string name="frame_gen_remove">REMOVE</string>
+    <string name="frame_gen_footer">Imported files stay in the app\'s private folder and take effect the next time the game starts. IMPORT .DLL also works when Steam is unavailable.</string>
+
+    <!-- About 页 -->
+    <string name="about_title">God of War III for Android</string>
+    <string name="about_version_fmt">Version %1$s</string>
+    <string name="about_description">A community launcher bringing the God of War III Remastered experience to Android via emulation.</string>
+    <string name="about_third_party_licenses">Third-party licenses</string>
+    <string name="language_setting">Language</string>
+    <string name="language_follow_system">Follow system</string>
+    <string name="language_zh">简体中文</string>
+    <string name="language_en">English</string>
+
+    <!-- 存档卡片 -->
+    <string name="save_data_title">SAVE DATA</string>
+    <string name="saves_found">Saves found</string>
+    <string name="no_saves_yet">No saves yet</string>
+    <string name="save_data_description">Back up your God of War III saves to a .zip file, or restore a backup. The game\'s savedata lives in the app\'s private folder.</string>
+    <string name="save_export">EXPORT SAVE</string>
+    <string name="save_import">IMPORT SAVE</string>
+    <string name="save_import_footer">Importing replaces the current saves, but the existing ones are backed up first into the app\'s private folder.</string>
+
+    <!-- 日志卡片 -->
+    <string name="log_runtime_logs">RUNTIME LOGS</string>
+    <string name="logs_found">Logs found</string>
+    <string name="no_logs_yet">No logs yet</string>
+    <string name="log_description">Export the God of War III runtime logs to a .zip file for troubleshooting. The game\'s log (android-game.log) lives in the app\'s private folder.</string>
+    <string name="log_export">EXPORT LOGS</string>
+    <string name="log_export_footer">Exporting only reads the runtime log files; it never modifies them or grabs the system logcat.</string>
+
+    <!-- 联系卡片 -->
+    <string name="contact_title">AUTHOR &amp; SUPPORT</string>
+    <string name="contact_author_label">Author</string>
+    <string name="contact_qq_label">QQ group</string>
+    <string name="contact_telegram_label">Telegram</string>
+    <string name="contact_open">OPEN</string>
+    <string name="copied_fmt">%1$s copied</string>
+    <string name="contact_qq_not_installed">QQ not installed, group number copied</string>
+    <string name="contact_no_app_fmt">No app can open %1$s</string>
+    <string name="contact_description">Bug reports, crashes and feature requests are all welcome — attach the exported logs when you report an issue so it can be reproduced.</string>
+
+    <!-- Mods 页 -->
+    <string name="mods_title">MOD &amp; PATCH</string>
+    <string name="mods_description">Manage game file mods and third-party shadPS4 patches for God of War III.</string>
+    <string name="mods_empty_title">NO MODS INSTALLED</string>
+    <string name="mods_empty_description">Your mod and patch list will appear here.</string>
+
+    <!-- 数据层消息 -->
+    <string name="no_file_picker_fmt">No file picker is available on this device (%1$s).</string>
+    <string name="unknown_error">unknown error</string>
+    <string name="selected_location">the selected location</string>
+    <string name="log_no_logs">No logs to export</string>
+    <string name="log_write_failed">Could not write to the selected location. The logs were not modified.</string>
+    <string name="log_exported_fmt">Logs exported: %1$s</string>
+    <string name="log_export_failed_fmt">Log export failed: %1$s</string>
+    <string name="save_no_saves">No saves to export</string>
+    <string name="save_write_failed">Could not write to the selected location. No saves were changed.</string>
+    <string name="save_exported_fmt">Saves exported: %1$s</string>
+    <string name="save_export_failed_fmt">Save export failed: %1$s</string>
+    <string name="save_read_failed">Could not read the selected file.</string>
+    <string name="save_imported_with_backup_fmt">Saves imported successfully; the previous saves were backed up to %1$s.</string>
+    <string name="save_imported">Saves imported successfully.</string>
+    <string name="save_import_failed_fmt">Save import failed: %1$s</string>
+    <string name="save_archive_not_zip">The selected file is not a valid zip archive.</string>
+    <string name="save_archive_no_content">The archive contains no saves to import.</string>
+    <string name="save_archive_unsafe_path_fmt">The archive contains an unsafe path: %1$s</string>
+    <string name="save_archive_duplicate_fmt">The archive contains a duplicate path: %1$s</string>
+    <string name="save_archive_wrong_layout_fmt">The archive layout is not a savedata layout: %1$s</string>
+    <string name="save_archive_title_fmt">The archive title does not match God of War III (%2$s): %1$s</string>
+    <string name="lossless_no_readable_name">That file has no readable name.</string>
+    <string name="lossless_wrong_file_fmt">That is not %1$s (selected: %2$s).</string>
+    <string name="lossless_empty_fmt">%1$s is empty.</string>
+    <string name="lossless_write_failed_fmt">%1$s could not be written. Nothing was changed.</string>
+    <string name="lossless_remove_failed_fmt">%1$s could not be removed.</string>
+
+    <!-- 游戏目录管理器 -->
+    <string name="storage_permission_title">Storage permission required</string>
+    <string name="storage_permission_message">God of War III needs storage access to read the game folder.</string>
+    <string name="not_a_game_folder">Not a God of War III folder</string>
+    <string name="not_a_game_update_folder">Not a God of War III update folder</string>
+    <string name="choose_again">Choose again</string>
+    <string name="no_eboot">That location has no eboot.bin.</string>
+    <string name="no_eboot_path_fmt">%1$s has no eboot.bin.</string>
+    <string name="update_same_as_game">Choose a folder separate from the game folder, or clear the update.</string>
+    <string name="folder_eyebrow_game">GAME SETUP</string>
+    <string name="folder_eyebrow_update">GAME UPDATE</string>
+    <string name="folder_title_game">Choose your game folder</string>
+    <string name="folder_title_update">Choose the game update folder</string>
+    <string name="folder_message_update">Optional: the update (patch) folder of the game, e.g. CUSA01740-patch. Its eboot.bin and sce_sys are laid over the game at start; the game files are never changed. Leave it empty to use the game folder as-is.</string>
+    <string name="folder_message_game">Select the extracted God of War III folder, such as CUSA01740, or its parent folder. The selected location must contain eboot.bin.</string>
+    <string name="folder_current_selection_fmt">\n\nCurrent selection:\n%1$s</string>
+    <string name="folder_choose_update">CHOOSE UPDATE FOLDER</string>
+    <string name="folder_choose_game">CHOOSE GAME FOLDER</string>
+    <string name="folder_confirm_update">CONFIRM UPDATE</string>
+    <string name="folder_confirm">CONFIRM</string>
+    <string name="no_folder_picker_fmt">No folder picker: %1$s</string>
 </resources>

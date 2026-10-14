@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.gow3.android.R
 import java.io.File
 
 /** 按运行时解析顺序，记录有效 Lossless.dll 被发现的位置。 */
@@ -83,7 +84,7 @@ internal class LosslessDllManager(private val activity: Activity) {
             activity.startActivityForResult(intent, REQUEST_LOSSESS_DLL)
         } catch (ex: Exception) {
             pending = null
-            onResult(ImportResult.Failed("No file picker is available on this device (${ex.message ?: "unknown error"})."))
+            onResult(ImportResult.Failed(activity.getString(R.string.no_file_picker_fmt, ex.message ?: activity.getString(R.string.unknown_error))))
         }
     }
 
@@ -105,13 +106,16 @@ internal class LosslessDllManager(private val activity: Activity) {
      */
     fun importFrom(uri: Uri): ImportResult {
         val name = displayName(uri)
-        if (name == null) return ImportResult.Failed("That file has no readable name.")
-        if (!name.equals(FILE_NAME, ignoreCase = true)) return ImportResult.Failed("That is not $FILE_NAME (selected: $name).")
+        if (name == null) return ImportResult.Failed(activity.getString(R.string.lossless_no_readable_name))
+        if (!name.equals(FILE_NAME, ignoreCase = true)) {
+            return ImportResult.Failed(activity.getString(R.string.lossless_wrong_file_fmt, FILE_NAME, name))
+        }
 
         val size = sizeOf(uri)
-        if (size != null && size <= 0L) return ImportResult.Failed("$FILE_NAME is empty.")
+        if (size != null && size <= 0L) return ImportResult.Failed(activity.getString(R.string.lossless_empty_fmt, FILE_NAME))
 
-        val target = copyInto(uri) ?: return ImportResult.Failed("$FILE_NAME could not be written. Nothing was changed.")
+        val target = copyInto(uri)
+            ?: return ImportResult.Failed(activity.getString(R.string.lossless_write_failed_fmt, FILE_NAME))
         return ImportResult.Success(installed(target, LosslessDllSource.APP_PRIVATE))
     }
 
@@ -122,7 +126,7 @@ internal class LosslessDllManager(private val activity: Activity) {
      */
     fun remove(): RemoveResult {
         val own = appCopy()
-        if (own.exists() && !own.delete()) return RemoveResult.Failed("$FILE_NAME could not be removed.")
+        if (own.exists() && !own.delete()) return RemoveResult.Failed(activity.getString(R.string.lossless_remove_failed_fmt, FILE_NAME))
         val state = resolve()
         return RemoveResult.Done(state, state is LosslessDllState.Installed && state.source == LosslessDllSource.GAME_FOLDER)
     }

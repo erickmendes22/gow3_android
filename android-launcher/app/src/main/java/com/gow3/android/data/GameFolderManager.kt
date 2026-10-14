@@ -12,6 +12,7 @@ import android.os.Environment
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.gow3.android.R
 import java.io.File
 
 /** 负责首次运行时的游戏目录校验、存储权限和目录选择器状态。 */
@@ -73,9 +74,9 @@ internal class GameFolderManager(private val activity: Activity) {
             showFolderDialog(Kind.GAME)
         } else {
             AlertDialog.Builder(activity)
-                .setTitle("Storage permission required")
-                .setMessage("God of War III needs storage access to read the game folder.")
-                .setPositiveButton("OK", null)
+                .setTitle(activity.getString(R.string.storage_permission_title))
+                .setMessage(activity.getString(R.string.storage_permission_message))
+                .setPositiveButton(activity.getString(R.string.dialog_ok), null)
                 .show()
         }
     }
@@ -103,9 +104,12 @@ internal class GameFolderManager(private val activity: Activity) {
         val problem = validate(kind, dir)
         if (problem != null) {
             AlertDialog.Builder(activity)
-                .setTitle(if (kind == Kind.UPDATE) "Not a God of War III update folder" else "Not a God of War III folder")
+                .setTitle(
+                    if (kind == Kind.UPDATE) activity.getString(R.string.not_a_game_update_folder)
+                    else activity.getString(R.string.not_a_game_folder)
+                )
                 .setMessage(problem)
-                .setPositiveButton("Choose again") { _, _ -> showFolderDialog(kind) }
+                .setPositiveButton(activity.getString(R.string.choose_again)) { _, _ -> showFolderDialog(kind) }
                 .show()
             return
         }
@@ -116,14 +120,14 @@ internal class GameFolderManager(private val activity: Activity) {
 
     /** 目录是否可用；null 表示可用，否则返回给玩家看的原因。 */
     private fun validate(kind: Kind, dir: File?): String? {
-        val folder = dir ?: return "That location has no eboot.bin."
+        val folder = dir ?: return activity.getString(R.string.no_eboot)
         if (!isGame(folder)) {
-            return folder.path + " has no eboot.bin."
+            return activity.getString(R.string.no_eboot_path_fmt, folder.path)
         }
         if (kind == Kind.UPDATE) {
             val gamePath = prefs().getString("game_dir", null) ?: ""
             if (gamePath.isNotEmpty() && sameAs(folder, File(gamePath))) {
-                return "Choose a folder separate from the game folder, or clear the update."
+                return activity.getString(R.string.update_same_as_game)
             }
         }
         return null
@@ -141,13 +145,15 @@ internal class GameFolderManager(private val activity: Activity) {
             background = roundedBackground(0xff171411.toInt(), 0xffc6ad76.toInt(), 20)
         }
         val eyebrow = TextView(activity).apply {
-            text = if (isUpdate) "GAME UPDATE" else "GAME SETUP"
+            text = if (isUpdate) activity.getString(R.string.folder_eyebrow_update)
+            else activity.getString(R.string.folder_eyebrow_game)
             textSize = 11f
             letterSpacing = 0.18f
             setTextColor(0xffc6ad76.toInt())
         }
         val title = TextView(activity).apply {
-            text = if (isUpdate) "Choose the game update folder" else "Choose your game folder"
+            text = if (isUpdate) activity.getString(R.string.folder_title_update)
+            else activity.getString(R.string.folder_title_game)
             textSize = 22f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(0xffe8dfc9.toInt())
@@ -155,20 +161,19 @@ internal class GameFolderManager(private val activity: Activity) {
         }
         val message = TextView(activity).apply {
             text = if (isUpdate)
-                "Optional: the update (patch) folder of the game, e.g. CUSA01740-patch. Its eboot.bin " +
-                    "and sce_sys are laid over the game at start; the game files are never changed. " +
-                    "Leave it empty to use the game folder as-is." +
-                    (if (current != null) "\n\nCurrent selection:\n$current" else "")
+                activity.getString(R.string.folder_message_update) +
+                    (if (current != null) activity.getString(R.string.folder_current_selection_fmt, current) else "")
             else
-                "Select the extracted God of War III folder, such as CUSA01740, or its parent folder. The selected location must contain eboot.bin." +
-                    (if (current != null) "\n\nCurrent selection:\n$current" else "")
+                activity.getString(R.string.folder_message_game) +
+                    (if (current != null) activity.getString(R.string.folder_current_selection_fmt, current) else "")
             textSize = 14f
             setTextColor(0xff8e9097.toInt())
             setLineSpacing(0f, 1.15f)
             setPadding(0, dp(12), 0, dp(20))
         }
         val choose = TextView(activity).apply {
-            text = if (isUpdate) "CHOOSE UPDATE FOLDER" else "CHOOSE GAME FOLDER"
+            text = if (isUpdate) activity.getString(R.string.folder_choose_update)
+            else activity.getString(R.string.folder_choose_game)
             gravity = Gravity.CENTER
             textSize = 13f
             letterSpacing = 0.08f
@@ -179,7 +184,8 @@ internal class GameFolderManager(private val activity: Activity) {
             isFocusable = true
         }
         val secondary = TextView(activity).apply {
-            text = if (isUpdate) "CHOOSE GAME FOLDER" else "CHOOSE UPDATE FOLDER"
+            text = if (isUpdate) activity.getString(R.string.folder_choose_game)
+            else activity.getString(R.string.folder_choose_update)
             gravity = Gravity.CENTER
             textSize = 13f
             letterSpacing = 0.08f
@@ -190,7 +196,8 @@ internal class GameFolderManager(private val activity: Activity) {
             isFocusable = true
         }
         val confirm = if (current != null) TextView(activity).apply {
-            text = if (isUpdate) "CONFIRM UPDATE" else "CONFIRM"
+            text = if (isUpdate) activity.getString(R.string.folder_confirm_update)
+            else activity.getString(R.string.folder_confirm)
             gravity = Gravity.CENTER
             textSize = 13f
             letterSpacing = 0.08f
@@ -228,7 +235,10 @@ internal class GameFolderManager(private val activity: Activity) {
                     if (isUpdate) REQUEST_UPDATE_FOLDER else REQUEST_GAME_FOLDER,
                 )
             } catch (ex: Exception) {
-                AlertDialog.Builder(activity).setMessage("No folder picker: $ex").setPositiveButton("OK", null).show()
+                AlertDialog.Builder(activity)
+                    .setMessage(activity.getString(R.string.no_folder_picker_fmt, ex.toString()))
+                    .setPositiveButton(activity.getString(R.string.dialog_ok), null)
+                    .show()
             }
         }
         confirm?.setOnClickListener { dialog.dismiss() }

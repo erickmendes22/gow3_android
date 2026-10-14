@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,13 +24,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.gow3.android.R
+import com.gow3.android.data.LanguageManager
 import com.gow3.android.data.LogArchive
 import com.gow3.android.data.LogManager
 import com.gow3.android.data.LogResult
@@ -40,7 +45,11 @@ import com.gow3.android.ui.components.LauncherColors
 import com.gow3.android.ui.components.ScreenColumn
 
 @Composable
-internal fun AboutScreen(saves: SaveManager, logs: LogManager) {
+internal fun AboutScreen(
+    saves: SaveManager,
+    logs: LogManager,
+    onChangeLanguage: (String) -> Unit,
+) {
     val context = LocalContext.current
     var hasSaves by remember { mutableStateOf(SaveArchive.hasSaves(saves.savedataDir())) }
     var hasLogs by remember { mutableStateOf(LogArchive.hasLogs(logs.logsDir())) }
@@ -66,9 +75,9 @@ internal fun AboutScreen(saves: SaveManager, logs: LogManager) {
     }
 
     ScreenColumn {
-        Text("God of War III for Android", color = LauncherColors.textPrimary, fontFamily = FontFamily.Serif, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text("Version 1.2.4", color = LauncherColors.gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        Text("A community launcher bringing the God of War III Remastered experience to Android via emulation.", color = LauncherColors.textMuted, fontSize = 13.sp, lineHeight = 19.sp)
+        Text(stringResource(R.string.about_title), color = LauncherColors.textPrimary, fontFamily = FontFamily.Serif, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.about_version_fmt, "1.2.4"), color = LauncherColors.gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.about_description), color = LauncherColors.textMuted, fontSize = 13.sp, lineHeight = 19.sp)
         Spacer(Modifier.height(8.dp))
         ContactCard()
         SaveCard(
@@ -121,8 +130,54 @@ internal fun AboutScreen(saves: SaveManager, logs: LogManager) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("Third-party licenses", color = LauncherColors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(stringResource(R.string.about_third_party_licenses), color = LauncherColors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             Text("›", color = LauncherColors.gold, fontSize = 24.sp)
+        }
+        LanguageSetting(onChangeLanguage)
+    }
+}
+
+/** 语言 / Language 设置：跟随系统 / 简体中文 / English，切换后由调用方持久化并重建。 */
+@Composable
+private fun LanguageSetting(onChange: (String) -> Unit) {
+    val context = LocalContext.current
+    val current = LanguageManager.read(context)
+    val options = listOf(
+        R.string.language_follow_system to LanguageManager.FOLLOW_SYSTEM,
+        R.string.language_zh to LanguageManager.ZH,
+        R.string.language_en to LanguageManager.EN,
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(LauncherColors.surface)
+            .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.4f)), RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(stringResource(R.string.language_setting), color = LauncherColors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            options.forEach { (labelRes, value) ->
+                val selected = current == value
+                Text(
+                    stringResource(labelRes),
+                    color = if (selected) LauncherColors.textPrimary else LauncherColors.textMuted,
+                    fontSize = 12.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (selected) LauncherColors.crimson else LauncherColors.navSurface)
+                        .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.45f)), RoundedCornerShape(8.dp))
+                        .clickable { onChange(value) }
+                        .padding(vertical = 10.dp, horizontal = 8.dp),
+                )
+            }
         }
     }
 }

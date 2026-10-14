@@ -19,13 +19,24 @@ import java.util.zip.ZipOutputStream
  * 只有当所有条目都位于该目录树之下（包括 `<title>.memory/` 的 SaveDataMemory 目录）
  * 时，归档才会被接受。
  */
+/**
+ * 存档归档校验失败的原因；由 UI 层（SaveManager）映射为本地化提示文本。
+ * 纯 JVM 类型，不依赖 Android。
+ */
+internal sealed class SaveArchiveProblem {
+    object NotAZip : SaveArchiveProblem()
+    object NoContent : SaveArchiveProblem()
+    data class UnsafePath(val name: String) : SaveArchiveProblem()
+    data class DuplicateEntry(val name: String) : SaveArchiveProblem()
+    data class WrongLayout(val name: String) : SaveArchiveProblem()
+    data class UnsupportedTitle(val name: String) : SaveArchiveProblem()
+}
+
 internal object SaveArchive {
 
     const val USER_ID = "1"
     const val TITLE_ID = "CUSA01623"
-    private const val ROOT = "savedata"
-
-    /** 当目录中至少含一个存档文件（游戏非空的 savedata 目录树）时为 true。 */
+    private const val ROOT = "savedata"    /** 当目录中至少含一个存档文件（游戏非空的 savedata 目录树）时为 true。 */
     fun hasSaves(savedata: File): Boolean =
         savedata.isDirectory && savedata.walkTopDown().any { it.isFile }
 
@@ -62,7 +73,7 @@ internal object SaveArchive {
     }
 
     /** 当 [input] 是有效的 God of War III 存档归档时返回 null，否则返回失败原因。 */
-    fun validate(input: InputStream): String? {
+    fun validate(input: InputStream): SaveArchiveProblem? {
         val seen = HashSet<String>()
         var contentFiles = 0
         try {
@@ -70,22 +81,22 @@ internal object SaveArchive {
                 while (true) {
                     val entry = zip.nextEntry ?: break
                     val name = entry.name
-                    val reason = validateEntry(name, seen)
-                    if (reason != null) return reason
+                    val problem = validateEntry(name, seen)
+                    if (problem != null) return problem
                     if (!entry.isDirectory) contentFiles++
                 }
             }
         } catch (_: Exception) {
-            return "所选文件不是有效的 zip 归档"
+            return SaveArchiveProblem.NotAZip
         }
-        return if (contentFiles == 0) "归档中没有可导入的存档内容" else null
+        return if (contentFiles == 0) SaveArchiveProblem.NoContent else null
     }
 
-    private fun validateEntry(name: String, seen: MutableSet<String>): String? {
-        if (!isSafePath(name)) return "归档包含非法路径：$name"
-        if (!seen.add(name)) return "归档包含重复路径：$name"
-        if (!name.startsWith(ROOT)) return "归档结构不是存档布局：$name"
-        if (!isSupportedName(name)) return "归档标题与 God of War III（$TITLE_ID）不匹配：$name"
+    private fun validateEntry(name: String, seen: MutableSet<String>): SaveArchiveProblem? {
+        if (!isSafePath(name)) return SaveArchiveProblem.UnsafePath(name)
+        if (!seen.add(name)) return SaveArchiveProblem.DuplicateEntry(name)
+        if (!name.startsWith(ROOT)) return SaveArchiveProblem.WrongLayout(name)
+        if (!isSupportedName(name)) return SaveArchiveProblem.UnsupportedTitle(name)
         return null
     }
 
@@ -134,10 +145,10 @@ internal object SaveArchive {
     fun replaceStaging(staging: File, savedata: File) {
         val old = File(savedata.parentFile, "savedata.old")
         old.deleteRecursively()
-        if (savedata.exists() && !savedata.renameTo(old)) throw IllegalStateException("无法移开现有存档")
+        if (savedata.exists() && !savedata.renameTo(old)) throw IllegalStateException("could not move aside the existing savedata")
         if (!staging.renameTo(savedata)) {
             if (old.exists()) old.renameTo(savedata)
-            throw IllegalStateException("无法应用导入的存档")
+            throw IllegalStateException("could not apply the imported saves")
         }
         old.deleteRecursively()
     }

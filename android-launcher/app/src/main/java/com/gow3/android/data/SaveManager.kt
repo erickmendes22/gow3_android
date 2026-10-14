@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.gow3.android.R
 import java.io.File
 import java.io.FileInputStream
 
@@ -44,7 +45,7 @@ internal class SaveManager(private val activity: Activity) {
      */
     fun launchExport(onResult: (SaveResult) -> Unit) {
         if (!SaveArchive.hasSaves(savedataDir())) {
-            onResult(SaveResult.Failed("暂无存档可导出"))
+            onResult(SaveResult.Failed(activity.getString(R.string.save_no_saves)))
             return
         }
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
@@ -57,7 +58,7 @@ internal class SaveManager(private val activity: Activity) {
             activity.startActivityForResult(intent, REQUEST_EXPORT)
         } catch (ex: Exception) {
             pending = null
-            onResult(SaveResult.Failed("No file picker is available on this device (${ex.message ?: "unknown error"})."))
+            onResult(SaveResult.Failed(activity.getString(R.string.no_file_picker_fmt, ex.message ?: activity.getString(R.string.unknown_error))))
         }
     }
 
@@ -75,7 +76,7 @@ internal class SaveManager(private val activity: Activity) {
             activity.startActivityForResult(intent, REQUEST_IMPORT)
         } catch (ex: Exception) {
             pending = null
-            onResult(SaveResult.Failed("No file picker is available on this device (${ex.message ?: "unknown error"})."))
+            onResult(SaveResult.Failed(activity.getString(R.string.no_file_picker_fmt, ex.message ?: activity.getString(R.string.unknown_error))))
         }
     }
 
@@ -105,19 +106,19 @@ internal class SaveManager(private val activity: Activity) {
      */
     private fun exportTo(uri: Uri): SaveResult {
         val savedata = savedataDir()
-        if (!SaveArchive.hasSaves(savedata)) return SaveResult.Failed("暂无存档可导出")
+        if (!SaveArchive.hasSaves(savedata)) return SaveResult.Failed(activity.getString(R.string.save_no_saves))
         val temporary = File(activity.filesDir, "gow3port/.export-saves.tmp")
         temporary.delete()
         return try {
             SaveArchive.pack(savedata, temporary)
             val output = activity.contentResolver.openOutputStream(uri)
-                ?: return SaveResult.Failed("无法写入所选位置，未改动任何存档。")
+                ?: return SaveResult.Failed(activity.getString(R.string.save_write_failed))
             output.use { out ->
                 FileInputStream(temporary).use { it.copyTo(out) }
             }
-            SaveResult.Success("存档已导出：${displayName(uri) ?: "所选位置"}")
+            SaveResult.Success(activity.getString(R.string.save_exported_fmt, displayName(uri) ?: activity.getString(R.string.selected_location)))
         } catch (ex: Exception) {
-            SaveResult.Failed("存档导出失败：${ex.message ?: "未知错误"}")
+            SaveResult.Failed(activity.getString(R.string.save_export_failed_fmt, ex.message ?: activity.getString(R.string.unknown_error)))
         } finally {
             temporary.delete()
         }
@@ -129,25 +130,25 @@ internal class SaveManager(private val activity: Activity) {
         val staging = File(user, "savedata.restoring")
         return try {
             val first = activity.contentResolver.openInputStream(uri)
-                ?: return SaveResult.Failed("无法读取所选文件。")
+                ?: return SaveResult.Failed(activity.getString(R.string.save_read_failed))
             val problem = first.use { SaveArchive.validate(it) }
-            if (problem != null) return SaveResult.Failed(problem)
+            if (problem != null) return SaveResult.Failed(saveArchiveProblemMessage(problem))
 
             staging.deleteRecursively()
             val second = activity.contentResolver.openInputStream(uri)
-                ?: return SaveResult.Failed("无法读取所选文件。")
+                ?: return SaveResult.Failed(activity.getString(R.string.save_read_failed))
             second.use { SaveArchive.extract(it, staging) }
 
             val savedata = savedataDir()
             val backup = backupExisting(savedata)
             SaveArchive.replaceStaging(staging, savedata)
             SaveResult.Success(
-                if (backup != null) "存档导入成功，导入前的存档已备份到 ${backup.name}。"
-                else "存档导入成功。",
+                if (backup != null) activity.getString(R.string.save_imported_with_backup_fmt, backup.name)
+                else activity.getString(R.string.save_imported),
             )
         } catch (ex: Exception) {
             staging.deleteRecursively()
-            SaveResult.Failed("存档导入失败：${ex.message ?: "未知错误"}")
+            SaveResult.Failed(activity.getString(R.string.save_import_failed_fmt, ex.message ?: activity.getString(R.string.unknown_error)))
         }
     }
 
@@ -161,9 +162,18 @@ internal class SaveManager(private val activity: Activity) {
         return target
     }
 
+    /** 把纯逻辑的 [SaveArchiveProblem] 映射为本地化提示文本。 */
+    private fun saveArchiveProblemMessage(problem: SaveArchiveProblem): String = when (problem) {
+        is SaveArchiveProblem.NotAZip -> activity.getString(R.string.save_archive_not_zip)
+        is SaveArchiveProblem.NoContent -> activity.getString(R.string.save_archive_no_content)
+        is SaveArchiveProblem.UnsafePath -> activity.getString(R.string.save_archive_unsafe_path_fmt, problem.name)
+        is SaveArchiveProblem.DuplicateEntry -> activity.getString(R.string.save_archive_duplicate_fmt, problem.name)
+        is SaveArchiveProblem.WrongLayout -> activity.getString(R.string.save_archive_wrong_layout_fmt, problem.name)
+        is SaveArchiveProblem.UnsupportedTitle -> activity.getString(R.string.save_archive_title_fmt, problem.name, SaveArchive.TITLE_ID)
+    }
+
     /** Provider 的显示名称，回退到 URI 的最后一段。 */
-    private fun displayName(uri: Uri): String? {
-        try {
+    private fun displayName(uri: Uri): String? {        try {
             activity.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
                 val column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                 if (column >= 0 && cursor.moveToFirst()) {

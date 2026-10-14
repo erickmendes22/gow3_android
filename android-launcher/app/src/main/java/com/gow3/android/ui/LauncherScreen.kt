@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,6 +54,7 @@ internal fun LauncherScreen(
     onChooseUpdateFolder: () -> Unit,
     saves: SaveManager,
     logs: LogManager,
+    onChangeLanguage: (String) -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(LauncherTab.HOME.ordinal) }
     val tab = LauncherTab.entries[selectedTab]
@@ -80,7 +82,7 @@ internal fun LauncherScreen(
             when (tab) {
                 LauncherTab.HOME -> HomeScreen(onStartGame, losslessDlls, onGetFromSteam, onChooseGameFolder, onChooseUpdateFolder)
                 LauncherTab.MODS -> ModsScreen()
-                LauncherTab.ABOUT -> AboutScreen(saves, logs)
+                LauncherTab.ABOUT -> AboutScreen(saves, logs, onChangeLanguage)
             }
         }
     }
@@ -105,9 +107,9 @@ private fun BottomNavigation(selectedTab: LauncherTab, onTabSelected: (LauncherT
                 .padding(4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            NavItem(LauncherTab.HOME, selectedTab == LauncherTab.HOME, "HOME", "⌂", onTabSelected)
+            NavItem(LauncherTab.HOME, selectedTab == LauncherTab.HOME, stringResource(R.string.nav_home), "⌂", onTabSelected)
 //        NavItem(LauncherTab.MODS, selectedTab == LauncherTab.MODS, "MOD & PATCH", "⚙", onTabSelected)
-            NavItem(LauncherTab.ABOUT, selectedTab == LauncherTab.ABOUT, "ABOUT", "ⓘ", onTabSelected)
+            NavItem(LauncherTab.ABOUT, selectedTab == LauncherTab.ABOUT, stringResource(R.string.nav_about), "ⓘ", onTabSelected)
         }
     }
 

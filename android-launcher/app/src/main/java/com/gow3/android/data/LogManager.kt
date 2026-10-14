@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.gow3.android.R
 import java.io.File
 import java.io.FileInputStream
 
@@ -40,7 +41,7 @@ internal class LogManager(private val activity: Activity) {
      */
     fun launchExport(onResult: (LogResult) -> Unit) {
         if (!LogArchive.hasLogs(logsDir())) {
-            onResult(LogResult.Failed("暂无日志可导出"))
+            onResult(LogResult.Failed(activity.getString(R.string.log_no_logs)))
             return
         }
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
@@ -53,7 +54,7 @@ internal class LogManager(private val activity: Activity) {
             activity.startActivityForResult(intent, REQUEST_EXPORT)
         } catch (ex: Exception) {
             pending = null
-            onResult(LogResult.Failed("No file picker is available on this device (${ex.message ?: "unknown error"})."))
+            onResult(LogResult.Failed(activity.getString(R.string.no_file_picker_fmt, ex.message ?: activity.getString(R.string.unknown_error))))
         }
     }
 
@@ -81,19 +82,19 @@ internal class LogManager(private val activity: Activity) {
      */
     private fun exportTo(uri: Uri): LogResult {
         val logs = logsDir()
-        if (!LogArchive.hasLogs(logs)) return LogResult.Failed("暂无日志可导出")
+        if (!LogArchive.hasLogs(logs)) return LogResult.Failed(activity.getString(R.string.log_no_logs))
         val temporary = File(activity.filesDir, "gow3port/.export-logs.tmp")
         temporary.delete()
         return try {
             LogArchive.pack(logs, temporary)
             val output = activity.contentResolver.openOutputStream(uri)
-                ?: return LogResult.Failed("无法写入所选位置，日志未被修改。")
+                ?: return LogResult.Failed(activity.getString(R.string.log_write_failed))
             output.use { out ->
                 FileInputStream(temporary).use { it.copyTo(out) }
             }
-            LogResult.Success("日志已导出：${displayName(uri) ?: "所选位置"}")
+            LogResult.Success(activity.getString(R.string.log_exported_fmt, displayName(uri) ?: activity.getString(R.string.selected_location)))
         } catch (ex: Exception) {
-            LogResult.Failed("日志导出失败：${ex.message ?: "未知错误"}")
+            LogResult.Failed(activity.getString(R.string.log_export_failed_fmt, ex.message ?: activity.getString(R.string.unknown_error)))
         } finally {
             temporary.delete()
         }

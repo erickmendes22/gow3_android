@@ -13,9 +13,11 @@ import shutil
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -62,10 +64,25 @@ def sha256(path):
     return digest.hexdigest()
 
 
-def download(url, destination):
-    request = urllib.request.Request(url, headers={'User-Agent': 'gow3port-rootfs-fetch/1'})
-    with urllib.request.urlopen(request, timeout=120) as response, destination.open('wb') as stream:
-        shutil.copyfileobj(response, stream, length=1024 * 1024)
+def download(url, destination, attempts=4):
+    # GitHub's release CDN intermittently answers 5xx for the redirected asset; retry with
+    # backoff so a transient failure does not fail the whole build. Each attempt re-requests
+    # the redirect and therefore gets a fresh signed asset URL.
+    for attempt in range(1, attempts + 1):
+        try:
+            request = urllib.request.Request(url, headers={'User-Agent': 'gow3port-rootfs-fetch/1'})
+            with urllib.request.urlopen(request, timeout=120) as response, destination.open('wb') as stream:
+                shutil.copyfileobj(response, stream, length=1024 * 1024)
+            return
+        except HTTPError as error:
+            if error.code < 500 or attempt == attempts:
+                raise
+        except (URLError, TimeoutError):
+            if attempt == attempts:
+                raise
+        delay = 2 ** (attempt + 1)
+        print(f'Download attempt {attempt}/{attempts} failed; retrying in {delay}s...', flush=True)
+        time.sleep(delay)
 
 
 def safe_tar_members(archive):

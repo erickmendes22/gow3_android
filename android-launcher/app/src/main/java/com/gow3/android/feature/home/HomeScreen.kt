@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.gow3.android.R
 import com.gow3.android.data.Gow3Ini
 import com.gow3.android.data.ImportResult
 import com.gow3.android.data.LosslessDllManager
@@ -85,14 +87,14 @@ internal fun HomeScreen(
         if (Gow3Ini.write(gow3IniFile(context), mapOf(key to value))) {
             iniValues = iniValues + (key to value)
         } else {
-            Toast.makeText(context, "Settings could not be saved", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.settings_save_failed), Toast.LENGTH_SHORT).show()
         }
     }
 
     ScreenColumn(horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(36.dp))
-        Text("GOD OF WAR III", color = LauncherColors.textPrimary, fontFamily = FontFamily.Serif, fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
-        Text("REMASTERED", color = LauncherColors.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 2.sp)
+        Text(stringResource(R.string.title_god_of_war_iii), color = LauncherColors.textPrimary, fontFamily = FontFamily.Serif, fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+        Text(stringResource(R.string.title_remastered), color = LauncherColors.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 2.sp)
         Spacer(Modifier.height(28.dp))
         LaunchButton(onStartGame)
         Spacer(Modifier.height(20.dp))
@@ -106,7 +108,7 @@ internal fun HomeScreen(
                     when (result) {
                         is ImportResult.Success -> {
                             refreshDll()
-                            toast("Imported ${LosslessDllManager.FILE_NAME} (${formatBytes(result.state.sizeBytes)})")
+                            toast(context.getString(R.string.home_imported_fmt, LosslessDllManager.FILE_NAME, formatBytes(result.state.sizeBytes)))
                         }
                         ImportResult.Cancelled -> refreshDll()
                         is ImportResult.Failed -> toast(result.message)
@@ -127,9 +129,9 @@ internal fun HomeScreen(
                         refreshDll()
                         toast(
                             if (result.gameFolderRemains)
-                                "Removed the launcher copy. The Lossless.dll beside the game folder is yours to delete."
+                                context.getString(R.string.home_removed_game_folder_copy)
                             else
-                                "${LosslessDllManager.FILE_NAME} removed",
+                                context.getString(R.string.home_removed_fmt, LosslessDllManager.FILE_NAME),
                         )
                     }
                     is RemoveResult.Failed -> toast(result.message)
@@ -165,7 +167,7 @@ private fun LaunchButton(onClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("LAUNCH", color = LauncherColors.textPrimary, fontFamily = FontFamily.Serif, fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = 1.3.sp)
-        Text("START GAME", color = LauncherColors.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.5.sp)
+        Text(stringResource(R.string.launch_button), color = LauncherColors.textPrimary, fontFamily = FontFamily.Serif, fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = 1.3.sp)
+        Text(stringResource(R.string.start_game_button), color = LauncherColors.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.5.sp)
     }
 }

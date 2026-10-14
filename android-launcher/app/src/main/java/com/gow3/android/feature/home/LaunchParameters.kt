@@ -24,12 +24,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.gow3.android.R
 import com.gow3.android.data.LaunchParam
 import com.gow3.android.data.LaunchParams
 import com.gow3.android.ui.components.LauncherColors
@@ -43,7 +46,8 @@ internal fun LaunchParameters(
     onChooseGameFolder: () -> Unit,
     onChooseUpdateFolder: () -> Unit,
 ) {
-    val groups = LaunchParams.all.groupBy { it.group }
+    val context = LocalContext.current
+    val groups = LaunchParams.all.groupBy { it.groupRes }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -53,9 +57,9 @@ internal fun LaunchParameters(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("LAUNCH PARAMETERS", color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+        Text(stringResource(R.string.launch_parameters_title), color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
         Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Text("GAME", color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Text(stringResource(R.string.launch_parameters_group_game), color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -65,11 +69,11 @@ internal fun LaunchParameters(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Game folder", color = LauncherColors.textMuted, fontSize = 13.sp)
-                Text("CHANGE  ›", color = LauncherColors.gold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp)
+                Text(stringResource(R.string.game_folder_label), color = LauncherColors.textMuted, fontSize = 13.sp)
+                Text(stringResource(R.string.change_button), color = LauncherColors.gold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp)
             }
             Text(
-                gameDir ?: "Not selected",
+                gameDir ?: stringResource(R.string.game_folder_not_selected),
                 color = if (gameDir != null) LauncherColors.textPrimary else LauncherColors.textMuted,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -77,7 +81,7 @@ internal fun LaunchParameters(
                 overflow = TextOverflow.Ellipsis,
                 softWrap = false,
             )
-            Text("Tap to choose a different folder", color = LauncherColors.textMuted, fontSize = 10.sp)
+            Text(stringResource(R.string.game_folder_hint), color = LauncherColors.textMuted, fontSize = 10.sp)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -87,11 +91,11 @@ internal fun LaunchParameters(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Update folder", color = LauncherColors.textMuted, fontSize = 13.sp)
-                Text("CHANGE  ›", color = LauncherColors.gold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp)
+                Text(stringResource(R.string.update_folder_label), color = LauncherColors.textMuted, fontSize = 13.sp)
+                Text(stringResource(R.string.change_button), color = LauncherColors.gold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp)
             }
             Text(
-                updateDir ?: "Not set (use the game folder as-is)",
+                updateDir ?: stringResource(R.string.update_folder_not_set),
                 color = if (updateDir != null) LauncherColors.textPrimary else LauncherColors.textMuted,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -99,20 +103,21 @@ internal fun LaunchParameters(
                 overflow = TextOverflow.Ellipsis,
                 softWrap = false,
             )
-            Text("Optional: the game's update (patch) folder, e.g. CUSA01740-patch. Laid over the game at start.", color = LauncherColors.textMuted, fontSize = 10.sp)
+            Text(stringResource(R.string.update_folder_description), color = LauncherColors.textMuted, fontSize = 10.sp)
         }
-        groups.forEach { (title, params) ->
+        groups.forEach { (titleRes, params) ->
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text(title, color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text(context.getString(titleRes), color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 params.forEach { param -> ParamRow(param, ini, save) }
             }
         }
-        Text("Changes are saved to gow3.ini immediately and take effect at the next launch.", color = LauncherColors.textMuted, fontSize = 11.sp, lineHeight = 16.sp)
+        Text(stringResource(R.string.launch_parameters_footer), color = LauncherColors.textMuted, fontSize = 11.sp, lineHeight = 16.sp)
     }
 }
 
 @Composable
 private fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (String, String) -> Unit) {
+    val context = LocalContext.current
     var showInfo by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
@@ -125,8 +130,8 @@ private fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (Str
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(param.label, color = LauncherColors.textMuted, fontSize = 13.sp)
-            if (param.description != null) {
+            Text(context.getString(param.labelRes), color = LauncherColors.textMuted, fontSize = 13.sp)
+            if (param.descriptionRes != null) {
                 Text(
                     "ⓘ",
                     color = LauncherColors.gold,
@@ -148,7 +153,7 @@ private fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (Str
             var expanded by remember { mutableStateOf(false) }
             Box {
                 Text(
-                    LaunchParams.labelOf(values, param) + "  ▾",
+                    selectedLabel(context, values, param) + "  ▾",
                     color = LauncherColors.textPrimary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -162,7 +167,7 @@ private fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (Str
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     param.options.forEach { option ->
                         DropdownMenuItem(
-                            text = { Text(option.label) },
+                            text = { Text(context.getString(option.labelRes)) },
                             onClick = {
                                 expanded = false
                                 save(param.key, option.value)
@@ -173,9 +178,19 @@ private fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (Str
             }
         }
     }
-    if (showInfo && param.description != null) {
-        ParamInfoDialog(title = param.label, message = param.description, onDismiss = { showInfo = false })
+    if (showInfo && param.descriptionRes != null) {
+        ParamInfoDialog(
+            title = context.getString(param.labelRes),
+            message = context.getString(param.descriptionRes),
+            onDismiss = { showInfo = false },
+        )
     }
+}
+
+/** 当前值对应的本地化展示名；未知值回退到原始值。 */
+private fun selectedLabel(context: android.content.Context, values: Map<String, String>, param: LaunchParam): String {
+    val option = LaunchParams.selectedOption(values, param)
+    return option?.let { context.getString(it.labelRes) } ?: LaunchParams.valueOf(values, param)
 }
 
 @Composable
@@ -193,7 +208,7 @@ private fun ParamInfoDialog(title: String, message: String, onDismiss: () -> Uni
             Text(title, color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
             Text(message, color = LauncherColors.textMuted, fontSize = 13.sp, lineHeight = 19.sp)
             Text(
-                "OK",
+                stringResource(R.string.dialog_ok),
                 color = LauncherColors.textPrimary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,

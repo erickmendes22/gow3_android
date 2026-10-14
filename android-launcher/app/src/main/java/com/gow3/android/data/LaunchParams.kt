@@ -1,19 +1,24 @@
 package com.gow3.android.data
 
+import com.gow3.android.R
+
 /**
  * 一个可编辑的启动参数：其 gow3.ini 键、显示标签、分组以及 Android 运行时
  * 实际消费的取值域。`defaultValue` 是键缺失时 UI 显示的值。
+ *
+ * 显示标签、分组与说明使用字符串资源 id（labelRes / groupRes / descriptionRes），
+ * 由 UI 层通过 Context 解析，数据层保持纯 JVM 结构、不依赖 Android。
  */
 internal data class LaunchParam(
     val key: String,
-    val label: String,
-    val group: String,
+    val labelRes: Int,
+    val groupRes: Int,
     val options: List<LaunchOption>,
     val defaultValue: String,
-    val description: String? = null,
+    val descriptionRes: Int? = null,
 )
 
-internal data class LaunchOption(val value: String, val label: String)
+internal data class LaunchOption(val value: String, val labelRes: Int)
 
 /**
  * launcher 编辑的启动参数，由 Android 运行时消费的 gow3.ini 键支撑。
@@ -30,97 +35,97 @@ internal data class LaunchOption(val value: String, val label: String)
 internal object LaunchParams {
     val all: List<LaunchParam> = listOf(
         LaunchParam(
-            key = "upscaler", label = "Upscaler", group = "DISPLAY",
+            key = "upscaler", labelRes = R.string.param_upscaler, groupRes = R.string.param_group_display,
             options = listOf(
-                LaunchOption("off", "Off (render at 1280×720)"),
-                LaunchOption("fsr3", "FSR 3.1"),
+                LaunchOption("off", R.string.param_option_off_720p),
+                LaunchOption("fsr3", R.string.param_option_fsr31),
             ),
             defaultValue = "fsr3",
-            description = "Renders the game at a lower internal resolution and then uses FSR 3.1 to scale the image up to your screen, so you get more performance while keeping a sharp picture. Off renders at a fixed 1280×720.",
+            descriptionRes = R.string.param_desc_upscaler,
         ),
         LaunchParam(
-            key = "render_resolution", label = "Resolution", group = "DISPLAY",
+            key = "render_resolution", labelRes = R.string.param_resolution, groupRes = R.string.param_group_display,
             options = listOf(
-                LaunchOption("native", "Native"),
-                LaunchOption("480p", "480p"),
-                LaunchOption("720p", "720p"),
-                LaunchOption("800p", "800p"),
-                LaunchOption("1440p", "1440p"),
-                LaunchOption("1800p", "1800p"),
-                LaunchOption("4K", "4K"),
+                LaunchOption("native", R.string.param_option_native),
+                LaunchOption("480p", R.string.param_option_480p),
+                LaunchOption("720p", R.string.param_option_720p),
+                LaunchOption("800p", R.string.param_option_800p),
+                LaunchOption("1440p", R.string.param_option_1440p),
+                LaunchOption("1800p", R.string.param_option_1800p),
+                LaunchOption("4K", R.string.param_option_4k),
             ),
             // 移动端优化默认值：720p 内部分辨率 + FSR 升采样，手机/平板上更流畅省电。
             // 与 tools/android/config/gow3-default.ini 保持一致。
             defaultValue = "720p",
         ),
         LaunchParam(
-            key = "fps_limit", label = "FPS limit", group = "PERFORMANCE",
+            key = "fps_limit", labelRes = R.string.param_fps_limit, groupRes = R.string.param_group_performance,
             options = listOf(
-                LaunchOption("30", "30"),
-                LaunchOption("60", "60"),
-                LaunchOption("120", "120"),
-                LaunchOption("240", "240"),
-                LaunchOption("0", "Unlimited"),
+                LaunchOption("30", R.string.param_option_30),
+                LaunchOption("60", R.string.param_option_60),
+                LaunchOption("120", R.string.param_option_120),
+                LaunchOption("240", R.string.param_option_240),
+                LaunchOption("0", R.string.param_option_unlimited),
             ),
             // 移动端优化默认值：以 60 封顶，避免无限帧率导致发热与耗电。
             // 与 tools/android/config/gow3-default.ini 保持一致。
             defaultValue = "60",
         ),
         LaunchParam(
-            key = "engine_fps", label = "Engine FPS", group = "PERFORMANCE",
+            key = "engine_fps", labelRes = R.string.param_engine_fps, groupRes = R.string.param_group_performance,
             options = listOf(
-                LaunchOption("60", "60 (the game's own)"),
-                LaunchOption("120", "120"),
-                LaunchOption("240", "240"),
+                LaunchOption("60", R.string.param_option_engine_60),
+                LaunchOption("120", R.string.param_option_120),
+                LaunchOption("240", R.string.param_option_240),
             ),
             // 移动端优化默认值：游戏原生引擎速度，最稳定、最省电。
             // 与 tools/android/config/gow3-default.ini 保持一致。
             defaultValue = "60",
-            description = "How fast the game engine itself updates the game world, separate from the display. 60 is the game's original speed; higher values make motion smoother but use more power.",
+            descriptionRes = R.string.param_desc_engine_fps,
         ),
         LaunchParam(
-            key = "vsync", label = "VSync", group = "PERFORMANCE",
+            key = "vsync", labelRes = R.string.param_vsync, groupRes = R.string.param_group_performance,
             options = listOf(
-                LaunchOption("0", "OFF"),
-                LaunchOption("1", "ON"),
+                LaunchOption("0", R.string.param_option_off),
+                LaunchOption("1", R.string.param_option_on),
             ),
             defaultValue = "1",
-            description = "Syncs the game's frames with your screen's refresh rate to stop visual tearing. Leave it ON unless you see tearing or stutter.",
+            descriptionRes = R.string.param_desc_vsync,
         ),
         LaunchParam(
-            key = "frames_queued", label = "Frames queued", group = "PERFORMANCE",
+            key = "frames_queued", labelRes = R.string.param_frames_queued, groupRes = R.string.param_group_performance,
             options = listOf(
-                LaunchOption("1", "1 (lowest latency)"),
-                LaunchOption("2", "2"),
-                LaunchOption("0", "Unlimited"),
+                LaunchOption("1", R.string.param_option_frames_1),
+                LaunchOption("2", R.string.param_option_frames_2),
+                LaunchOption("0", R.string.param_option_unlimited),
             ),
             defaultValue = "1",
-            description = "How many frames the game prepares ahead of what the screen shows. Lower numbers cut input lag; higher numbers can improve smoothness on weaker hardware.",
+            descriptionRes = R.string.param_desc_frames_queued,
         ),
         LaunchParam(
-            key = "skip_network_choice", label = "Offline start", group = "STARTUP",
+            key = "skip_network_choice", labelRes = R.string.param_offline_start, groupRes = R.string.param_group_startup,
             options = listOf(
-                LaunchOption("0", "OFF"),
-                LaunchOption("1", "ON"),
-            ),
-            defaultValue = "1",
-        ),
-        LaunchParam(
-            key = "skip_intro", label = "Skip intros", group = "STARTUP",
-            options = listOf(
-                LaunchOption("0", "OFF"),
-                LaunchOption("1", "ON"),
+                LaunchOption("0", R.string.param_option_off),
+                LaunchOption("1", R.string.param_option_on),
             ),
             defaultValue = "1",
         ),
         LaunchParam(
-            key = "debug_camera", label = "Free camera", group = "STARTUP",
+            key = "skip_intro", labelRes = R.string.param_skip_intros, groupRes = R.string.param_group_startup,
             options = listOf(
-                LaunchOption("0", "OFF"),
-                LaunchOption("1", "ON"),
+                LaunchOption("0", R.string.param_option_off),
+                LaunchOption("1", R.string.param_option_on),
+            ),
+            defaultValue = "1",
+        ),
+        LaunchParam(
+            key = "debug_camera", labelRes = R.string.param_free_camera, groupRes = R.string.param_group_startup,
+            options = listOf(
+                LaunchOption("0", R.string.param_option_off),
+                LaunchOption("1", R.string.param_option_on),
             ),
             defaultValue = "0",
-            description = "Lets you move the camera freely around the world for exploring or testing, instead of following the gameplay camera. Meant for experimentation, not normal play.",
+            descriptionRes = R.string.param_desc_free_camera,
         ),
     )
 
@@ -130,9 +135,9 @@ internal object LaunchParams {
         return if (v.isNullOrEmpty()) param.defaultValue else v
     }
 
-    /** 当前值的人类可读标签；未知值回退到原始值。 */
-    fun labelOf(ini: Map<String, String>, param: LaunchParam): String {
+    /** 当前值对应的选项；未知值返回 null（由 UI 层回退到原始值）。 */
+    fun selectedOption(ini: Map<String, String>, param: LaunchParam): LaunchOption? {
         val v = valueOf(ini, param)
-        return param.options.firstOrNull { it.value == v }?.label ?: v
+        return param.options.firstOrNull { it.value == v }
     }
 }
