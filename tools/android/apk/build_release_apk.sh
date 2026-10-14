@@ -12,7 +12,7 @@ python3 tools/android/runtime/build_release_runtime.py
 # (android-launcher/app/build.gradle.kts: out/android-release/assets).
 mkdir -p out/android-release/assets
 cp out/release/runtime.tar.gz out/android-release/assets/runtime.payload
-cp out/release/runtime.tar.gz.sha256 out/android-release/assets/runtime.sha256
+cp out/release/runtime.sha256 out/android-release/assets/runtime.sha256
 
 "$root/android-launcher/gradlew" -p "$root/android-launcher" :app:assembleRelease
 unsigned="$root/android-launcher/app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk"
