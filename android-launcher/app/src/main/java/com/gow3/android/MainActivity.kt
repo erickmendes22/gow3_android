@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
 import com.gow3.android.data.GameFolderManager
+import com.gow3.android.data.LogManager
 import com.gow3.android.data.LosslessDllManager
 import com.gow3.android.data.SaveManager
 import com.gow3.android.ui.LauncherScreen
@@ -16,6 +17,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var gameFolderManager: GameFolderManager
     private lateinit var losslessDllManager: LosslessDllManager
     private lateinit var saveManager: SaveManager
+    private lateinit var logManager: LogManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,6 +29,7 @@ class MainActivity : ComponentActivity() {
         gameFolderManager = GameFolderManager(this)
         losslessDllManager = LosslessDllManager(this)
         saveManager = SaveManager(this)
+        logManager = LogManager(this)
         setContent {
             Gow3LauncherTheme(dynamicColor = false) {
                 LauncherScreen(
@@ -41,6 +44,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onChooseGameFolder = { gameFolderManager.chooseGameFolder() },
                     saves = saveManager,
+                    logs = logManager,
                 )
             }
         }
@@ -57,6 +61,7 @@ class MainActivity : ComponentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (saveManager.onActivityResult(requestCode, resultCode, data)) return
+        if (logManager.onActivityResult(requestCode, resultCode, data)) return
         if (losslessDllManager.onPickerResult(requestCode, resultCode, data)) return
         gameFolderManager.onFolderResult(requestCode, resultCode, data)
     }

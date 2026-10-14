@@ -6,53 +6,52 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import java.io.File
 
-/** Where the effective Lossless.dll was found, in the order the runtime resolves it. */
+/** 按运行时解析顺序，记录有效 Lossless.dll 被发现的位置。 */
 internal enum class LosslessDllSource { GAME_FOLDER, APP_PRIVATE }
 
-/** What the launcher currently has installed, re-read from disk on every call to `resolve()`. */
+/** launcher 当前已安装的内容，每次调用 `resolve()` 时都会从磁盘重新读取。 */
 internal sealed class LosslessDllState {
     object NotInstalled : LosslessDllState()
     data class Installed(val file: File, val sizeBytes: Long, val source: LosslessDllSource) : LosslessDllState()
 }
 
-/** Outcome of one `IMPORT .DLL` attempt. Cancelled means the user backed out of the picker. */
+/** 一次 `IMPORT .DLL` 尝试的结果。Cancelled 表示用户在文件选择器中退出了。 */
 internal sealed class ImportResult {
     data class Success(val state: LosslessDllState.Installed) : ImportResult()
     object Cancelled : ImportResult()
     data class Failed(val message: String) : ImportResult()
 }
 
-/** Outcome of one `REMOVE`. The game-folder copy is never touched, only reported. */
+/** 一次 `REMOVE` 的结果。游戏目录中的副本不会被改动，只会被上报。 */
 internal sealed class RemoveResult {
     data class Done(val state: LosslessDllState, val gameFolderRemains: Boolean) : RemoveResult()
     data class Failed(val message: String) : RemoveResult()
 }
 
 /**
- * Owns the player's `Lossless.dll`: where the runtime looks for it, importing one the player
- * picked themselves, and telling the UI which copy is in effect.
+ * 负责玩家的 `Lossless.dll`：运行时在哪里查找它、导入玩家自己选择的文件，
+ * 并告知 UI 当前生效的是哪份副本。
  *
- * The lookup order is the single source of truth shared with the game runtime: the copy beside
- * the game folder wins, `filesDir/gow3port/Lossless.dll` is the fallback that both the Steam
- * download and the manual import write to. No third location is consulted, and nothing outside
- * the app-private directory is ever written or deleted — the player's game folder is read-only
- * to this class.
+ * 查找顺序是与游戏运行时共享的单一事实来源：游戏目录旁的同名副本优先，
+ * `filesDir/gow3port/Lossless.dll` 是 Steam 下载和手动导入都会写入的回退位置。
+ * 不查询第三个位置，也不会写入或删除应用私有目录之外的任何内容——对本类而言，
+ * 玩家的游戏目录是只读的。
  */
 internal class LosslessDllManager(private val activity: Activity) {
 
     companion object {
-        /** Distinct from GameFolderManager's 1001 (folder) and 1002 (storage permission). */
+        /** 区别于 GameFolderManager 的 1001（目录）和 1002（存储权限）。 */
         const val REQUEST_LOSSESS_DLL = 1003
         const val FILE_NAME = "Lossless.dll"
     }
 
-    /** Set by [launchPicker], consumed by [onPickerResult]; a cancel or a second launch clears it. */
+    /** 由 [launchPicker] 设置，由 [onPickerResult] 消费；取消或第二次启动会清空它。 */
     private var pending: ((ImportResult) -> Unit)? = null
 
-    /** Where Steam downloads and manual imports both land: the runtime's fallback location. */
+    /** Steam 下载和手动导入都会落地的位置：运行时的回退位置。 */
     fun appCopy(): File = File(activity.filesDir, "gow3port/$FILE_NAME")
 
-    /** The copy beside the game folder, or null when no game folder is chosen or it has no parent. */
+    /** 游戏目录旁的同名副本；未选择游戏目录或它没有父目录时返回 null。 */
     fun besideGameFolder(): File? {
         val dir = activity.getSharedPreferences("gow3", Activity.MODE_PRIVATE).getString("game_dir", null) ?: return null
         return try {
@@ -70,9 +69,9 @@ internal class LosslessDllManager(private val activity: Activity) {
     }
 
     /**
-     * Opens the system file picker. [onResult] always runs: the user cancelling, no picker being
-     * installed, a rejected file and a failed copy all come back as an [ImportResult], never as a
-     * throw. The result arrives through [onPickerResult] from the activity's legacy callback.
+     * 打开系统文件选择器。[onResult] 一定会执行：用户取消、没有安装选择器、
+     * 文件被拒绝和复制失败都会以 [ImportResult] 返回，绝不会抛异常。
+     * 结果通过 activity 的 legacy 回调经由 [onPickerResult] 到达。
      */
     fun launchPicker(onResult: (ImportResult) -> Unit) {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -88,7 +87,7 @@ internal class LosslessDllManager(private val activity: Activity) {
         }
     }
 
-    /** @return true when the request was ours and has been consumed. */
+    /** @return 当请求属于我们且已被消费时返回 true。 */
     fun onPickerResult(requestCode: Int, resultCode: Int, intent: Intent?): Boolean {
         if (requestCode != REQUEST_LOSSESS_DLL) return false
         val callback = pending
@@ -100,10 +99,9 @@ internal class LosslessDllManager(private val activity: Activity) {
     }
 
     /**
-     * Copies a player-supplied DLL to [appCopy]. Validation is by name, non-emptiness and
-     * readability only: the launcher ships no copy to compare against, and lsfg-vk — not us —
-     * decides which Lossless build loads, so parsing the PE header here would only risk
-     * rejecting a valid file.
+     * 将玩家提供的 DLL 复制到 [appCopy]。校验仅限文件名、非空和可读性：
+     * launcher 不附带任何可比对的副本，且由 lsfg-vk——而非我们——决定加载哪个
+     * Lossless 构建，因此在这里解析 PE 头只会带来误拒合法文件的风险。
      */
     fun importFrom(uri: Uri): ImportResult {
         val name = displayName(uri)
@@ -118,9 +116,9 @@ internal class LosslessDllManager(private val activity: Activity) {
     }
 
     /**
-     * Deletes the app-private copy only. When the game-folder copy is the effective one the player
-     * has to delete it themselves, so the caller is told via [RemoveResult.Done.gameFolderRemains]
-     * and the resulting state still reports it as installed.
+     * 只删除应用私有副本。当游戏目录副本才是生效副本时，需要玩家自行删除，
+     * 因此通过 [RemoveResult.Done.gameFolderRemains] 告知调用方，并且结果状态
+     * 仍将其报告为已安装。
      */
     fun remove(): RemoveResult {
         val own = appCopy()
@@ -130,9 +128,8 @@ internal class LosslessDllManager(private val activity: Activity) {
     }
 
     /**
-     * Writes to a temporary file in the same directory and renames it over the target, so a failure
-     * mid-copy can never leave the runtime reading a truncated Lossless.dll. rename(2) replaces
-     * the destination atomically.
+     * 先写入同一目录下的临时文件，再重命名覆盖目标，因此复制中途失败绝不会让
+     * 运行时读到被截断的 Lossless.dll。rename(2) 会原子地替换目标文件。
      */
     private fun copyInto(source: Uri): File? {
         val target = appCopy()
@@ -157,7 +154,7 @@ internal class LosslessDllManager(private val activity: Activity) {
     private fun installed(file: File, source: LosslessDllSource): LosslessDllState.Installed =
         LosslessDllState.Installed(file, if (file.isFile) file.length() else 0L, source)
 
-    /** The provider's display name, falling back to the URI's last segment. */
+    /** Provider 的显示名称，回退到 URI 的最后一段。 */
     private fun displayName(uri: Uri): String? {
         try {
             activity.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
@@ -168,13 +165,13 @@ internal class LosslessDllManager(private val activity: Activity) {
                 }
             }
         } catch (_: Exception) {
-            // Fall through to the URI segment: some providers refuse the query.
+            // 回退到 URI 段：部分 provider 拒绝该查询。
         }
         val segment = uri.lastPathSegment ?: return null
         return segment.substringAfterLast('/').takeIf { it.isNotEmpty() }
     }
 
-    /** Null when the provider does not report a size; the readable check below still applies. */
+    /** 当 provider 未上报大小时返回 null；下面的可读性检查仍然适用。 */
     private fun sizeOf(uri: Uri): Long? =
         try {
             activity.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->

@@ -8,7 +8,7 @@
 # Resolved with a pinned Apache Maven into .local-deps/android/steam-libs/{jars,jni}; the
 # android-launcher Gradle build dexes the jars into the APK.
 set -euo pipefail
-cd -- "$(dirname -- "$0")/../.."
+cd -- "$(dirname -- "$0")/../../.."
 deps=$PWD/.local-deps/android
 out=$deps/steam-libs
 MAVEN_VERSION=3.9.11

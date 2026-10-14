@@ -1,8 +1,8 @@
 package com.gow3.android.data
 
 /**
- * One editable launch parameter: its gow3.ini key, display label, group and the value domain the
- * Android runtime actually consumes. `defaultValue` is what the UI shows when the key is missing.
+ * 一个可编辑的启动参数：其 gow3.ini 键、显示标签、分组以及 Android 运行时
+ * 实际消费的取值域。`defaultValue` 是键缺失时 UI 显示的值。
  */
 internal data class LaunchParam(
     val key: String,
@@ -15,11 +15,11 @@ internal data class LaunchParam(
 internal data class LaunchOption(val value: String, val label: String)
 
 /**
- * The launch parameters the launcher edits, backed by gow3.ini keys the Android runtime consumes.
- * Defaults and value domains follow `SettingsDialog.java` constants (UPSCALER_VALUES/FPS_VALUES …)
- * and the runtime parsers in `gpu/shim/gow3_graphics.h` / `gpu/shim/gow3_settings.cpp`; where the
- * two disagree (fps_limit: the Java frontend offers 40/45 but `ParseFpsLimit` maps them to 0) the
- * runtime domain wins so every option actually takes effect.
+ * launcher 编辑的启动参数，由 Android 运行时消费的 gow3.ini 键支撑。
+ * 默认值与取值域遵循 `SettingsDialog.java` 的常量（UPSCALER_VALUES/FPS_VALUES …）
+ * 以及 `gpu/shim/gow3_graphics.h` / `gpu/shim/gow3_settings.cpp` 中的运行时解析器；
+ * 当两者不一致时（fps_limit：Java 前端提供 40/45，但 `ParseFpsLimit` 把它们映射为 0）
+ * 以运行时取值域为准，确保每个选项都实际生效。
  */
 internal object LaunchParams {
     val all: List<LaunchParam> = listOf(
@@ -116,13 +116,13 @@ internal object LaunchParams {
         ),
     )
 
-    /** Current raw value of a param, or its default when missing/blank. */
+    /** 参数的当前原始值；缺失或为空时返回其默认值。 */
     fun valueOf(ini: Map<String, String>, param: LaunchParam): String {
         val v = ini[param.key]?.trim()
         return if (v.isNullOrEmpty()) param.defaultValue else v
     }
 
-    /** Human-readable label for the current value; unknown values fall back to the raw value. */
+    /** 当前值的人类可读标签；未知值回退到原始值。 */
     fun labelOf(ini: Map<String, String>, param: LaunchParam): String {
         val v = valueOf(ini, param)
         return param.options.firstOrNull { it.value == v }?.label ?: v

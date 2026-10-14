@@ -3,16 +3,16 @@ package com.gow3.android.data
 import java.io.File
 
 /**
- * Safe reader/writer of gow3.ini (key=value lines, `#` comments), mirroring the semantics of
- * the Java frontend's SettingsDialog.load()/save(): a whole-file rewrite that keeps every other
- * line (comments, blanks, untouched keys), replaces changed keys in place, and appends missing
- * keys at the end. Writes go to a temp file that is atomically renamed, so a failure never
- * corrupts the original file. This is the launcher's only persistence channel for launch
- * parameters; the game (Gow3Settings::Load), run-gow3.sh and the in-game menu share the same file.
+ * gow3.ini 的安全读写器（key=value 行，`#` 注释），与 Java 前端的
+ * SettingsDialog.load()/save() 语义一致：整文件重写，保留其他所有行
+ * （注释、空行、未修改的键），在原位替换被修改的键，并在末尾追加缺失的键。
+ * 写入先写临时文件再原子重命名，因此失败绝不会破坏原文件。这是 launcher
+ * 唯一的启动参数持久化通道；游戏（Gow3Settings::Load）、run-gow3.sh 和
+ * 游戏内菜单共享同一文件。
  */
 internal object Gow3Ini {
 
-    /** Parses key=value lines into a map; `#` comments and blank lines are ignored. Missing file -> empty. */
+    /** 将 key=value 行解析为映射；`#` 注释和空行被忽略。文件缺失 -> 返回空映射。 */
     fun read(path: File): Map<String, String> {
         if (!path.isFile) return emptyMap()
         val values = LinkedHashMap<String, String>()
@@ -30,9 +30,8 @@ internal object Gow3Ini {
     }
 
     /**
-     * Rewrites `path` whole with `updates` applied (changed keys replace their lines, missing keys
-     * are appended; every other line is kept verbatim). Returns true on success; on any failure the
-     * original file is left untouched and false is returned.
+     * 应用 `updates` 后整体重写 `path`（被修改的键替换其所在行，缺失的键追加到
+     * 末尾；其余行原样保留）。成功返回 true；任何失败都会保持原文件不变并返回 false。
      */
     fun write(path: File, updates: Map<String, String>): Boolean {
         val lines = try {

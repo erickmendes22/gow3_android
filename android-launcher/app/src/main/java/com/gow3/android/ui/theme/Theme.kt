@@ -22,7 +22,7 @@ private val LightColorScheme = lightColorScheme(
     secondary = PurpleGrey40,
     tertiary = Pink40
 
-    /* Other default colors to override
+    /* 其他可覆盖的默认颜色
     background = Color(0xFFFFFBFE),
     surface = Color(0xFFFFFBFE),
     onPrimary = Color.White,
@@ -36,7 +36,7 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun Gow3LauncherTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
+    // 动态颜色在 Android 12+ 上可用
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {

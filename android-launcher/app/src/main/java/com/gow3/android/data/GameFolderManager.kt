@@ -14,7 +14,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import java.io.File
 
-/** Owns first-run game folder validation, storage permission and folder picker state. */
+/** 负责首次运行时的游戏目录校验、存储权限和目录选择器状态。 */
 internal class GameFolderManager(private val activity: Activity) {
     companion object {
         const val REQUEST_GAME_FOLDER = 1001
@@ -34,7 +34,7 @@ internal class GameFolderManager(private val activity: Activity) {
         chooseGameFolder()
     }
 
-    /** Re-opens the folder picker so the player can point the game at another folder. */
+    /** 重新打开目录选择器，让玩家可以将游戏指向另一个目录。 */
     fun chooseGameFolder() {
         if (activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             activity.requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE), REQUEST_STORAGE)
@@ -145,8 +145,8 @@ internal class GameFolderManager(private val activity: Activity) {
             panel.addView(keep, params)
         }
 
-        // First-run setup must not be dismissed; when re-selecting from Home there is already a
-        // valid folder, so let the player back out without changing anything.
+        // 首次设置不可被取消；当从 Home 页重新选择时已存在有效目录，
+        // 因此允许玩家在不做任何修改的情况下退出。
         val dialog = AlertDialog.Builder(activity).setView(panel).setCancelable(current != null).create()
         choose.setOnClickListener {
             dialog.dismiss()

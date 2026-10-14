@@ -26,9 +26,9 @@ import com.gow3.android.ui.components.LauncherColors
 import com.gow3.android.ui.components.formatBytes
 
 /**
- * Supplies Lossless.dll, the player-supplied file lsfg-vk frame generation loads. The LSFG
- * multiplier, flow scale and performance mode are tuned in the in-game settings dialog and live in
- * gow3.ini; this card only covers where the DLL comes from and whether it is installed.
+ * 提供 Lossless.dll，即 lsfg-vk 帧生成所加载的玩家自备文件。LSFG 倍率、
+ * flow scale 和性能模式在游戏内设置对话框中调节，存放在 gow3.ini 中；
+ * 本卡片只负责 DLL 的来源以及是否已安装。
  */
 @Composable
 internal fun FrameGenerationCard(
@@ -72,8 +72,8 @@ internal fun FrameGenerationCard(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    // Deliberately says "launcher folder" rather than "downloaded": an imported
-                    // file and a Steam download are indistinguishable from disk.
+                    // 特意写成“launcher 文件夹”而非“已下载”：导入的文件和 Steam
+                    // 下载的文件在磁盘上无法区分。
                     when (installed.source) {
                         LosslessDllSource.GAME_FOLDER -> "Beside your game folder — remove it there yourself"
                         LosslessDllSource.APP_PRIVATE -> "In the launcher's own folder"

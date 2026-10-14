@@ -4,8 +4,8 @@
 
 > 本文件为中文翻译与整理版；上游项目原始 README 为英文版。
 
-《**战神 III 重制版**》（God of War III Remastered，PlayStation 4）向 Windows 10/11 与
-Linux（含 Steam Deck）的**原生移植**。
+《**战神 III 重制版**》（God of War III Remastered，PlayStation 4）向 **Linux**（含
+Steam Deck）的**原生移植**；本仓库同时包含一个 **Android / ARM64 移植**（开发中，见下文）。
 
 游戏原本的可执行文件可以直接跑在 PC 处理器上（PS4 使用的同样是 x86-64 架构）。一套为本作
 专门编写的运行时替代了 PS4 的系统库，图形部分则被翻译为 Vulkan。它不是通用模拟器：整个
@@ -19,6 +19,11 @@ Linux（含 Steam Deck）的**原生移植**。
 > God of War 是 Sony Interactive Entertainment 的商标。
 
 开发进度（以葡萄牙语记录）见 [docs/gow3/ROADMAP.md](docs/gow3/ROADMAP.md)。
+
+## 快速开始
+
+从拿到项目到跑起 debug 的完整教程（Android 移植，macOS Apple Silicon 主机）见
+**[docs/QUICKSTART.md](docs/QUICKSTART.md)**。
 
 ## 性能表现
 
@@ -35,14 +40,10 @@ Linux（含 Steam Deck）的**原生移植**。
 - 启动流程、菜单、视频过场动画（H.264）以及实际游玩。
 - 音频：音乐、语音与音效（ATRAC9 与 MP3）。
 - 手柄（DualSense、Xbox 等，经由 SDL3）与键盘可同时使用，且两者均可自定义按键。
-- 存档与读档：存档列表在画面上显示，与 PS4 上相同；自动存档同样可用。启动器会在每次启动
-  前备份存档。
+- 存档与读档：存档列表在画面上显示，与 PS4 上相同；自动存档同样可用。启动时会对存档进行备份。
 - 补丁：渲染分辨率 480p / 720p / 1440p / 1800p / 4K、损坏贴图修复、按 X 跳过视频（社区贡献）；
   引擎帧率 120 FPS（kvicken）或 240 FPS（由 Felipe Prado 适配）。
 - **秒进：** 已保存的着色器缓存在后台加载，新着色器同样在后台编译，游戏不会停下来等待构建。
-- **启动器：** 采用游戏本身的配色，英文界面并带部分翻译。首页提供快捷设置，另有显示、性能、
-  游戏目录与存档备份、补丁、模组（排序、预设与冲突）、按键（可切换 PlayStation 或 Xbox 键位
-  图标）、更新与诊断等页面。
 - **游戏内菜单**（键盘 `Insert`，手柄 `R3 + L2`），四个标签页：
   - **Game：** 修改器（无限生命、魔力、道具槽、斯巴达之怒、红色魂珠最大化）；红色（EXP）、
     绿色（生命）、蓝色（魔力）、金色（斯巴达之怒）魂珠以及输出/承受伤害的倍率调节，范围
@@ -54,9 +55,11 @@ Linux（含 Steam Deck）的**原生移植**。
     每项均可单独开关，并可调整字号、位置角落、背景不透明度与排版。数字取自游戏自身占用，
     而非整机占用。
 
+桌面 Linux 构建无图形启动器：直接使用 `run.sh` 与游戏内菜单配置。
+
 ## 系统要求
 
-- Windows 10（1903 或更高版本）或 Windows 11，64 位。
+- Linux（x86-64，64 位）。Steam Deck 见下文。
 - 支持 Vulkan 1.3 的显卡，且驱动为较新版本。
 - 你自己的游戏副本：**CUSA01623 并已应用 01.02 更新**（包含 `eboot.bin`、`sce_module`、
   `sce_sys` 的目录）。下载包中不包含任何游戏文件。
@@ -70,43 +73,13 @@ Linux（含 Steam Deck）的**原生移植**。
 
 ### 源码构建依赖
 
-[MSYS2](https://www.msys2.org) 与 [Python 3](https://www.python.org)（需安装 Pillow：
-`pip install pillow`，用于生成游戏图标与封面图）。
+- `pkg-config` 提供：`vulkan`、`sdl3`、`libavcodec`、`libavutil`、`libswscale`（FFmpeg）。
+- `cmake` 与 `ninja`（GPU 库）。
+- C 编译器（GCC 或 Clang）。
+- [Python 3](https://www.python.org)（可选，需安装 Pillow：`pip install pillow`，用于生成
+  游戏图标与封面图）。
 
-## 下载与游玩（Windows）
-
-### 操作步骤
-
-1. 从 [Releases 页面](https://github.com/FelipePrado0/gow3_pc/releases/latest) 下载
-   `gow3-windows.zip`。
-2. 解压到任意目录，例如 `C:\Games\gow3-windows`。不要在压缩包内直接运行。
-3. 打开 **`God of War III.exe`**。如果 Windows 弹出「Windows 已保护你的电脑」，点击
-   **更多信息**，再点 **仍要运行**：该程序没有数字签名。
-4. 点击 **Choose the game folder**，进入 **Game** 页面。在 **Game folder** 一栏点击
-   **Browse…**，选择包含 `eboot.bin` 的目录。
-5. 回到 **Home** 页面，此时会显示封面图以及「CUSA01623 · version 01.02」。可按需调整
-   **Quick settings**：显示模式、帧率限制、渲染分辨率与引擎帧率。
-6. 点击 **PLAY**。首次启动需要稍长时间，用于准备游戏镜像；之后的启动会很快。
-
-补丁与修复已内置并自动生效：贴图修复、按 X 跳过视频与 120 FPS 默认开启。分辨率与帧率可在
-**Home** 或 **Performance** 页面调整。
-
-### 游玩过程中
-
-- 按键盘 **Insert** 或手柄 **R3 + L2** 打开移植版菜单：修改器、倍率、画面、性能与性能叠加层。
-- 已保存的着色器在后台加载，角落会出现一条小提示「Loading shader cache」显示进度。
-
-### 下次启动
-
-- **`Play God of War III.exe`** 会直接按已保存的设置启动游戏。可以为它创建桌面快捷方式，或用
-  **Add a Non-Steam Game** 添加到 Steam。
-- 存档、着色器缓存与日志位于 `God of War III.exe` 同级的 `user` 目录。更新时请保留该目录。
-- **Advanced → Check for updates** 会下载并安装新版本，存档与设置都会保留。
-
-### 遇到问题时
-
-- 启动黑屏：**Advanced → Clear shader cache**，然后重新启动。
-- 游戏无法启动：查看 **Log** 页面，或在反馈问题时附上 `user\last_run.log`。
+NixOS 用户在 `nix-shell` 中使用仓库内的 `shell.nix`。
 
 ## Linux 与 Steam Deck
 
@@ -116,15 +89,14 @@ Linux（含 Steam Deck）的**原生移植**。
 **下载与游玩（发行版）**
 
 1. 从 Releases 下载 `gow3-linux-x86_64.tar.gz` 并解压到任意位置。
-2. 把游戏目录（包含 `eboot.bin` 的目录，例如 `CUSA01740`）放进解压后的目录中，与 `bin/` 同级。
+2. 把游戏目录（包含 `eboot.bin` 的目录，例如 `CUSA01623`）放进解压后的目录中，与 `bin/` 同级。
 3. 任意 Linux 上运行 `start-gow3.sh`；在 Steam Deck 上运行 `start-gow3-deck.sh`，或直接双击
    `God of War III.desktop`。
 
 游戏目录会被自动识别；存档、着色器缓存与 `gow3.ini` 存放在 `~/.local/share/gow3`。首次启动会
 编译着色器（约一两分钟）。本项目不会向系统全局安装任何内容，直接使用宿主机的 Vulkan 驱动。
 
-**从源码构建：** 见 [docs/LINUX.md](docs/LINUX.md)。依赖位于本地 `.deps/`（无需 root 权限）；
-执行 `bash build.sh`，然后 `GOW3_GAME_DIR=/path/to/CUSA01623 bash run.sh`。
+**从源码构建：** 见 [docs/LINUX.md](docs/LINUX.md)。
 
 ## Android 移植（开发中）
 
@@ -137,7 +109,7 @@ Android 移植目前仍在真机上验证中。
 加载器无需游戏补丁即可准备并运行它；针对 `CUSA01740` 的分辨率、FPS 与修改器补丁尚未做字节级
 校验。
 
-架构说明与完整设计笔记见 [`docs/ANDROID_PORT.md`](docs/ANDROID_PORT.md)。
+架构说明与完整设计笔记见 [`my-docs/08-Android移植/移植设计与进度.md`](my-docs/08-Android移植/移植设计与进度.md)。
 
 ### Android 构建快速开始（macOS Apple Silicon）
 
@@ -149,12 +121,11 @@ Android 移植目前仍在真机上验证中。
 仓库中必须已包含 FEX 与 ARM64 依赖。若 FEX 已放在 `third_party/FEX`，继续使用该 checkout：
 
 ```bash
-cd /Users/zhengmiao/mygitworks/gow3_android
 git submodule update --init --recursive
 ```
 
 Android rootfs/sysroot 与头文件依赖也必须已存在于 `.local-deps/android` 与 `.local-deps/root`
-下。如果缺失，参见 [`docs/ANDROID_PORT.md`](docs/ANDROID_PORT.md)。
+下。如果缺失，参见 [`my-docs/08-Android移植/移植设计与进度.md`](my-docs/08-Android移植/移植设计与进度.md)。
 
 #### 2. 只复制准备加载器所需的游戏文件
 
@@ -203,8 +174,15 @@ export GOW3_AR="$GOW3_LLVM_PREFIX/bin/llvm-ar"
 export GOW3_FEX_SOURCE="$PWD/third_party/FEX"
 ```
 
-构建原生 CPU/GPU/probe 组件。由于当前 `CUSA01740` 测试的游戏专用补丁地址尚未通过校验，
-必须设置 `GOW3_SKIP_GAME_PATCH_PARTS=1`：
+构建 CPU + GPU + 原生 probe：
+
+```bash
+GOW3_SKIP_GAME_PATCH_PARTS=1 \
+bash tools/android/build/build_arm64.sh
+```
+
+构建完整运行时。由于当前 `CUSA01740` 测试的游戏专用补丁地址尚未通过校验，必须设置
+`GOW3_SKIP_GAME_PATCH_PARTS=1`：
 
 ```bash
 GOW3_SKIP_GAME_PATCH_PARTS=1 \
@@ -226,9 +204,6 @@ out/arm64/bundle/
 ```bash
 GOW3_REBUILD_DEBUG_RUNTIME=1 \
 GOW3_DEBIAN_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian \
-GOW3_KEYSTORE_PASSWORD=android \
-GOW3_KEY_ALIAS=gow3 \
-GOW3_KEY_PASSWORD=android \
 bash tools/android/debug/build_debug_apk.sh
 ```
 
@@ -272,79 +247,16 @@ build_debug_apk.sh             debug 运行时归档 + debug APK；复用本地 
 常规重新构建时不要分别执行三个原生命令。完整运行时用 `build_android_runtime.sh`；原生组件
 已经是最新的情况下用 `build_debug_apk.sh`。
 
-## 从源码构建（Windows）
-
-开发在 `gow3` 分支上进行；`main` 分支接收经过测试的合并。
-
-1. 安装 MSYS2（`winget install MSYS2.MSYS2`），并在 **MSYS2 CLANG64** shell 中安装
-   [packaging/windows/README.md](packaging/windows/README.md) 列出的软件包。
-2. 递归克隆仓库并构建：
-
-   ```bash
-   git clone --recursive https://github.com/FelipePrado0/gow3_pc
-   cd gow3_pc
-   git checkout gow3   # 最新进展在此分支；跳过则构建 main
-   bash build.sh
-   ```
-
-3. 在项目目录中用 PowerShell 启动启动器：
-
-   ```powershell
-   python launcher/gow3_launcher_win.py
-   ```
-
-4. 在 **Game** 页面选择游戏目录。按需调整 **Display**、**Performance** 与 **Patches**，
-   然后点击 **PLAY**。
-
-若希望直接按已保存的设置启动、不弹出启动器窗口（用于快捷方式或 Steam）：
-
-```powershell
-python launcher/gow3_launcher_win.py --play
-```
-
-或者完全不使用启动器：
-
-```powershell
-$env:GOW3_GAME_DIR = 'D:\path\CUSA01623'
-python run.py
-```
-
-设置保存在 `gow3.ini`（游戏与游戏内菜单使用）与 `%APPDATA%\gow3-launcher\settings.json`
-（启动器使用）中。存档、着色器缓存与 `last_run.log` 位于项目的 `user` 目录。
-
-### 键盘操作
-
-以下为默认按键，可在启动器的 **Controls** 页面修改。
-
-| 按键          | 手柄按键                    |
-| ------------- | --------------------------- |
-| WASD          | 左摇杆                      |
-| 方向键        | 右摇杆（视角）              |
-| Space         | 叉（Cross）                 |
-| Left Shift    | 圈（Circle）                |
-| E             | 方（Square）                |
-| Q             | 三角（Triangle）            |
-| 1 / 3         | L1 / R1                     |
-| R / F         | L2 / R2                     |
-| Z / C         | L3 / R3                     |
-| I、K、J、L     | 方向键（d-pad）             |
-| Enter         | Options                     |
-| Tab           | 触摸板                      |
-| Insert        | 移植版菜单（手柄上为 R3+L2） |
-
-菜单中：L1/R1 或 Q/E 切换标签页。存档列表中：方向键或十字键选择，Enter 或叉键确认，
-Esc 或圈键取消。
-
 ## 测试
 
 ```bash
-python -m unittest discover -s tests
+python3 -m unittest discover -s tests
 bash build.sh --test
 ninja -C out/gpu stat-multipliers-test perf-overlay-test warmup-inbox-test graphics-settings-test
-out/gpu/stat-multipliers-test.exe out/eboot.elf
-out/gpu/perf-overlay-test.exe
-out/gpu/warmup-inbox-test.exe
-out/gpu/graphics-settings-test.exe
+out/gpu/stat-multipliers-test out/eboot.elf
+out/gpu/perf-overlay-test
+out/gpu/warmup-inbox-test
+out/gpu/graphics-settings-test
 ```
 
 C++ 测试是 [gpu/CMakeLists.txt](gpu/CMakeLists.txt) 中的构建目标；其中校验游戏代码的测试需要
@@ -353,7 +265,7 @@ C++ 测试是 [gpu/CMakeLists.txt](gpu/CMakeLists.txt) 中的构建目标；其�
 若要在不启动游戏的前提下，检查游戏用到的每个系统函数是否都已实现：
 
 ```bash
-out/gow3-probe.exe out/boot-linked.bin --app0 <game folder> --check-imports
+out/gow3-probe out/boot-linked.bin --app0 <game folder> --check-imports
 ```
 
 ## 工作原理
@@ -366,7 +278,7 @@ out/gow3-probe.exe out/boot-linked.bin --app0 <game folder> --check-imports
 | GPU      | `gpu/shadps4/`                                                    | shadPS4 图形核心，将 PS4 GPU 指令翻译为 Vulkan，并包含本移植的性能优化（后台着色器缓存、延迟回读） |
 | 游戏内菜单 | `gpu/shim/gow3_overlay.cpp`                                     | Dear ImGui 菜单与性能叠加层；设置位于 `gpu/shim/gow3_settings.cpp`                                 |
 | 补丁     | `patches/God_of_War_III_Remastered.xml`、`scripts/patches.py`     | 启动时在内存中应用，不修改游戏文件                                                                 |
-| 启动器   | `launcher/gow3_launcher_win.py`                                   | 设置、补丁、模组、按键与开始游戏按钮                                                               |
+| 启动     | `run.sh`                                                          | 准备游戏镜像、应用补丁，并启动 `out/gow3-probe`                                                     |
 
 更多文档：[模组](docs/MODS.md)、[帧图与放大器](docs/upscaler.md)、[GPU 并行工作](docs/parallel_gpu.md)
 与[路线图](docs/gow3/ROADMAP.md)。
@@ -394,7 +306,7 @@ out/gow3-probe.exe out/boot-linked.bin --app0 <game folder> --check-imports
 [miniz](https://github.com/richgel999/miniz)、[xbyak](https://github.com/herumi/xbyak)、
 [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)、
 [FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) 与 AMD FidelityFX SDK、
-[MSYS2](https://www.msys2.org)、[LLVM](https://llvm.org) 以及 [Pillow](https://python-pillow.org)。
+[LLVM](https://llvm.org) 以及 [Pillow](https://python-pillow.org)。
 
 ## 许可证
 

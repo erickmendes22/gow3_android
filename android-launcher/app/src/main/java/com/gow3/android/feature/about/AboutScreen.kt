@@ -30,6 +30,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.gow3.android.data.LogArchive
+import com.gow3.android.data.LogManager
+import com.gow3.android.data.LogResult
 import com.gow3.android.data.SaveArchive
 import com.gow3.android.data.SaveManager
 import com.gow3.android.data.SaveResult
@@ -37,24 +40,26 @@ import com.gow3.android.ui.components.LauncherColors
 import com.gow3.android.ui.components.ScreenColumn
 
 @Composable
-internal fun AboutScreen(saves: SaveManager) {
+internal fun AboutScreen(saves: SaveManager, logs: LogManager) {
     val context = LocalContext.current
     var hasSaves by remember { mutableStateOf(SaveArchive.hasSaves(saves.savedataDir())) }
+    var hasLogs by remember { mutableStateOf(LogArchive.hasLogs(logs.logsDir())) }
 
-    fun refreshSaves() {
+    fun refresh() {
         hasSaves = SaveArchive.hasSaves(saves.savedataDir())
+        hasLogs = LogArchive.hasLogs(logs.logsDir())
     }
 
     fun toast(message: String) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
-    // The player may back up/restore saves or install them while the app is backgrounded, so the
-    // savedata state is re-read from disk every time About comes back to the foreground.
+    // 玩家可能在应用退到后台期间备份/恢复存档、安装运行时或运行游戏，
+    // 因此每次 About 回到前台时都会从磁盘重新读取 savedata/日志状态。
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) refreshSaves()
+            if (event == Lifecycle.Event.ON_RESUME) refresh()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -65,6 +70,7 @@ internal fun AboutScreen(saves: SaveManager) {
         Text("Version 1.2.4", color = LauncherColors.gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         Text("A community launcher bringing the God of War III Remastered experience to Android via emulation.", color = LauncherColors.textMuted, fontSize = 13.sp, lineHeight = 19.sp)
         Spacer(Modifier.height(8.dp))
+        ContactCard()
         SaveCard(
             hasSaves = hasSaves,
             onExport = {
@@ -80,11 +86,26 @@ internal fun AboutScreen(saves: SaveManager) {
                 saves.launchImport { result ->
                     when (result) {
                         is SaveResult.Success -> {
-                            refreshSaves()
+                            refresh()
                             toast(result.message)
                         }
                         SaveResult.Cancelled -> Unit
                         is SaveResult.Failed -> toast(result.message)
+                    }
+                }
+            },
+        )
+        LogCard(
+            hasLogs = hasLogs,
+            onExport = {
+                logs.launchExport { result ->
+                    when (result) {
+                        is LogResult.Success -> {
+                            refresh()
+                            toast(result.message)
+                        }
+                        LogResult.Cancelled -> Unit
+                        is LogResult.Failed -> toast(result.message)
                     }
                 }
             },

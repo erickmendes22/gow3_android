@@ -10,14 +10,14 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /**
- * Pure save-archive logic: packing the game's `savedata/` tree into a `.zip` that keeps the
- * `savedata/1/CUSA01623/...` prefix, validating such an archive (zip-slip-safe, layout- and
- * title-checked), extracting it into a staging directory, and naming backup folders.
+ * 纯存档归档逻辑：将游戏的 `savedata/` 目录树打包成保留 `savedata/1/CUSA01623/...`
+ * 前缀的 `.zip`，校验此类归档（防 zip-slip、校验布局和标题）、解压到暂存目录，
+ * 并为备份目录命名。
  *
- * Kept free of Android dependencies so the host-side JVM tests can exercise it directly, in the
- * same spirit as [Gow3Ini]. This port supports a single title (God of War III, `CUSA01623`) and a
- * single user (`1`), so an archive is only accepted when every entry stays under that tree (the
- * `<title>.memory/` SaveDataMemory folder included).
+ * 保持不依赖 Android，以便宿主端 JVM 测试可以直接验证它，与 [Gow3Ini] 思路一致。
+ * 本移植只支持单一标题（God of War III，`CUSA01623`）和单一用户（`1`），因此
+ * 只有当所有条目都位于该目录树之下（包括 `<title>.memory/` 的 SaveDataMemory 目录）
+ * 时，归档才会被接受。
  */
 internal object SaveArchive {
 
@@ -25,14 +25,14 @@ internal object SaveArchive {
     const val TITLE_ID = "CUSA01623"
     private const val ROOT = "savedata"
 
-    /** True when the directory holds at least one save file (the game's non-empty savedata tree). */
+    /** 当目录中至少含一个存档文件（游戏非空的 savedata 目录树）时为 true。 */
     fun hasSaves(savedata: File): Boolean =
         savedata.isDirectory && savedata.walkTopDown().any { it.isFile }
 
-    /** `yyyyMMdd-HHmmss`, the same stamp layout the Linux-side save_backup.py uses. */
+    /** `yyyyMMdd-HHmmss`，与 Linux 侧 save_backup.py 使用相同的时间戳格式。 */
     fun stamp(now: Date = Date()): String = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(now)
 
-    /** First free backup name under [backupsRoot]: the stamp, then `<stamp>-2`, `<stamp>-3`, ... */
+    /** [backupsRoot] 下第一个可用的备份名：时间戳，然后是 `<stamp>-2`、`<stamp>-3`…… */
     fun backupName(backupsRoot: File, stamp: String): String {
         var name = stamp
         var n = 2
@@ -43,7 +43,7 @@ internal object SaveArchive {
         return name
     }
 
-    /** Writes the whole [savedata] tree into [target] as a zip whose entries keep the `savedata/` prefix. */
+    /** 将整个 [savedata] 目录树写入 [target] 的 zip，条目保留 `savedata/` 前缀。 */
     fun pack(savedata: File, target: File) {
         val root = savedata.parentFile ?: throw IllegalStateException("savedata has no parent directory")
         ZipOutputStream(target.outputStream().buffered()).use { zip ->
@@ -61,7 +61,7 @@ internal object SaveArchive {
         }
     }
 
-    /** Returns a failure reason, or null when [input] is a valid God of War III save archive. */
+    /** 当 [input] 是有效的 God of War III 存档归档时返回 null，否则返回失败原因。 */
     fun validate(input: InputStream): String? {
         val seen = HashSet<String>()
         var contentFiles = 0
@@ -89,14 +89,14 @@ internal object SaveArchive {
         return null
     }
 
-    /** Rejects absolute paths, `..` and empty segments (zip-slip guard). */
+    /** 拒绝绝对路径、`..` 和空段（zip-slip 防护）。 */
     private fun isSafePath(name: String): Boolean {
         if (name.isEmpty() || name.startsWith("/") || name.contains('\\')) return false
-        // A trailing slash marks a directory entry and is not an empty segment.
+        // 结尾斜杠表示目录条目，并非空段。
         return name.trimEnd('/').split('/').none { it.isEmpty() || it == "." || it == ".." }
     }
 
-    /** Accepts the `savedata/` structural tree and everything under `savedata/1/CUSA01623(/)` or `.memory`. */
+    /** 接受 `savedata/` 结构树以及 `savedata/1/CUSA01623(/)` 或 `.memory` 下的所有内容。 */
     private fun isSupportedName(name: String): Boolean {
         val parts = name.trimEnd('/').split('/')
         return when {
@@ -108,7 +108,7 @@ internal object SaveArchive {
         }
     }
 
-    /** Extracts a validated archive into [staging] (which will become the new `savedata`). */
+    /** 将已校验的归档解压到 [staging]（它将成为新的 `savedata`）。 */
     fun extract(input: InputStream, staging: File) {
         ZipInputStream(input).use { zip ->
             while (true) {
@@ -128,8 +128,8 @@ internal object SaveArchive {
     }
 
     /**
-     * Swaps [staging] in as [savedata]. The current tree is renamed aside first, so a failure in the
-     * final rename restores the original and never leaves an empty `savedata` behind.
+     * 用 [staging] 替换 [savedata]。先把当前目录树重命名到一边，因此最终重命名
+     * 失败时可以恢复原目录，绝不会留下空的 `savedata`。
      */
     fun replaceStaging(staging: File, savedata: File) {
         val old = File(savedata.parentFile, "savedata.old")

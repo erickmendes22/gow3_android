@@ -134,7 +134,7 @@ class SaveArchiveTest {
         val dir = tempDir()
         val savedata = File(dir, "savedata").apply { mkdirs() }
         File(savedata, "data.bin").writeText("v1")
-        // staging does not exist, so the final rename must fail
+        // staging 不存在，因此最终重命名必然失败
         val staging = File(dir, "savedata.restoring")
         val failed = try {
             SaveArchive.replaceStaging(staging, savedata)

@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.gow3.android.data.LogManager
 import com.gow3.android.data.LosslessDllManager
 import com.gow3.android.data.SaveManager
 import com.gow3.android.feature.about.AboutScreen
@@ -45,6 +46,7 @@ internal fun LauncherScreen(
     onGetFromSteam: () -> Unit,
     onChooseGameFolder: () -> Unit,
     saves: SaveManager,
+    logs: LogManager,
 ) {
     var selectedTab by remember { mutableIntStateOf(LauncherTab.HOME.ordinal) }
     val tab = LauncherTab.entries[selectedTab]
@@ -62,7 +64,7 @@ internal fun LauncherScreen(
             when (tab) {
                 LauncherTab.HOME -> HomeScreen(onStartGame, losslessDlls, onGetFromSteam, onChooseGameFolder)
                 LauncherTab.MODS -> ModsScreen()
-                LauncherTab.ABOUT -> AboutScreen(saves)
+                LauncherTab.ABOUT -> AboutScreen(saves, logs)
             }
         }
     }

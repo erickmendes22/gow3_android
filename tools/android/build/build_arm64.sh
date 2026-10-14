@@ -29,6 +29,50 @@ export PATH="$headers/bin:$PATH"   # glslangValidator for gpu/host_shaders
 }
 mkdir -p "$out"
 
+# ---- progress helpers -------------------------------------------------------
+# Banners/elapsed time print on every run; the rolling "[N/M]" line only shows on a TTY
+# (no-op when output is piped, so CI logs stay clean).
+step=0
+total=4
+_t0=0
+
+begin() { step=$((step + 1)); _t0=$(date +%s); printf '\n==> [%d/%d] %s\n' "$step" "$total" "$*"; }
+
+end_stage() {
+    local sec=$(( $(date +%s) - _t0 ))
+    printf '    %s (%dm%02ds)\n' "$*" "$((sec / 60))" "$((sec % 60))"
+}
+
+# Print a live status line on a TTY only.
+live() { [[ -t 1 ]] && printf '\r    %s\033[K' "$*"; }
+live_end() { [[ -t 1 ]] && printf '\r\033[K\n'; }
+
+# Run ninja and return its exit status. On a TTY, run it in the background and poll the
+# full log (kept in $3 for diagnostics) for the latest "[N/M] ..." line, shown as a rolling
+# progress line. On non-TTY, run it in the foreground exactly as before.
+build_ninja() {
+    local dir=$1 target=$2 log=$3 pid line last="" status=0
+    if [[ -t 1 ]]; then
+        ninja -C "$dir" "$target" > "$log" 2>&1 &
+        pid=$!
+        trap 'kill "$pid" 2>/dev/null || true' INT TERM
+        while kill -0 "$pid" 2>/dev/null; do
+            line=$(grep -E '^\[[0-9]+/[0-9]+\]' "$log" 2>/dev/null | tail -1 || true)
+            if [[ -n $line && $line != "$last" ]]; then
+                live "${line:0:100}"
+                last=$line
+            fi
+            sleep 2
+        done
+        wait "$pid" || status=$?
+        trap - INT TERM
+        if [[ -n $last ]]; then live_end; fi
+        return "$status"
+    fi
+    ninja -C "$dir" "$target" > "$log" 2>&1 || status=$?
+    return "$status"
+}
+
 # This port's changes to FSR-Vulkan (gpu/patches/fsr-vulkan), applied once, as build.sh does.
 for patch in gpu/patches/fsr-vulkan/*.patch; do
     if ! git -C gpu/third_party/fsr-vulkan apply --reverse --check "$root/$patch" 2>/dev/null; then
@@ -36,17 +80,26 @@ for patch in gpu/patches/fsr-vulkan/*.patch; do
     fi
 done
 
-# ---- FEXCore + libgow3cpu.so (the guest CPU) -------------------------------
+# ---- 1/4 FEXCore + libgow3cpu.so (the guest CPU) ----------------------------
+begin "FEXCore + libgow3cpu.so"
 if [[ ! -f $out/fex/build.ninja ]]; then
+    echo "    cmake: $fex_source"
     cmake -S "$fex_source" -B "$out/fex" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$toolchain" \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_PROJECT_FEX_INCLUDE="$root/cpu/fex_project.cmake" \
         -DBUILD_TESTING=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF -DBUILD_STEAM_SUPPORT=OFF \
         -DBUILD_FEX_LINUX_TESTS=OFF -DENABLE_ZYDIS=OFF -DTUNE_ARCH=armv8.2-a -DTUNE_CPU=generic >/dev/null
 fi
-ninja -C "$out/fex" gow3cpu > "$out/fex-build.log" 2>&1 || { tail -40 "$out/fex-build.log" >&2; exit 1; }
+if ! build_ninja "$out/fex" gow3cpu "$out/fex-build.log"; then
+    echo "    FEX build failed (full log: $out/fex-build.log)" >&2
+    tail -40 "$out/fex-build.log" >&2
+    exit 1
+fi
+end_stage "libgow3cpu.so"
 
-# ---- libgow3gpu.so (shadPS4 video core + drivers) --------------------------
+# ---- 2/4 libgow3gpu.so (shadPS4 video core + drivers) -----------------------
+begin "libgow3gpu.so (shadPS4 video core)"
 if [[ ! -f $out/gpu/build.ninja ]]; then
+    echo "    cmake: gpu/"
     cmake -S gpu -B "$out/gpu" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$toolchain" \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo -DGOW3_PGO=off -DGOW3_LTO=OFF \
         -DGOW3_ARM64_HEADER_PREFIX="$headers" \
@@ -55,25 +108,45 @@ if [[ ! -f $out/gpu/build.ninja ]]; then
         -DBoost_DIR="$boost_dir" \
         -DZydis_DIR="$sysroot/usr/lib/aarch64-linux-gnu/cmake/zydis" >/dev/null
 fi
-ninja -C "$out/gpu" gow3gpu > "$out/gpu-build.log" 2>&1 || { grep -v '^\[' "$out/gpu-build.log" | tail -40 >&2; exit 1; }
+if ! build_ninja "$out/gpu" gow3gpu "$out/gpu-build.log"; then
+    echo "    GPU build failed (full log: $out/gpu-build.log)" >&2
+    grep -v '^\[' "$out/gpu-build.log" | tail -40 >&2
+    exit 1
+fi
+end_stage "libgow3gpu.so"
 
-# ---- gow3-probe (the loader) ----------------------------------------------
+# ---- 3/4 gow3-probe (the loader) --------------------------------------------
 cc=(clang --target=aarch64-linux-gnu --sysroot="$sysroot" -fuse-ld=lld)
 export PKG_CONFIG_SYSROOT_DIR=$sysroot
 export PKG_CONFIG_LIBDIR=$sysroot/usr/lib/aarch64-linux-gnu/pkgconfig:$sysroot/usr/share/pkgconfig
 read -r -a includes <<< "$(pkg-config --cflags vulkan sdl3 libavcodec libavutil libswscale)"
 read -r -a libraries <<< "$(pkg-config --libs vulkan sdl3 libavcodec libavutil libswscale)"
+
+begin "LibAtrac9 (third-party decoders)"
 mkdir -p "$out/atrac9"
-for source in third_party/LibAtrac9/C/src/*.c; do
+atrac9_sources=(third_party/LibAtrac9/C/src/*.c)
+atrac9_total=${#atrac9_sources[@]}
+n=0
+for source in "${atrac9_sources[@]}"; do
+    n=$((n + 1))
+    live "atrac9 $n/$atrac9_total  $(basename "$source")"
     "${cc[@]}" -std=c99 -O2 -w -c "$source" -o "$out/atrac9/$(basename "${source%.c}").o"
 done
+live_end
 archiver=${GOW3_AR:-$(command -v llvm-ar || true)}
 [[ -n $archiver ]] || { echo "No LLVM archiver (set GOW3_AR)" >&2; exit 1; }
 "$archiver" rcs "$out/libatrac9.a" "$out"/atrac9/*.o
+end_stage "libatrac9.a"
+
+# ---- 4/4 gow3-probe (the loader) --------------------------------------------
+begin "gow3-probe (loader)"
 # src/runtime*.c includes runtime_cpu.c (a stub on ARM64: libgow3cpu.so implements guest_cpu.h).
 "${cc[@]}" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -no-pie "${includes[@]}" -I. -Isrc \
     src/probe.c src/runtime*.c src/vulkan_smoke.c "$out/libatrac9.a" -lm \
     -L"$out/gpu" -lgow3gpu -L"$out/fex" -lgow3cpu -Wl,-rpath,'$ORIGIN/../lib' \
     -Wl,--dynamic-linker="$rootfs/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1" -rdynamic \
     "${libraries[@]}" -o "$out/gow3-probe"
-echo "Built $out/gow3-probe (aarch64)"
+end_stage "gow3-probe"
+
+printf '\nAll ARM64 artifacts built:\n'
+ls -lh "$out/fex/libgow3cpu.so" "$out/gpu/libgow3gpu.so" "$out/gow3-probe"

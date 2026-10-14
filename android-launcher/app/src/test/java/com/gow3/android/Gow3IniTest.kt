@@ -74,7 +74,7 @@ class Gow3IniTest {
         val dir = tempDir()
         val file = File(dir, "gow3.ini")
         file.writeText("upscaler=fsr3\nfps_limit=60\n")
-        // Make the temp path unwritable: occupy it with a directory so the temp write fails.
+        // 让临时路径不可写：用目录占据它，使临时写入失败。
         val tmp = File(dir, "gow3.ini.tmp")
         assertTrue(tmp.mkdir())
         val ok = Gow3Ini.write(file, mapOf("fps_limit" to "0"))

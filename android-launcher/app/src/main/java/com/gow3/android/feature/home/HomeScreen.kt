@@ -64,8 +64,8 @@ internal fun HomeScreen(
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
-    // The player may drop a Lossless.dll beside the game folder while the game runs, so the state
-    // is re-read from disk every time Home comes back to the foreground.
+    // 玩家可能在游戏运行期间把 Lossless.dll 放到游戏目录旁，因此每次 Home 回到前台
+    // 时都会从磁盘重新读取状态。
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -112,8 +112,8 @@ internal fun HomeScreen(
             },
             onSteam = {
                 onGetFromSteam()
-                // The download (when this build has one) runs outside the launcher; re-read on the
-                // way back so a completed download shows up without a manual pull-to-refresh.
+                // 下载（当该构建附带下载时）在 launcher 外部进行；返回时重新读取，
+                // 以便完成的下载无需手动下拉刷新即可显示。
             },
             onRemove = {
                 when (val result = losslessDlls.remove()) {
@@ -134,7 +134,7 @@ internal fun HomeScreen(
     }
 }
 
-/** The launcher's gow3.ini path, the same file the game, run-gow3.sh and GameActivity read. */
+/** launcher 的 gow3.ini 路径，即游戏、run-gow3.sh 和 GameActivity 读取的同一个文件。 */
 private fun gow3IniFile(context: Context): File = File(context.filesDir, "gow3port/gow3.ini")
 
 private fun loadIni(context: Context): Map<String, String> = Gow3Ini.read(gow3IniFile(context))

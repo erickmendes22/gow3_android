@@ -10,6 +10,7 @@ import hashlib
 import os
 import posixpath
 import shutil
+import sys
 import tarfile
 import tempfile
 import urllib.request
@@ -139,7 +140,14 @@ def main(argv=None):
         staging.mkdir()
         with tarfile.open(tar_path, 'r:') as archive:
             safe_tar_members(archive)
-            archive.extractall(staging)
+            # Python 3.12+ defaults extractall() to the strict data_filter, which rejects
+            # symlinks to absolute paths. Debian rootfs legitimately contains them (e.g.
+            # /etc/alsa/conf.d/*.conf -> /usr/share/alsa/alsa.conf.d/...), and every member
+            # was already validated by safe_tar_members() above, so disable the filter.
+            if sys.version_info >= (3, 12):
+                archive.extractall(staging, filter='fully_trusted')
+            else:
+                archive.extractall(staging)
         if not (staging / 'usr/bin/FEX').is_file():
             raise SystemExit('rootfs-arm64.tar is missing usr/bin/FEX')
         if not (staging / 'usr/share/fex-emu').is_dir():

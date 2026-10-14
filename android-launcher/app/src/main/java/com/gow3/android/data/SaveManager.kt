@@ -7,7 +7,7 @@ import android.provider.OpenableColumns
 import java.io.File
 import java.io.FileInputStream
 
-/** Outcome of one save export/import attempt. Cancelled means the user backed out of the picker. */
+/** 一次存档导出/导入尝试的结果。Cancelled 表示用户在文件选择器中退出了。 */
 internal sealed class SaveResult {
     data class Success(val message: String) : SaveResult()
     object Cancelled : SaveResult()
@@ -15,33 +15,32 @@ internal sealed class SaveResult {
 }
 
 /**
- * Owns the God of War III saves: exporting the `savedata/` tree to a `.zip` the player picks via
- * Storage Access Framework, and importing such an archive back with validation, a safety backup and
- * an atomic swap. Only `filesDir/gow3port/user/savedata` and its `savedata_backups` are touched; the
- * runtime, gow3.ini, runtime install and game files are never modified.
+ * 负责 God of War III 存档：将 `savedata/` 目录树导出为玩家通过 Storage Access
+ * Framework 选择的 `.zip`，并在校验、安全备份和原子替换后导入此类归档。
+ * 只触及 `filesDir/gow3port/user/savedata` 及其 `savedata_backups`；
+ * 运行时、gow3.ini、运行时安装和游戏文件绝不被修改。
  */
 internal class SaveManager(private val activity: Activity) {
 
     companion object {
-        /** Distinct from GameFolderManager's 1001/1002 and LosslessDllManager's 1003. */
+        /** 区别于 GameFolderManager 的 1001/1002 和 LosslessDllManager 的 1003。 */
         const val REQUEST_EXPORT = 1004
         const val REQUEST_IMPORT = 1005
         private const val DEFAULT_EXPORT_NAME = "GodOfWar3-Saves"
     }
 
-    /** Set by [launchExport]/[launchImport], consumed by [onActivityResult]. */
+    /** 由 [launchExport]/[launchImport] 设置，由 [onActivityResult] 消费。 */
     private var pending: ((SaveResult) -> Unit)? = null
 
-    /** The game's savedata, the directory run-gow3.sh passes to the game as `--user .../user/savedata`. */
+    /** 游戏的 savedata，即 run-gow3.sh 以 `--user .../user/savedata` 传给游戏的目录。 */
     fun savedataDir(): File = File(activity.filesDir, "gow3port/user/savedata")
 
-    /** Safety backups made before every import, mirroring the Linux-side savedata_backups layout. */
+    /** 每次导入前创建的安全备份，与 Linux 侧 savedata_backups 布局一致。 */
     fun savedataBackupsDir(): File = File(activity.filesDir, "gow3port/user/savedata_backups")
 
     /**
-     * Opens the system save-as picker. When there are no saves, [onResult] is called immediately
-     * with a failure and no picker is shown. On any other outcome the result arrives through
-     * [onActivityResult] from the activity's legacy callback.
+     * 打开系统“另存为”选择器。当没有存档时，立即以失败调用 [onResult]，且不显示
+     * 选择器。其他情况下，结果通过 activity 的 legacy 回调经由 [onActivityResult] 到达。
      */
     fun launchExport(onResult: (SaveResult) -> Unit) {
         if (!SaveArchive.hasSaves(savedataDir())) {
@@ -63,9 +62,8 @@ internal class SaveManager(private val activity: Activity) {
     }
 
     /**
-     * Opens the system file picker for a save archive. [onResult] always runs: the user cancelling,
-     * no picker being installed, a rejected archive and a failed swap all come back as a
-     * [SaveResult], never as a throw.
+     * 打开系统文件选择器以选择存档归档。[onResult] 一定会执行：用户取消、没有安装
+     * 选择器、归档被拒绝和替换失败都会以 [SaveResult] 返回，绝不会抛异常。
      */
     fun launchImport(onResult: (SaveResult) -> Unit) {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -81,7 +79,7 @@ internal class SaveManager(private val activity: Activity) {
         }
     }
 
-    /** @return true when the request was ours and has been consumed. */
+    /** @return 当请求属于我们且已被消费时返回 true。 */
     fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?): Boolean {
         val isExport = requestCode == REQUEST_EXPORT
         val isImport = requestCode == REQUEST_IMPORT
@@ -102,8 +100,8 @@ internal class SaveManager(private val activity: Activity) {
     }
 
     /**
-     * Packs the savedata tree into a temp zip first (SAF streams are not seekable), then copies it
-     * into the picker's URI. The temp file is always deleted, success or failure.
+     * 先把 savedata 目录树打包成临时 zip（SAF 流不可 seek），再复制到选择器返回的 URI。
+     * 无论成功或失败，临时文件始终会被删除。
      */
     private fun exportTo(uri: Uri): SaveResult {
         val savedata = savedataDir()
@@ -125,7 +123,7 @@ internal class SaveManager(private val activity: Activity) {
         }
     }
 
-    /** Validates, extracts to staging, backs up the current saves and swaps them in. */
+    /** 校验、解压到暂存目录、备份当前存档并替换生效。 */
     private fun importFrom(uri: Uri): SaveResult {
         val user = File(activity.filesDir, "gow3port/user")
         val staging = File(user, "savedata.restoring")
@@ -153,7 +151,7 @@ internal class SaveManager(private val activity: Activity) {
         }
     }
 
-    /** Copies the current saves to a timestamped backup folder; null when there was nothing to back up. */
+    /** 将当前存档复制到带时间戳的备份目录；没有可备份内容时返回 null。 */
     private fun backupExisting(savedata: File): File? {
         if (!SaveArchive.hasSaves(savedata)) return null
         val root = savedataBackupsDir()
@@ -163,7 +161,7 @@ internal class SaveManager(private val activity: Activity) {
         return target
     }
 
-    /** The provider's display name, falling back to the URI's last segment. */
+    /** Provider 的显示名称，回退到 URI 的最后一段。 */
     private fun displayName(uri: Uri): String? {
         try {
             activity.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
@@ -174,7 +172,7 @@ internal class SaveManager(private val activity: Activity) {
                 }
             }
         } catch (_: Exception) {
-            // Fall through to the URI segment.
+            // 回退到 URI 段。
         }
         val segment = uri.lastPathSegment ?: return null
         return segment.substringAfterLast('/').takeIf { it.isNotEmpty() }

@@ -16,6 +16,18 @@ fi
 if [[ -n ${GOW3_LLD_PREFIX:-} && -d $GOW3_LLD_PREFIX/bin ]]; then
     export PATH="$GOW3_LLD_PREFIX/bin:$PATH"
 fi
+# Mesa's ir3_parser needs Bison >= 3.8 (-Wcounterexamples) and a recent Flex. macOS ships
+# bison 2.3, so prefer Homebrew's keg-only bison/flex when installed.
+for tool in bison flex; do
+    for prefix in /opt/homebrew/opt/$tool /usr/local/opt/$tool; do
+        [[ -d $prefix/bin ]] && { export PATH="$prefix/bin:$PATH"; break; }
+    done
+done
+command -v bison >/dev/null || die 'bison is required (brew install bison)'
+command -v flex >/dev/null || die 'flex is required (brew install flex)'
+if ! bison -Wcounterexamples -V >/dev/null 2>&1; then
+    die "bison is too old ($(bison --version 2>&1 | head -1)); need >= 3.8 (brew install bison)"
+fi
 command -v git >/dev/null || die 'git is required'
 command -v clang >/dev/null || die 'clang is required'
 command -v clang++ >/dev/null || die 'clang++ is required'
