@@ -33,6 +33,8 @@ private const val AUTHOR = "zfitness"
 private const val QQ_GROUP = "1105902080"
 private const val TELEGRAM_URL = "https://t.me/gow3_android"
 private const val TELEGRAM_HANDLE = "@gow3_android"
+private const val QQ_GROUP_SCHEME =
+    "mqqapi://card/show_pslcard?src_type=internal&version=1&card_type=group&source=qrcode&uin=$QQ_GROUP"
 
 /** 致谢移植作者，并引导玩家前往反馈群。 */
 @Composable
@@ -44,22 +46,51 @@ internal fun ContactCard() {
         Toast.makeText(context, "$value copied", Toast.LENGTH_SHORT).show()
     }
 
+    /** 用 QQ 打开群卡片；未安装 QQ 返回 false。 */
+    fun openQqGroup(context: Context, group: String): Boolean =
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, QQ_GROUP_SCHEME.toUri()))
+            true
+        } catch (error: ActivityNotFoundException) {
+            false
+        }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(LauncherColors.surface)
-            .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.5f)), RoundedCornerShape(14.dp))
+            .border(
+                BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.5f)),
+                RoundedCornerShape(14.dp)
+            )
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("AUTHOR & SUPPORT", color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+        Text(
+            "AUTHOR & SUPPORT",
+            color = LauncherColors.gold,
+            fontFamily = FontFamily.Serif,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp
+        )
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             ContactRow("Author", AUTHOR)
-            ContactRow("QQ group", QQ_GROUP, "COPY") { copy("QQ group", QQ_GROUP) }
+            ContactRow("QQ group", QQ_GROUP, "OPEN") {
+                if (!openQqGroup(context, QQ_GROUP)) {
+                    copyToClipboard(context, "QQ group", QQ_GROUP)
+                    Toast.makeText(
+                        context,
+                        "QQ not installed, group number copied",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
             ContactRow("Telegram", TELEGRAM_HANDLE, "OPEN") {
                 if (!openUrl(context, TELEGRAM_URL)) {
-                    Toast.makeText(context, "No app can open $TELEGRAM_URL", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "No app can open $TELEGRAM_URL", Toast.LENGTH_SHORT)
+                        .show()
                 }
             }
         }
@@ -88,8 +119,19 @@ private fun ContactRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(label, color = LauncherColors.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.4.sp)
-            Text(value, color = LauncherColors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                label,
+                color = LauncherColors.textMuted,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.4.sp
+            )
+            Text(
+                value,
+                color = LauncherColors.textPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
         }
         if (action != null) {
             ActionButton(action, false, onClick = onAction)

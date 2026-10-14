@@ -176,6 +176,17 @@ internal class GameFolderManager(private val activity: Activity) {
             setPadding(0, dp(15), 0, dp(15))
             isFocusable = true
         }
+        val secondary = TextView(activity).apply {
+            text = if (isUpdate) "CHOOSE GAME FOLDER" else "CHOOSE UPDATE FOLDER"
+            gravity = Gravity.CENTER
+            textSize = 13f
+            letterSpacing = 0.08f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(0xffc6ad76.toInt())
+            background = roundedBackground(0xff12100d.toInt(), 0xffc6ad76.toInt(), 12)
+            setPadding(0, dp(13), 0, dp(13))
+            isFocusable = true
+        }
         val keep = if (current != null) TextView(activity).apply {
             text = "KEEP CURRENT SELECTION"
             gravity = Gravity.CENTER
@@ -191,6 +202,9 @@ internal class GameFolderManager(private val activity: Activity) {
         panel.addView(title, LinearLayout.LayoutParams(-1, -2))
         panel.addView(message, LinearLayout.LayoutParams(-1, -2))
         panel.addView(choose, LinearLayout.LayoutParams(-1, dp(52)))
+        val secondaryParams = LinearLayout.LayoutParams(-1, -2)
+        secondaryParams.topMargin = dp(10)
+        panel.addView(secondary, secondaryParams)
         if (keep != null) {
             val params = LinearLayout.LayoutParams(-1, -2)
             params.topMargin = dp(10)
@@ -200,6 +214,10 @@ internal class GameFolderManager(private val activity: Activity) {
         // 首次设置不可被取消；当从 Home 页重新选择时已存在有效目录，
         // 因此允许玩家在不做任何修改的情况下退出。
         val dialog = AlertDialog.Builder(activity).setView(panel).setCancelable(current != null || isUpdate).create()
+        // 首次配置时若从游戏弹窗跳到补丁弹窗后又取消，补丁目录可留空，但要回到游戏目录的流程。
+        if (isUpdate && prefs().getString("game_dir", null) == null) {
+            dialog.setOnCancelListener { showFolderDialog(Kind.GAME) }
+        }
         choose.setOnClickListener {
             dialog.dismiss()
             try {
@@ -212,6 +230,11 @@ internal class GameFolderManager(private val activity: Activity) {
             }
         }
         keep?.setOnClickListener { dialog.dismiss() }
+        secondary.setOnClickListener {
+            dialog.dismiss()
+            // 游戏/补丁弹窗之间互相切换，让玩家在同一个设置流程里配好两个目录。
+            showFolderDialog(if (isUpdate) Kind.GAME else Kind.UPDATE)
+        }
         dialog.show()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.window?.setLayout(dp(350), LinearLayout.LayoutParams.WRAP_CONTENT)
