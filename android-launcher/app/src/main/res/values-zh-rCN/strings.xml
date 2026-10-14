@@ -85,7 +85,7 @@
     <string name="frame_gen_footer">导入的文件保存在应用私有目录内，下次启动游戏时生效。没有 Steam 时同样可以「导入 .DLL」。</string>
 
     <!-- About 页 -->
-    <string name="about_title">God of War III Android 版</string>
+    <string name="about_title">God of War III Android</string>
     <string name="about_version_fmt">版本 %1$s</string>
     <string name="about_description">一个通过模拟将《战神 III 重制版》体验带到 Android 的社区启动器。</string>
     <string name="about_third_party_licenses">第三方许可</string>
@@ -182,7 +182,5 @@
     <string name="folder_current_selection_fmt">\n\n当前选择：\n%1$s</string>
     <string name="folder_choose_update">选择升级补丁目录</string>
     <string name="folder_choose_game">选择游戏目录</string>
-    <string name="folder_confirm_update">确认升级补丁</string>
-    <string name="folder_confirm">确认</string>
     <string name="no_folder_picker_fmt">没有目录选择器：%1$s</string>
 </resources>

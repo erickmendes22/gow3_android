@@ -182,7 +182,5 @@
     <string name="folder_current_selection_fmt">\n\nCurrent selection:\n%1$s</string>
     <string name="folder_choose_update">CHOOSE UPDATE FOLDER</string>
     <string name="folder_choose_game">CHOOSE GAME FOLDER</string>
-    <string name="folder_confirm_update">CONFIRM UPDATE</string>
-    <string name="folder_confirm">CONFIRM</string>
     <string name="no_folder_picker_fmt">No folder picker: %1$s</string>
 </resources>
