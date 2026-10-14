@@ -56,7 +56,7 @@ public final class GameActivity extends Activity {
     private LinearLayout drawerItems;
     private TextView status;
     private View resume;
-    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem, folderItem;
+    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem;
     private TouchControllerOverlay controllerOverlay;
     private PadBridge pad;
     private AudioBridge audio;
@@ -169,9 +169,6 @@ public final class GameActivity extends Activity {
         body.addView(edge,new LinearLayout.LayoutParams(dp(1),-1));
         drawer.addView(body,new LinearLayout.LayoutParams(-1,0,1));
 
-        TextView title=text("BLOODBORNE",24,0xffe8dfc9); title.setTypeface(Typeface.SERIF,Typeface.BOLD);
-        title.setLetterSpacing(0.12f); title.setPadding(dp(10),0,0,0);
-        drawerItems.addView(title,new LinearLayout.LayoutParams(-1,-2));
         TextView hint=text("Swipe left or press A to return",12,0xff8e9097);
         hint.setPadding(dp(10),dp(2),0,dp(6));
         drawerItems.addView(hint,new LinearLayout.LayoutParams(-1,-2));
@@ -220,8 +217,6 @@ public final class GameActivity extends Activity {
             closeDrawer();
         });
 
-        section("Storage");
-        folderItem=menuItem("ic_folder","Game folder","",() -> { closeDrawer(); askGameFolder(true); });
         menuItem("ic_exit","Quit game",null,() -> new AlertDialog.Builder(this)
             .setTitle("Quit God of War III?").setMessage("Any unsaved progress will be lost.")
             .setNegativeButton("Cancel",null).setPositiveButton("Quit",(dialog,which) -> finish()).show());
@@ -308,7 +303,6 @@ public final class GameActivity extends Activity {
         setDetail(losslessItem,lsfgOn ? lsfg+"× frames · flow "
             +(setting("lsfg_flow_scale")==null ? "1.0" : setting("lsfg_flow_scale")) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
-        setDetail(folderItem,gameDir==null ? "Not chosen" : gameDir);
     }
 
     private void openDrawer() {

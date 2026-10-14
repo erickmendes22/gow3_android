@@ -10,6 +10,7 @@ internal data class LaunchParam(
     val group: String,
     val options: List<LaunchOption>,
     val defaultValue: String,
+    val description: String? = null,
 )
 
 internal data class LaunchOption(val value: String, val label: String)
@@ -30,6 +31,7 @@ internal object LaunchParams {
                 LaunchOption("fsr3", "FSR 3.1"),
             ),
             defaultValue = "fsr3",
+            description = "Renders the game at a lower internal resolution and then uses FSR 3.1 to scale the image up to your screen, so you get more performance while keeping a sharp picture. Off renders at a fixed 1280×720.",
         ),
         LaunchParam(
             key = "render_resolution", label = "Resolution", group = "DISPLAY",
@@ -72,6 +74,7 @@ internal object LaunchParams {
                 LaunchOption("240", "240"),
             ),
             defaultValue = "120",
+            description = "How fast the game engine itself updates the game world, separate from the display. 60 is the game's original speed; higher values make motion smoother but use more power.",
         ),
         LaunchParam(
             key = "vsync", label = "VSync", group = "PERFORMANCE",
@@ -80,6 +83,7 @@ internal object LaunchParams {
                 LaunchOption("1", "ON"),
             ),
             defaultValue = "1",
+            description = "Syncs the game's frames with your screen's refresh rate to stop visual tearing. Leave it ON unless you see tearing or stutter.",
         ),
         LaunchParam(
             key = "frames_queued", label = "Frames queued", group = "PERFORMANCE",
@@ -89,6 +93,7 @@ internal object LaunchParams {
                 LaunchOption("0", "Unlimited"),
             ),
             defaultValue = "1",
+            description = "How many frames the game prepares ahead of what the screen shows. Lower numbers cut input lag; higher numbers can improve smoothness on weaker hardware.",
         ),
         LaunchParam(
             key = "skip_network_choice", label = "Offline start", group = "STARTUP",
@@ -113,6 +118,7 @@ internal object LaunchParams {
                 LaunchOption("1", "ON"),
             ),
             defaultValue = "0",
+            description = "Lets you move the camera freely around the world for exploring or testing, instead of following the gameplay camera. Meant for experimentation, not normal play.",
         ),
     )
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.gow3.android.data.LaunchParam
 import com.gow3.android.data.LaunchParams
 import com.gow3.android.ui.components.LauncherColors
@@ -87,6 +89,7 @@ internal fun LaunchParameters(
 
 @Composable
 private fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (String, String) -> Unit) {
+    var showInfo by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -94,7 +97,24 @@ private fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (Str
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(param.label, color = LauncherColors.textMuted, fontSize = 13.sp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(param.label, color = LauncherColors.textMuted, fontSize = 13.sp)
+            if (param.description != null) {
+                Text(
+                    "ⓘ",
+                    color = LauncherColors.gold,
+                    fontSize = 13.sp,
+                    lineHeight = 13.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { showInfo = true }
+                        .padding(2.dp),
+                )
+            }
+        }
         if (param.options.size == 2 && param.options[0].value == "0" && param.options[1].value == "1") {
             Switch(
                 checked = LaunchParams.valueOf(values, param) == "1",
@@ -127,6 +147,41 @@ private fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (Str
                     }
                 }
             }
+        }
+    }
+    if (showInfo && param.description != null) {
+        ParamInfoDialog(title = param.label, message = param.description, onDismiss = { showInfo = false })
+    }
+}
+
+@Composable
+private fun ParamInfoDialog(title: String, message: String, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 340.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(LauncherColors.surface)
+                .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.5f)), RoundedCornerShape(14.dp))
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(title, color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
+            Text(message, color = LauncherColors.textMuted, fontSize = 13.sp, lineHeight = 19.sp)
+            Text(
+                "OK",
+                color = LauncherColors.textPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.4.sp,
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(LauncherColors.navSurface)
+                    .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.45f)), RoundedCornerShape(8.dp))
+                    .clickable(onClick = onDismiss)
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+            )
         }
     }
 }
