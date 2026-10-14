@@ -174,6 +174,7 @@ meson setup "$build" "$src" --cross-file "$cross" --prefix="$rootfs/usr" \
     -Dplatforms=x11 -Dvulkan-drivers=freedreno -Dfreedreno-kmds=kgsl -Dgallium-drivers= \
     -Dopengl=false -Degl=disabled -Dgles1=disabled -Dgles2=disabled -Dglx=disabled -Dgbm=disabled \
     -Dllvm=disabled -Dvalgrind=disabled -Dlibunwind=disabled -Dlmsensors=disabled \
+    -Dspirv-tools=disabled \
     -Dzstd=enabled -Dexpat=enabled -Dvulkan-layers= -Dtools= -Dbuild-tests=false \
     > "$build.log" 2>&1 || { tail -40 "$build.log" >&2; exit 1; }
 end_stage "configured $(grep -cE '^\[[0-9]+/[0-9]+\]' "$build.log" || true) targets"
