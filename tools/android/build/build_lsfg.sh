@@ -11,6 +11,11 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../../.."
 die() { echo "build_lsfg: $*" >&2; exit 1; }
+# The CI's conda toolchain exports x86-64-only flags (-march=nocona,
+# -mtune=haswell), include paths, and linker search paths. This is a
+# Clang aarch64 cross-build: consume the conda host tools via PATH,
+# but never pass its x86-64 build flags or paths to CMake.
+unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH CMAKE_PREFIX_PATH PKG_CONFIG_PATH
 if [[ -n ${GOW3_LLVM_PREFIX:-} && -d $GOW3_LLVM_PREFIX/bin ]]; then
     export PATH="$GOW3_LLVM_PREFIX/bin:$PATH"
 fi
