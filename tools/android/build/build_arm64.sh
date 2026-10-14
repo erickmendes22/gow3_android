@@ -93,9 +93,10 @@ end_stage() {
     printf '    %s (%dm%02ds)\n' "$*" "$((sec / 60))" "$((sec % 60))"
 }
 
-# Print a live status line on a TTY only.
-live() { [[ -t 1 ]] && printf '\r    %s\033[K' "$*"; }
-live_end() { [[ -t 1 ]] && printf '\r\033[K\n'; }
+# Print a live status line on a TTY only. The `if` form matters: `[[ -t 1 ]] && printf` would
+# return 1 when stdout is a pipe (CI), which `set -e` turns into a silent early exit.
+live() { if [[ -t 1 ]]; then printf '\r    %s\033[K' "$*"; fi; }
+live_end() { if [[ -t 1 ]]; then printf '\r\033[K\n'; fi; }
 
 # Run ninja and return its exit status. On a TTY, run it in the background and poll the
 # full log (kept in $3 for diagnostics) for the latest "[N/M] ..." line, shown as a rolling
