@@ -110,6 +110,8 @@ internal class GameFolderManager(private val activity: Activity) {
             return
         }
         prefs().edit().putString(kind.prefKey, dir!!.path).apply()
+        // 选完不立即关闭：回到目录弹窗，让玩家确认，并可在同一流程里继续选升级补丁。
+        showFolderDialog(kind)
     }
 
     /** 目录是否可用；null 表示可用，否则返回给玩家看的原因。 */
@@ -187,14 +189,14 @@ internal class GameFolderManager(private val activity: Activity) {
             setPadding(0, dp(13), 0, dp(13))
             isFocusable = true
         }
-        val keep = if (current != null) TextView(activity).apply {
-            text = "KEEP CURRENT SELECTION"
+        val confirm = if (current != null) TextView(activity).apply {
+            text = if (isUpdate) "CONFIRM UPDATE" else "CONFIRM"
             gravity = Gravity.CENTER
             textSize = 13f
             letterSpacing = 0.08f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(0xff8e9097.toInt())
-            background = roundedBackground(0xff12100d.toInt(), 0xffc6ad76.toInt(), 12)
+            setTextColor(0xff12100d.toInt())
+            background = roundedBackground(0xffc6ad76.toInt(), 0xffc6ad76.toInt(), 12)
             setPadding(0, dp(13), 0, dp(13))
             isFocusable = true
         } else null
@@ -205,10 +207,10 @@ internal class GameFolderManager(private val activity: Activity) {
         val secondaryParams = LinearLayout.LayoutParams(-1, -2)
         secondaryParams.topMargin = dp(10)
         panel.addView(secondary, secondaryParams)
-        if (keep != null) {
+        if (confirm != null) {
             val params = LinearLayout.LayoutParams(-1, -2)
             params.topMargin = dp(10)
-            panel.addView(keep, params)
+            panel.addView(confirm, params)
         }
 
         // 首次设置不可被取消；当从 Home 页重新选择时已存在有效目录，
@@ -229,7 +231,7 @@ internal class GameFolderManager(private val activity: Activity) {
                 AlertDialog.Builder(activity).setMessage("No folder picker: $ex").setPositiveButton("OK", null).show()
             }
         }
-        keep?.setOnClickListener { dialog.dismiss() }
+        confirm?.setOnClickListener { dialog.dismiss() }
         secondary.setOnClickListener {
             dialog.dismiss()
             // 游戏/补丁弹窗之间互相切换，让玩家在同一个设置流程里配好两个目录。
