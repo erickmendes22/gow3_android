@@ -59,6 +59,17 @@ internal object LaunchParams {
             defaultValue = "720p",
         ),
         LaunchParam(
+            key = "output_res", labelRes = R.string.param_output_resolution, groupRes = R.string.param_group_display,
+            options = listOf(
+                LaunchOption("1280x720", R.string.param_option_720p),
+                LaunchOption("1920x1080", R.string.param_option_1080p),
+                LaunchOption("2560x1440", R.string.param_option_1440p),
+                LaunchOption("3840x2160", R.string.param_option_4k),
+            ),
+            defaultValue = "1280x720",
+            descriptionRes = R.string.param_desc_output_resolution,
+        ),
+        LaunchParam(
             key = "fps_limit", labelRes = R.string.param_fps_limit, groupRes = R.string.param_group_performance,
             options = listOf(
                 LaunchOption("30", R.string.param_option_30),
