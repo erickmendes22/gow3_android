@@ -77,6 +77,24 @@ std::string choice_title;
 std::vector<std::string> choice_items;
 int choice_index = 0;
 std::atomic<int> choice_result{-1}; // -1 open, -2 cancelled, else the chosen index
+// Android virtual buttons are written to GOW3_PAD_FILE instead of SDL events.
+unsigned choice_pad_held = 0;
+unsigned ChoicePadMask() {
+    static const char* path = std::getenv("GOW3_PAD_FILE");
+    if (!path || !*path) return 0;
+    FILE* file = std::fopen(path, "r");
+    if (!file) return 0;
+    unsigned mask = 0;
+    char word[64];
+    while (std::fscanf(file, "%63s", word) == 1) {
+        if (!std::strcmp(word, "up")) mask |= 1u;
+        else if (!std::strcmp(word, "down")) mask |= 2u;
+        else if (!std::strcmp(word, "cross")) mask |= 4u;
+        else if (!std::strcmp(word, "circle")) mask |= 8u;
+    }
+    std::fclose(file);
+    return mask;
+}
 // Save pictures: decoded by BeginChoice, made textures on the present thread (null = none).
 // Closed lists' textures wait in choice_retired until the backend has destroyed them.
 std::vector<Gow3Png::Image> choice_pictures;
@@ -1108,11 +1126,29 @@ void BeginChoice(const std::string& title, const std::vector<std::string>& items
     choice_items = items;
     choice_index = focus >= 0 && focus < int(items.size()) ? focus : 0;
     choice_result = -1;
+    // Ignore buttons held when entering the save menu; require a new press.
+    choice_pad_held = ChoicePadMask();
     choice_active = true;
 }
 
 int PollChoice() {
-    return choice_result;
+    if (!choice_active || !std::getenv("GOW3_PAD_FILE")) return choice_result.load();
+    std::scoped_lock lock{imgui_mutex};
+    if (!choice_active) return choice_result.load();
+    const unsigned held = ChoicePadMask();
+    const unsigned pressed = held & ~choice_pad_held;
+    choice_pad_held = held;
+    const int count = int(choice_items.size());
+    if (count) {
+        if (pressed & 1u) choice_index = (choice_index + count - 1) % count;
+        if (pressed & 2u) choice_index = (choice_index + 1) % count;
+    }
+    if (pressed & (4u | 8u)) {
+        choice_result = ((pressed & 4u) && count) ? choice_index : -2;
+        choice_active = false;
+        RetireChoiceTextures();
+    }
+    return choice_result.load();
 }
 
 void SetTextEntry(bool active, const std::string& prompt, const std::string& text) {

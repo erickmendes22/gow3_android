@@ -33,6 +33,22 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn('set(GOW3_FMT_TARGET fmt::fmt-header-only)', cmake)
         self.assertIn('UND.*_ZN3fmt3v[0-9]+', build)
 
+    def test_android_virtual_save_dialog_and_720p_ui_target(self):
+        overlay = (ROOT / "gpu/shim/gow3_overlay.cpp").read_text()
+        header = (ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.h").read_text()
+        self.assertIn("ChoicePadMask()", overlay)
+        self.assertIn("const unsigned pressed = held & ~choice_pad_held", overlay)
+        self.assertIn("(w == target_width && h == target_height)", header)
+
+    def test_shadow_toggle_semantics(self):
+        from launch_env import disable_shadows_requested
+        self.assertTrue(disable_shadows_requested({"disable_dynamic_shadows": "1"}))
+        self.assertFalse(disable_shadows_requested({"disable_dynamic_shadows": "0"}))
+        self.assertTrue(disable_shadows_requested({"effect_dynamic_shadows": "0"}))
+        self.assertFalse(disable_shadows_requested({"effect_dynamic_shadows": "1"}))
+        self.assertFalse(disable_shadows_requested({
+            "disable_dynamic_shadows": "0", "effect_dynamic_shadows": "0"}))
+
     def test_verified_shadow_patch_exists(self):
         metas = ET.parse(ROOT / "patches/God_of_War_III_Remastered.xml").getroot().iter("Metadata")
         matching = [meta for meta in metas if meta.get("Name") == "Disable Dynamic Shadows"]

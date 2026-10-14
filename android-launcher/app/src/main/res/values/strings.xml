@@ -42,8 +42,8 @@
     <string name="param_option_quality">Quality</string>
     <string name="param_option_performance">Performance</string>
     <string name="param_option_ultra_performance">Ultra Performance</string>
-    <string name="param_shadows">Dynamic shadows</string>
-    <string name="param_desc_shadows">ON keeps the original shadows. OFF applies the tested CUSA01715 1.02 shadow patch on restart; other game builds keep their original shadows.</string>
+    <string name="param_shadows">Disable dynamic shadows</string>
+    <string name="param_desc_shadows">ON disables dynamic shadows by applying the verified CUSA01715 v1.02 patch after restart. OFF keeps original shadows.</string>
     <string name="param_fps_limit">FPS limit</string>
     <string name="param_engine_fps">Engine FPS</string>
     <string name="param_vsync">VSync</string>

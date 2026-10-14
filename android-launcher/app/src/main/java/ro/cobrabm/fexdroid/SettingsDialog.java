@@ -216,8 +216,9 @@ final class SettingsDialog {
         // effect_dynamic_shadows is consumed by launch_env.py to select the
         // SHA-gated Disable Dynamic Shadows eboot patch on the next launch.
         heading(box,"Game effects");
-        final Switch dynamicShadows=toggle(box,"Dynamic shadows",
-            "1".equals(get("effect_dynamic_shadows","1")));
+        final Switch disableShadows=toggle(box,"Disable dynamic shadows",
+            "1".equals(get("disable_dynamic_shadows",
+                           "0".equals(get("effect_dynamic_shadows","1")) ? "1" : "0")));
 
         // FPS 上限入口：取值域必须与运行时 FPS_LIMITS（gow3_graphics.h 的 FpsLimits：30/60/120/
         // 240/0）完全一致——ParseFpsLimit 把表外的值（例如旧版提供的 40/45）一律当成 0（不限制），
@@ -272,7 +273,8 @@ final class SettingsDialog {
                 changed.put("preset",PRESET_VALUES[Math.max(0,checkedIndex(presets))]);
                 changed.put("output_res","1280x720");
                 changed.put("render_resolution","720p");
-                changed.put("effect_dynamic_shadows",dynamicShadows.isChecked() ? "1" : "0");
+                changed.put("disable_dynamic_shadows",disableShadows.isChecked() ? "1" : "0");
+                changed.put("effect_dynamic_shadows",disableShadows.isChecked() ? "0" : "1");
                 changed.put("sharpen",sharpen.isChecked() ? "1" : "0");
                 changed.put("sharpness",String.format(Locale.ROOT,"%.2f",sharpness.getProgress()/100f));
                 changed.put("show_fps",fps.isChecked() ? "1" : "0");

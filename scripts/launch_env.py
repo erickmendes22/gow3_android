@@ -14,6 +14,13 @@ from pathlib import Path
 PORT = Path(__file__).resolve().parent.parent
 
 
+def disable_shadows_requested(ini):
+    """New positive-toggle setting wins; legacy inverse toggle remains readable."""
+    if 'disable_dynamic_shadows' in ini:
+        return ini['disable_dynamic_shadows'] == '1'
+    return ini.get('effect_dynamic_shadows', '1') == '0'
+
+
 def derive(game, config, state_path, env):
     """Plan one launch.
 
@@ -59,6 +66,9 @@ def derive(game, config, state_path, env):
         updates['GOW3_OUTPUT_RES'] = '1280x720'
 
     names, dmem, vblank = [], None, None
+    shadow_requested = disable_shadows_requested(ini)
+    updates['GOW3_SHADOWS_REQUESTED'] = 'off' if shadow_requested else 'on'
+    updates['GOW3_SHADOWS_STATUS'] = 'pending' if shadow_requested else 'enabled'
     identity = patch_profile_status(game)
     profile = game_profile(identity['title_id'])
     reason = identity['reason'] or 'unknown'
@@ -79,9 +89,11 @@ def derive(game, config, state_path, env):
             # This exact-address patch belongs only to the supplied and
             # verified eboot revision. Other builds retain their shadows.
             shadow_reference = '6e72330e9092e5164049b865e5568f2d450904001a73fe0a2f4b39194c195b3c'
-            if (ini.get('effect_dynamic_shadows', '1') == '0' and
-                    identity['eboot_sha256'] == shadow_reference):
+            if shadow_requested and identity['eboot_sha256'] == shadow_reference:
                 names.append('Disable Dynamic Shadows')
+            updates['GOW3_SHADOWS_STATUS'] = ('disabled-patch-selected'
+                if 'Disable Dynamic Shadows' in names else
+                'unsupported-eboot' if shadow_requested else 'enabled')
             dmem, vblank = patch_requirements(profile[1], names, profile[2])
             # The retail pool plus the patches' extra DMEM must fit the device (design: gate
             # values by device/runtime capability and fail with a clear log, not an OOM kill).

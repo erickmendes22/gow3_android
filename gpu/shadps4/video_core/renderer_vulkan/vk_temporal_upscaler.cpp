@@ -1346,8 +1346,21 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
          image.info.pixel_format == vk::Format::eR8G8B8A8Srgb) &&
         RenderTarget(image.info.size.width, image.info.size.height) &&
         !FrameCapture::IsDisplayBuffer(image.info.guest_address);
-    switch (UiComposition::Choose(Scaled(), ui_draw,
-                                  camera_motion.Ready() && ldr_target == color,
+    const bool motion_ready = camera_motion.Ready();
+    const bool scene_ready = motion_ready && ldr_target == color;
+    // Only the first few relevant transitions, not per-frame log spam.
+    if (movie) {
+        static unsigned trace = 0;
+        if (trace < 12) {
+            ++trace;
+            std::printf("GOW3_FSR_UI_GATE event=%u ui=%d scene=%d camera=%d ldr=%d active=%d size=%ux%u output=%ux%u\n",
+                        trace, int(ui_draw), int(scene_ready), int(motion_ready),
+                        int(ldr_target == color), int(Active()),
+                        image.info.size.width, image.info.size.height,
+                        target_width, target_height);
+        }
+    }
+    switch (UiComposition::Choose(Scaled(), ui_draw, scene_ready,
                                   Active() && !failed)) {
     case UiComposition::Background::None:
         return;

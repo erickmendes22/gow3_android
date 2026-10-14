@@ -149,7 +149,11 @@ private:
     /// A target of the patched render size: the game allocates it with aligned dimensions
     /// (a 1916x1078 scene in 1916x1080 targets).
     [[nodiscard]] bool RenderTarget(u32 w, u32 h) const {
-        if (!scaled_session) return w == 1920 && h == 1080;
+        // Android 720p PS4 output is valid for post-scene UI composition.
+        // Rejecting anything but desktop 1080p prevented all scaled FSR passes.
+        if (!scaled_session)
+            return (w == 1920 && h == 1080) ||
+                   (w == target_width && h == target_height);
         return w >= render_width && h >= render_height && w < render_width + 8 &&
                h < render_height + 8;
     }

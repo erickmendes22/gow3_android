@@ -57,13 +57,13 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_fsr_input,
         ),
         LaunchParam(
-            key = "effect_dynamic_shadows", labelRes = R.string.param_shadows,
+            key = "disable_dynamic_shadows", labelRes = R.string.param_shadows,
             groupRes = R.string.param_group_display,
             options = listOf(
                 LaunchOption("0", R.string.param_option_off),
                 LaunchOption("1", R.string.param_option_on),
             ),
-            defaultValue = "1",
+            defaultValue = "0",
             descriptionRes = R.string.param_desc_shadows,
         ),
         LaunchParam(
