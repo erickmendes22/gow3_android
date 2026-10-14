@@ -16,6 +16,8 @@ int main() {
     assert(Choose(false, true, true, true) == Background::None);
     assert(NativeViewport(1920, -1080));
     assert(!NativeViewport(960, -540));
+    assert(NativeViewport(1280, -720, 1280, 720));
+    assert(!NativeViewport(640, -360, 1280, 720));
     assert(MovieShader(0x34e8a281) && MovieShader(0x24042a9b));
     assert(!MovieShader(0x0b0acf50)); // fullscreen post/tonemap also has a native viewport
     assert(!MovieShader(0x6c62a79f)); // shadow geometry
@@ -25,5 +27,9 @@ int main() {
     assert(ui[0] == 1 && ui[1] == 1); // don't double an already native UI viewport
     const auto larger = Scale(960, 540, 3840, 2160, true);
     assert(larger[0] == 2 && larger[1] == 2);
+    const auto android_native_ui = Scale(640, 360, 1280, 720, true, 1280, 720);
+    assert(android_native_ui[0] == 1 && android_native_ui[1] == 1);
+    const auto android_scene = Scale(640, 360, 1280, 720, false, 1280, 720);
+    assert(android_scene[0] == 2 && android_scene[1] == 2);
     std::puts("UI composition: PASS (menu without camera, HUD, FSR off, viewport scaling)");
 }

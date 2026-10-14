@@ -985,7 +985,9 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
         const auto& viewport = Regs().viewports[0];
         upscaler->OnDraw(pipeline->GetStage(Shader::SwStage::Vertex).pgm_hash,
                          cb_descs[0].first, db_desc.first,
-                         UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2));
+                         UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2,
+                                                      scene_targets->GuestSize().width,
+                                                      scene_targets->GuestSize().height));
     }
     const PreparedDraw* draw_prepared = bind_prepared;
     // gow3: vertex and index buffers are resolved while the helper binds textures (their
@@ -1214,7 +1216,9 @@ void Rasterizer::DrawIndirectRecord(const GraphicsPipeline* pipeline, bool is_in
         const auto& viewport = Regs().viewports[0];
         upscaler->OnDraw(pipeline->GetStage(Shader::SwStage::Vertex).pgm_hash,
                          cb_descs[0].first, db_desc.first,
-                         UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2));
+                         UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2,
+                                                      scene_targets->GuestSize().width,
+                                                      scene_targets->GuestSize().height));
     }
     if (!BindResources(pipeline)) {
         return;
@@ -2988,12 +2992,16 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
             // again. The final display copy still uses the guest render-size coordinates.
             const auto& viewport = regs.viewports[0];
             const bool native_coordinates = redirect.native_ui &&
-                (UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2) ||
+                (UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2,
+                                                      scene_targets->GuestSize().width,
+                                                      scene_targets->GuestSize().height) ||
                  (regs.IsClipDisabled() && !regs.viewport_control.xscale_enable &&
                   !regs.viewport_control.yscale_enable));
             target_scale = UiComposition::Scale(guest_extent.first, guest_extent.second,
-                                                redirect.width, redirect.height,
-                                                native_coordinates);
+                                                 redirect.width, redirect.height,
+                                                 native_coordinates,
+                                                 scene_targets->GuestSize().width,
+                                                 scene_targets->GuestSize().height);
         }
     }
 
@@ -3007,7 +3015,9 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
         const auto proxy = pass_size.value_or(size);
         state.width = proxy.width;
         state.height = proxy.height;
-        target_scale = {float(size.width) / 1920.0f, float(size.height) / 1080.0f};
+        const auto guest = scene_targets->GuestSize();
+        target_scale = {float(size.width) / float(guest.width),
+                        float(size.height) / float(guest.height)};
     }
     if (FrameCapture::Active()) {
         std::array<const VideoCore::ImageInfo*, AmdGpu::NUM_COLOR_BUFFERS> colors{};

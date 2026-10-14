@@ -40,6 +40,19 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn("const unsigned pressed = held & ~choice_pad_held", overlay)
         self.assertIn("(w == target_width && h == target_height)", header)
 
+    def test_android_720p_texture_targets_and_real_scaling(self):
+        root = ROOT / "gpu/shadps4/video_core/renderer_vulkan"
+        scene = (root / "vk_scene_resolution.cpp").read_text()
+        header = (root / "vk_scene_resolution.h").read_text()
+        raster = (root / "vk_rasterizer.cpp").read_text()
+        self.assertIn('guest_size = {1280, 720}', scene)
+        self.assertIn('SizeDivisor(i, size, guest_size)', scene)
+        self.assertIn('SizeDivisor(image.info, size, guest_size)', scene)
+        self.assertIn('size != guest_size', header)
+        self.assertIn('scene_targets->GuestSize().width', raster)
+        self.assertIn('float(size.width) / float(guest.width)', raster)
+        self.assertNotIn('target_scale = {float(size.width) / 1920.0f', raster)
+
     def test_shadow_toggle_semantics(self):
         from launch_env import disable_shadows_requested
         self.assertTrue(disable_shadows_requested({"disable_dynamic_shadows": "1"}))
