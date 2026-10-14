@@ -11,9 +11,12 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../../.."
 # A conda-forge gcc activation leaks host-only x86-64 flags (CFLAGS=-march=nocona -mtune=haswell,
-# CPATH=$CONDA_PREFIX/include) that clang rejects for the aarch64 target. Header deps are passed
+# CPATH=$CONDA_PREFIX/include) that clang rejects for the aarch64 target. conda also sets
+# CMAKE_PREFIX_PATH=$CONDA_PREFIX, which makes FindPkgConfig search the host's .pc files and return
+# $CONDA_PREFIX/include paths that get sysroot-prefixed into a broken path. Header deps are passed
 # explicitly via -D flags / the sysroot, so drop those env vars before any cross cmake/clang run.
-unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH
+unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH \
+    CMAKE_PREFIX_PATH
 root=$PWD
 out=$root/out/arm64
 sysroot=${GOW3_ARM64_SYSROOT:-$root/.local-deps/android/arm64-sysroot}
