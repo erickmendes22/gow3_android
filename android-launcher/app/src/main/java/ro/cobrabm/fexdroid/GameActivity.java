@@ -181,6 +181,10 @@ public final class GameActivity extends Activity {
 
         section("Game");
         resume=menuItem("ic_play","Resume game",null,() -> closeDrawer());
+        /* Game settings 与 Cheats 两个入口已隐藏（对应 SettingsDialog.showGame()/showCheats() 也已
+         * 注释掉）：它们写的 ini 键在本仓库的启动链路里没有消费方，作弊更是根本没装 hook——Android
+         * 走 FEXCore JIT，probe.c 的 install_cheats() 被 `#if defined(GUEST_CPU_NATIVE)` 编译掉了。
+         * 留着入口只会让玩家以为改了有用。接通后把下面两段取消注释即可。
         gameSettingsItem=menuItem("ic_settings","Game settings","",() -> {
             closeDrawer();
             new SettingsDialog(this,new File(BASE,"gow3.ini"),this::restartGame).showGame();
@@ -189,17 +193,24 @@ public final class GameActivity extends Activity {
             closeDrawer();
             new SettingsDialog(this,new File(BASE,"gow3.ini"),this::restartGame).showCheats();
         });
+         */
         menuItem("ic_refresh","Restart game","Unsaved progress is lost",() -> new AlertDialog.Builder(this)
             .setTitle("Restart God of War III?").setMessage("Any unsaved progress will be lost.")
             .setNegativeButton("Cancel",null).setPositiveButton("Restart",(dialog,which) -> restartGame()).show());
 
         section("Graphics");
+        // Graphics 入口只保留运行时真正消费的那几项：upscaler / preset / sharpen / sharpness /
+        // show_fps / fps_limit。原来的 CPU 核心（thor_cpus）、特效（effect_*）、模型细节
+        // （model_lod）在本仓库启动链路没有消费方，已在 SettingsDialog.show() 里注释掉。
+        // fps_limit 的摘要取值域与 SettingsDialog.FPS_VALUES 和运行时 FPS_LIMITS
+        // （30/60/120/240/0）对齐。
         graphicsItem=menuItem("ic_tune","Graphics settings","",() -> {
             closeDrawer();
             new SettingsDialog(this,new File(BASE,"gow3.ini"),this::restartGame).show();
         });
         // Tuning only. Supplying Lossless.dll is the launcher Home page's job (com.gow3.android);
-        // the drawer's row reports the multiplier, never where the DLL came from.
+        // the drawer's row reports the multiplier, never where the DLL came from. LSFG 是唯一帧生成
+        // 路径，FSR 3.1 帧生成未接通，不要在这里再加 FSR 帧生成入口。
         losslessItem=menuItem("ic_frames","Lossless Scaling","",() -> {
             closeDrawer();
             new SettingsDialog(this,new File(BASE,"gow3.ini"),this::restartGame)
@@ -301,6 +312,7 @@ public final class GameActivity extends Activity {
     }
     /** The rows' second lines: the current settings, read when the drawer opens. */
     private void refreshDrawer() {
+        /* gameSettingsItem / cheatsItem 的摘要随上面两个入口一起注释掉了（接回来时一起放开）。
         java.util.List<String> game=new java.util.ArrayList<>();
         if (!"0".equals(setting("skip_network_choice"))) game.add("Offline start");
         if ("1".equals(setting("skip_intro"))) game.add("no intros");
@@ -309,12 +321,15 @@ public final class GameActivity extends Activity {
         setDetail(gameSettingsItem,game.isEmpty() ? "Online/offline screen shown" : String.join(" · ",game));
         java.util.List<String> cheats=new java.util.ArrayList<>();
         if ("1".equals(setting("cheat_health"))) cheats.add("infinite health");
-        if ("1".equals(setting("cheat_items"))) cheats.add("infinite items");
+        if ("1".equals(setting("cheat_item"))) cheats.add("infinite items");
         setDetail(cheatsItem,cheats.isEmpty() ? "Off" : String.join(" · ",cheats));
+         */
         String upscaler="off".equals(setting("upscaler")) ? "No upscaling" : "FSR 3.1";
         String limit=setting("fps_limit");
+        // 取值域与 SettingsDialog.FPS_VALUES 一致：只有 30/60/120/240 会按原值显示，0 是"不限制"，
+        // 其余（键缺失、旧版遗留的 40/45）运行时 ParseFpsLimit 都当 0，所以回退显示 30。
         setDetail(graphicsItem,upscaler+" · "+("0".equals(limit) ? "no FPS limit"
-            : (limit==null || !limit.matches("40|45|60") ? "30" : limit)+" FPS limit"));
+            : (limit==null || !limit.matches("30|60|120|240") ? "30" : limit)+" FPS limit"));
         String lsfg=setting("lsfg_multiplier");
         boolean lsfgOn="2".equals(lsfg) || "3".equals(lsfg) || "4".equals(lsfg);
         // 没导入 Lossless.dll 就开不了插帧：lsfg-vk 只加载玩家自带的 DLL，run-gow3.sh 的
@@ -656,7 +671,7 @@ public final class GameActivity extends Activity {
     }
     /** Frame generation (Lossless Scaling only) presents 2-4 frames per game frame. Lossless
      *  Scaling presents them back to back and FIFO spaces them, evenly only when the display runs at
-     *  FPS limit x frames: that mode when the display has it (30x2: 60 Hz, 30x4, 40x3, 60x2: 120 Hz),
+     *  FPS limit x frames: that mode when the display has it (30x2: 60 Hz, 30x4, 30x3, 60x2: 120 Hz),
      *  else the fastest one (at the system's 60 Hz generated frames were dropped). Without frame
      *  generation, the system's choice. FSR 3.1 frame generation is not wired on this tree
      *  (shadps4 has no GOW3_FRAME_GEN consumer), so the multiplier is LSFG-only. */
@@ -684,9 +699,9 @@ public final class GameActivity extends Activity {
         String lsfg=setting("lsfg_multiplier");
         boolean lsfgOn=lsfgLaunchable() && !lsfgFallbackOff;
         int frames=lsfgOn ? Integer.parseInt(lsfg) : 1;
-        String limit=setting("fps_limit"); // as run-gow3.sh: 40, 45, 60, 0 (none), else 30
-        final float target=frames*("40".equals(limit) || "45".equals(limit) || "60".equals(limit)
-            ? Integer.parseInt(limit) : "0".equals(limit) ? 1000 : 30);
+        String limit=setting("fps_limit"); // 同 SettingsDialog.FPS_VALUES / 运行时 FPS_LIMITS
+        final float target=frames*("30".equals(limit) || "60".equals(limit) || "120".equals(limit)
+            || "240".equals(limit) ? Integer.parseInt(limit) : "0".equals(limit) ? 1000 : 30);
         main.post(() -> {
             if (destroyed) return;
             android.view.Display display=Build.VERSION.SDK_INT>=30 ? getDisplay() : getWindowManager().getDefaultDisplay();

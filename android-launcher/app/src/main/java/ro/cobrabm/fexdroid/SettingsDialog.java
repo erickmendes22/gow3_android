@@ -49,20 +49,26 @@ final class SettingsDialog {
         {"debug_camera","Free camera","Toggle it with Cross + L3","0"},
         {"debug_menu","Debug menu","The game's own debug menu; needs its font files","0"},
     };
-    /** Cheats: code hooks of the game applied at start (build_gow3_patch_parts.py, run-gow3.sh). */
+    /** Cheats: code hooks of the game applied at start (build_gow3_patch_parts.py, run-gow3.sh).
+     *  key MUST match the runtime's cheat_keys (gow3_settings.cpp): cheat_item is the singular one. */
     private static final String[][] CHEATS={
         {"cheat_health","Infinite health","Your HP refills to full every frame","0"},
-        {"cheat_items","Infinite blood vials and items","Using a blood vial, bullet or other item leaves its count as it was "
+        {"cheat_item","Infinite blood vials and items","Using a blood vial, bullet or other item leaves its count as it was "
             +"(items moved to storage or given away stay too)","0"},
     };
     private static final String[] UPSCALER_VALUES={"off","fsr3"};
     private static final String[] UPSCALER_NAMES={"Off (render at 1280×720)","FSR 3.1"};
     private static final String[] LSFG_VALUES={"0","2","3","4"};
     private static final String[] LSFG_NAMES={"Off","2× frames","3× frames","4× frames"};
-    private static final String[] LSFG_FLOW_VALUES={"1.0","0.75","0.5"};
-    private static final String[] LSFG_FLOW_NAMES={"1.0 (best quality)","0.75","0.5 (fastest)"};
-    private static final String[] FPS_VALUES={"30","40","45","60","0"};
-    private static final String[] FPS_NAMES={"30 (the game's own)","40","45","60","Unlimited"};
+    // flow scale 取值域照 run-gow3.sh 的白名单（0.25|0.5|0.75|1|1.0）：此前缺 0.25 这一档，这里
+    // 追加到末尾，默认值 "1.0" 的索引不变，writeLsfgProfile 原样写值、无需改动。
+    private static final String[] LSFG_FLOW_VALUES={"1.0","0.75","0.5","0.25"};
+    private static final String[] LSFG_FLOW_NAMES={"1.0 (best quality)","0.75","0.5","0.25 (fastest)"};
+    // FPS 上限只给运行时 FPS_LIMITS 的取值（gow3_graphics.h 的 FpsLimits：30/60/120/240/0）。
+    // 原来还提供 40/45，但 ParseFpsLimit 把不在表里的值一律映射成 0（不限制），等于"看着限帧、
+    // 实际无限"，因此删除；取值域与 my-docs/gow3/LAUNCHER.md §3.2 及 Home 页 LaunchParams.kt 对齐。
+    private static final String[] FPS_VALUES={"30","60","120","240","0"};
+    private static final String[] FPS_NAMES={"30 (the game's own)","60","120","240","Unlimited"};
     /** Snapdragon 8 Gen 2: three Cortex-A510, four Cortex-A715, one Cortex-X3. */
     private static final String[] CORE_NAMES={"Core 0 · efficiency A510 2.0 GHz","Core 1 · efficiency A510 2.0 GHz",
         "Core 2 · efficiency A510 2.0 GHz","Core 3 · performance A715 2.8 GHz","Core 4 · performance A715 2.8 GHz",
@@ -167,6 +173,11 @@ final class SettingsDialog {
         LinearLayout box=new LinearLayout(activity); box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(24),dp(4),dp(24),dp(8));
 
+        // 升采样入口只提供 off / fsr3。运行时的 UPSCALERS 还有 fsr4、fsr411、taa、dlss
+        // （gow3_settings.cpp 的 UpscalerName，见 my-docs/gow3/LAUNCHER.md §3.2），此处刻意不给：
+        // FSR 4 / 4.1.1 在 Adreno 740 上约 470ms 一帧且黑屏（run-gow3.sh 实测）；taa 需要 native
+        // guest 目标的实时路径、dlss 需要 gow3_dlss.dll/nvngx_dlss.dll，都是桌面 N 卡路径，在本
+        // 移植上不成立。要加新升采样器前，先确认它在这套 Vulkan/Turnip 上真能出画面。
         heading(box,"Upscaling (to 1280×720)");
         final RadioGroup upscalers=choices(box,UPSCALER_NAMES,indexOf(UPSCALER_VALUES,get("upscaler","fsr3"),1));
         heading(box,"Render resolution");
@@ -204,12 +215,23 @@ final class SettingsDialog {
         sharpen.setOnCheckedChangeListener((b,on) -> sharpness.setEnabled(on)); sharpness.setEnabled(sharpen.isChecked());
         final Switch fps=toggle(box,"Show FPS","1".equals(get("show_fps","0")));
 
+        // FPS 上限入口：取值域必须与运行时 FPS_LIMITS（gow3_graphics.h 的 FpsLimits：30/60/120/
+        // 240/0）完全一致——ParseFpsLimit 把表外的值（例如旧版提供的 40/45）一律当成 0（不限制），
+        // 给出这类选项等于"看着限帧、实际无限"，所以已删除。另外 120/240 还依赖引擎帧率补丁
+        // （gow3.ini 的 engine_fps），本弹窗不写 engine_fps，实际帧率仍受 PresentLimit 的引擎
+        // 速率约束；Home 页 LaunchParams.kt 的 fps_limit 同此。
         heading(box,"FPS limit");
         final RadioGroup fpsLimit=choices(box,FPS_NAMES,indexOf(FPS_VALUES,get("fps_limit","30"),0));
         TextView fpsNote=new TextView(activity); fpsNote.setTextSize(13); fpsNote.setAlpha(0.7f);
         fpsNote.setText("Above 30 uses the community frame-rate patch (game timing follows the real frame time).");
         box.addView(fpsNote);
 
+        /* 以下三段已注释掉：写入 gow3.ini 的键在本仓库的 fexdroid 启动链路里没有消费方，勾选后
+         * 游戏不会有任何变化，对玩家是误导，等接通再放开（不要直接删，接通时整段取消注释即可）。
+         *
+         * CPU 核心 → thor_cpus（taskset 列表格式）：run-gow3.sh → patches.py --extra / launch_env.py
+         * → probe 都不读它，也没有对应的 GOW3_* 环境变量；消费 taskset 的是桌面端 tools/restart.sh
+         * 的 $CPUS。
         heading(box,"CPU cores the game may use");
         final Switch[] cores=new Switch[CORE_NAMES.length];
         boolean[] allowed=parseCpus(get("thor_cpus",""),CORE_NAMES.length);
@@ -220,15 +242,21 @@ final class SettingsDialog {
             b.setChecked(true); // at least one core
         };
         for (Switch c:cores) c.setOnCheckedChangeListener(keepOne);
-
+         *
+         * 特效 → effect_*、模型细节 → model_lod：启动链路选补丁是按补丁名经 patches.py --extra /
+         * patches.json（run.sh、run-gow3.sh），既不读这些 ini 键，gow3_settings.cpp 也不解析；
+         * my-docs/gow3/LAUNCHER.md §3.2 的 GOW3 launcher 键表同样不含它们（只在 Bloodborne 参考
+         * 配置 bbport-ini.md 出现）。预编译它们的 Thor 路径 build_gow3_patch_parts.py 不被
+         * run-gow3.sh 使用。
         heading(box,"Game effects");
         final Switch[] effects=new Switch[EFFECTS.length];
         for (int i=0;i<EFFECTS.length;++i) effects[i]=toggle(box,EFFECTS[i][1],"1".equals(get(EFFECTS[i][0],EFFECTS[i][2])));
 
         heading(box,"Model detail");
         int lod=1;
-        for (int i=0;i<LOD_VALUES.length;++i) if (LOD_VALUES[i].equals(get("model_lod","0"))) lod=i;
+        for (int i=0;i<LOD_VALUES.length;++i) if (LOD_VALUES[i].equals(get("model_lod","0")) lod=i;
         final RadioGroup lods=choices(box,LOD_NAMES,lod);
+         */
 
         ScrollView scroll=new ScrollView(activity); scroll.addView(box);
         new AlertDialog.Builder(activity).setTitle("Graphics settings").setView(scroll)
@@ -237,13 +265,11 @@ final class SettingsDialog {
                 Map<String,String> changed=new LinkedHashMap<>();
                 changed.put("upscaler",UPSCALER_VALUES[Math.max(0,checkedIndex(upscalers))]);
                 changed.put("fps_limit",FPS_VALUES[Math.max(0,checkedIndex(fpsLimit))]);
-                changed.put("thor_cpus",cpuList(cores));
                 changed.put("preset",String.valueOf(Math.max(0,checkedIndex(presets))));
                 changed.put("sharpen",sharpen.isChecked() ? "1" : "0");
                 changed.put("sharpness",String.format(Locale.ROOT,"%.2f",sharpness.getProgress()/100f));
                 changed.put("show_fps",fps.isChecked() ? "1" : "0");
-                for (int i=0;i<EFFECTS.length;++i) changed.put(EFFECTS[i][0],effects[i].isChecked() ? "1" : "0");
-                changed.put("model_lod",LOD_VALUES[Math.max(0,checkedIndex(lods))]);
+                // thor_cpus / effect_* / model_lod 随上面三段一起注释掉了，这里也不写。
                 apply(changed);
             }).show();
     }
@@ -257,8 +283,12 @@ final class SettingsDialog {
         else new AlertDialog.Builder(activity).setMessage("The settings could not be saved.").setPositiveButton("OK",null).show();
     }
 
-    /** Lossless Scaling frame generation (run-gow3.sh: lsfg-vk with the player's Lossless.dll). */
-    /** Game settings: the game's patches (applied when the game starts: Apply restarts it). */
+    /* showGame() 已注释掉（入口也随之在 GameActivity 里隐藏）：这四个 ini 键
+     * （skip_network_choice / skip_intro / debug_camera / debug_menu）在本仓库的启动链路里没有
+     * 消费方——run-gow3.sh 与 run.sh 都是按补丁名经 patches.py --extra / patches.json 选补丁，
+     * gow3_settings.cpp 也不解析它们；预编译它们的 Thor 路径 build_gow3_patch_parts.py 不被
+     * run-gow3.sh 使用。开关写进 gow3.ini 后游戏不会有任何变化，属于误导入口。
+     * 等启动链路把这些键翻译成补丁名（或接入 patches.json）后再放开。
     void showGame() {
         load();
         LinearLayout box=new LinearLayout(activity); box.setOrientation(LinearLayout.VERTICAL);
@@ -283,8 +313,20 @@ final class SettingsDialog {
                 apply(changed);
             }).show();
     }
+     */
 
-    /** Cheats (applied when the game starts: Apply restarts it). */
+    /* showCheats() 与 writeCheatState() 已注释掉（入口也随之在 GameActivity 里隐藏）：作弊在
+     * Android 上根本不生效，属于误导入口。原因是 hook 根本没装上——
+     * src/probe.c 的 install_cheats() 被 `#if defined(GUEST_CPU_NATIVE)` 包着，而
+     * GUEST_CPU_NATIVE 只在 `__x86_64__` 时定义（src/guest_cpu.h:12）。Android 是 aarch64 交叉
+     * 编译（tools/android/build/aarch64-toolchain.cmake 的 CMAKE_C_COMPILER_TARGET），x86-64
+     * guest 跑在 FEXCore JIT 上，所以 probe.c 那段连调用带定义一起被编译掉了，源码注释写得很
+     * 直接："Under the JIT ... the game runs without cheats, the health bar and the orb
+     * multipliers"。gow3.ini 里的 cheat_health / cheat_item 会被 gow3_settings.cpp 读进
+     * Gow3Settings::cheats[]，但没有任何 hook 去读这些 flag，等于写了没人用。
+     * 附带：writeCheatState 写的 cheats.state 在本仓库也没有读取方（GOW3_CHEATS_FILE 只出现在
+     * 注释里），所以界面上"运行中即时生效"那句本来也不成立。
+     * 要接回来的前提是 probe.c 接上 JIT 的 hook 路径（guest_cpu_hook，注释标为 not yet wired）。
     void showCheats() {
         load();
         LinearLayout box=new LinearLayout(activity); box.setOrientation(LinearLayout.VERTICAL);
@@ -314,7 +356,7 @@ final class SettingsDialog {
             }).show();
     }
 
-    /** "10": infinite health on, items off (run-gow3.sh's GOW3_CHEATS_FILE), written whole then renamed. */
+    // "10": infinite health on, items off (run-gow3.sh's GOW3_CHEATS_FILE), written whole then renamed.
     private static boolean writeCheatState(File state,boolean health,boolean items) {
         File temporary=new File(state.getPath()+".tmp");
         try (Writer w=new OutputStreamWriter(new FileOutputStream(temporary),"UTF-8")) {
@@ -322,10 +364,14 @@ final class SettingsDialog {
         } catch (Exception ex) { android.util.Log.e("God of War III","cheats: "+ex); return false; }
         return temporary.renameTo(state);
     }
+     */
 
     /** Lossless Scaling frame generation. While the game runs with the lsfg-vk layer loaded
      *  (run-gow3.sh wrote lsfg-vk.toml), changes go to that file and apply at once (lsfg-vk watches
-     *  it; off is multiplier 1). Turning it on when the layer was not loaded restarts the game. */
+     *  it; off is multiplier 1). Turning it on when the layer was not loaded restarts the game.
+     *  flow scale 已按 run-gow3.sh 的白名单补齐 0.25 档（见 LSFG_FLOW_VALUES）。这是本移植唯一的
+     *  帧生成路径：FSR 3.1 帧生成（frame_generation=1）没有接通，shadps4 无 GOW3_FRAME_GEN 消费者，
+     *  所以这里不要再加一个"FSR 帧生成"开关。 */
     void showLossless(java.util.function.BooleanSupplier gameRunning,Runnable onLiveApplied) {
         load();
         final File live=new File(file.getParentFile(),"lsfg-vk.toml");
