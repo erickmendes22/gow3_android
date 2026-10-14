@@ -825,24 +825,31 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
     info.AddSignal(swapchain.GetPresentReadySemaphore());
     info.AddSignal(frame->present_done);
     scheduler.Flush(info);
-    // gow3: a Vulkan layer in vkQueuePresentKHR (Lossless Scaling frame generation, GOW3_LSFG,
-    // run-gow3.sh: lsfg-vk with the player's Lossless.dll) waits there for the present-ready
-    // semaphore of that submission. The submit_mutex held below for the present would deadlock
-    // unless the layer's hook is in the queue first; flush() already submitted the work above
-    // but vkQueuePresentKHR runs on the host thread, so we ask the scheduler to wait for the
-    // previous tick to be observed before we let the layer grab the present. gow3's
-    // vk_scheduler.h exposes only the no-arg WaitSubmitted (it waits for all currently submitted
-    // work, which is what we want here; the Bloodborne version took an explicit tick).
+    // gow3：vkQueuePresentKHR 处的 Vulkan layer（Lossless Scaling 插帧，GOW3_LSFG，由 run-gow3.sh
+    // 配合玩家自备的 Lossless.dll 加载 lsfg-vk）会等待上面这次提交所 signal 的 present-ready
+    // 信号量。GOW3 有意不在应用侧为它加等待：
+    //   * Flush(info) -> SubmitExecution -> vkQueueSubmit 已经在本线程执行完（它持有 submit_mutex
+    //     并等提交返回后才继续），所以提交及其 present-ready 信号在下面 Present() 之前就已进入队列；
+    //   * vkQueuePresentKHR 在同一队列上排在其后，layer 对 present-ready 的等待由队列顺序满足，
+    //     而不是靠 GPU 已经画完。
+    // Bloodborne 的 present 路径之所以调 scheduler.WaitSubmitted(tick)，是因为它的 recording 线程
+    // 是异步提交（BB_ASYNC_SUBMIT），layer 可能在提交进入队列前就抢到 present；GOW3 在本线程同步
+    // 提交，因此这个保护不需要——而且 gow3 的无参 WaitSubmitted() 是「GPU 完成等待」（Wait(tick-1)），
+    // 会在每帧无谓地卡住流水线。
+    // （A/B 验证见 docs / OpenSpec harden-gow3-lsfg-integration 任务 5.3：LSFG 开启时不得在 present 前等 GPU 完成。）
     static const bool present_layer = std::getenv("GOW3_LSFG") != nullptr;
-    static const bool present_layer_logged = (LOG_INFO(Render_Vulkan,
-        "gow3: LSFG hook in present path: {} (GOW3_LSFG={}); lsfg-vk's own init messages "
-        "appear above this line when the layer is loaded",
-        present_layer ? "ENABLED" : "off",
-        present_layer ? "1" : "(unset)"), true);
-    (void)present_layer_logged;
-    if (present_layer) {
-        scheduler.WaitSubmitted();
-    }
+    // 只打一次，且线程安全：用局部静态初始化（C++11 起 magic static 的初始化是原子的）做一次性
+    // 日志，避免可变 static bool 在多线程 Flip（GOW3_PRESENT_THREAD=0 时 RunPresenter 直接在工作
+    // 线程执行）并发进入 Present() 时的 data race（见 4.4 复评）。
+    static const bool present_layer_logged_once = [] {
+        // present_layer 是静态存储期的局部变量，lambda 直接引用即可，无需捕获。
+        LOG_INFO(Render_Vulkan,
+                 "gow3: LSFG present path: {} (GOW3_LSFG={}); no app-side WaitSubmitted "
+                 "(submission is already queued by Flush)",
+                 present_layer ? "ENABLED" : "off", present_layer ? "1" : "(unset)");
+        return true;
+    }();
+    (void)present_layer_logged_once;
 
     // Present to swapchain.
     {

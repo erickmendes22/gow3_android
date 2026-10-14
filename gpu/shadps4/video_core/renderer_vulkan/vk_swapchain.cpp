@@ -16,6 +16,13 @@
 
 namespace Vulkan {
 
+namespace {
+// gow3：LSFG 失败路径专用的退出码。run-gow3.sh 用它把「lsfg-vk layer 挂了」和普通崩溃区分开，
+// 从而只在这种情况下清掉 LSFG 状态并最多重试一次普通 Vulkan（OpenSpec harden-gow3-lsfg-integration
+// 任务 2.3）。必须与 tools/android/device/run-gow3.sh 里的数字保持一致。
+constexpr int kLsfgFailureExitCode = 46;
+} // namespace
+
 static constexpr vk::SurfaceFormatKHR SURFACE_FORMAT_HDR = {
     .format = vk::Format::eA2B10G10R10UnormPack32,
     .colorSpace = vk::ColorSpaceKHR::eHdr10St2084EXT,
@@ -74,18 +81,18 @@ void Swapchain::Create(u32 width_, u32 height_) {
     };
 
     auto [swapchain_result, chain] = instance.GetDevice().createSwapchainKHR(swapchain_info);
-    // gow3: the Lossless Scaling layer (lsfg-vk, run-gow3.sh) can fail swapchain creation when
-    // its DLL or the driver is unusable. We cannot restart in-place the way Bloodborne's
-    // run-thor.sh wrapper does (gow3-probe is launched natively under run-gow3.sh with launcher-
-    // owned audio / input / display bridges; re-execing here would orphan those bridges). Surface
-    // a clear diagnostic to logs/android-game.log and let the existing ASSERT_MSG abort the run
-    // so the launcher shows a Vulkan/Turnip error and the player can investigate.
+    // gow3：lsfg-vk layer（run-gow3.sh 加载）在它的 DLL 或驱动不可用时会创建 swapchain 失败。
+    // 这里不能像 Bloodborne 的 run-thor.sh 那样就地 execv 重启（gow3-probe 由 run-gow3.sh 原生
+    // 启动，并持有 launcher 管的 audio / input / display bridge，就地重启会把这些句柄全废掉）。
+    // 改为：打一条明确诊断到 logs/android-game.log，然后以专用退出码退出，交给 run-gow3.sh 清掉
+    // LSFG 状态并最多重试一次普通 Vulkan（见 OpenSpec harden-gow3-lsfg-integration 任务 2.3）。
     if (swapchain_result != vk::Result::eSuccess && std::getenv("GOW3_LSFG") &&
         !std::getenv("DISABLE_LSFG")) {
-        std::printf("Swapchain: Lossless Scaling frame generation failed to create (%s); "
-                    "disabling it would require restarting the game without GOW3_LSFG (run-gow3.sh: "
-                    "lsfg_multiplier=0)\n",
-                    vk::to_string(swapchain_result).c_str());
+        std::printf("Swapchain: Lossless Scaling frame generation failed to create (%s); exiting "
+                    "%d so run-gow3.sh retries once without it\n",
+                    vk::to_string(swapchain_result).c_str(), kLsfgFailureExitCode);
+        std::fflush(nullptr);
+        std::_Exit(kLsfgFailureExitCode);
     }
     ASSERT_MSG(swapchain_result == vk::Result::eSuccess, "Failed to create swapchain: {}",
                vk::to_string(swapchain_result));
@@ -155,18 +162,20 @@ bool Swapchain::Present() {
     auto result = instance.GetPresentQueue().presentKHR(present_info);
     if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
         needs_recreation = true;
-    } else if (result != vk::Result::eSuccess && std::getenv("GOW3_LSFG") &&
-               !std::getenv("DISABLE_LSFG")) {
-        // gow3: lsfg-vk 1.0 returns an error from a present that failed in the layer. We do not
-        // execv() here (see Create() above for why) and we do not silently mark the swapchain
-        // for recreation either, because the failure means the layer's frame generation is
-        // producing an invalid result and a successful present on the next attempt is unlikely.
-        // Surface a clear diagnostic and let ASSERT_MSG below abort the run.
-        std::printf("Swapchain: Lossless Scaling frame generation failed to present (%s)\n",
-                    vk::to_string(result).c_str());
-        ASSERT_MSG(result == vk::Result::eSuccess, "Swapchain presentation failed: {}",
-                   vk::to_string(result));
     } else {
+        // gow3：在 lsfg-vk 已加载时（GOW3_LSFG 已设且未被 DISABLE_LSFG 关闭）present 失败，说明是
+        // layer 的插帧产出了无效结果。与 Create() 相同处理：打一条诊断，然后以专用退出码退出，交给
+        // run-gow3.sh 清掉 LSFG 状态并最多重试一次普通 Vulkan（任务 2.3）。绝不 execv()（原因见
+        // Create()）；一次失败的 layer present 也不等于 swapchain 过期，因此 needs_recreation 保持
+        // false：不静默重试、也不会有重启循环。
+        if (result != vk::Result::eSuccess && std::getenv("GOW3_LSFG") &&
+            !std::getenv("DISABLE_LSFG")) {
+            std::printf("Swapchain: Lossless Scaling frame generation failed to present (%s); "
+                        "exiting %d so run-gow3.sh retries once without it\n",
+                        vk::to_string(result).c_str(), kLsfgFailureExitCode);
+            std::fflush(nullptr);
+            std::_Exit(kLsfgFailureExitCode);
+        }
         ASSERT_MSG(result == vk::Result::eSuccess, "Swapchain presentation failed: {}",
                    vk::to_string(result));
     }

@@ -94,8 +94,14 @@ class AndroidBuildInputTests(unittest.TestCase):
         manager = (launcher / 'data/LosslessDllManager.kt').read_text()
         self.assertIn('HomeScreen', screen)
         self.assertIn('FrameGenerationCard', home)
-        self.assertIn('IMPORT .DLL', card)
-        self.assertIn('GET FROM STEAM', card)
+        # The card renders the two provisioning actions through string resources, so assert the
+        # resource keys in the Kotlin (not the literal text, which lives in res/values) — otherwise
+        # a resource-based UI fails the test even though it is correct (4.5 复评).
+        self.assertIn('R.string.frame_gen_import_dll', card)
+        self.assertIn('R.string.frame_gen_get_from_steam', card)
+        resources = (ROOT / 'android-launcher/app/src/main/res/values/strings.xml').read_text()
+        self.assertIn('IMPORT .DLL', resources)
+        self.assertIn('GET FROM STEAM', resources)
         # The runtime's fallback location, quoted verbatim: drifting it breaks run-gow3.sh.
         self.assertIn('"gow3port/$FILE_NAME"', manager)
         self.assertIn('Lossless.dll', manager)

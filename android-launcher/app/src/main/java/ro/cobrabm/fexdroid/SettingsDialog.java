@@ -326,7 +326,7 @@ final class SettingsDialog {
     /** Lossless Scaling frame generation. While the game runs with the lsfg-vk layer loaded
      *  (run-gow3.sh wrote lsfg-vk.toml), changes go to that file and apply at once (lsfg-vk watches
      *  it; off is multiplier 1). Turning it on when the layer was not loaded restarts the game. */
-    void showLossless(java.util.function.BooleanSupplier gameRunning) {
+    void showLossless(java.util.function.BooleanSupplier gameRunning,Runnable onLiveApplied) {
         load();
         final File live=new File(file.getParentFile(),"lsfg-vk.toml");
         LinearLayout box=new LinearLayout(activity); box.setOrientation(LinearLayout.VERTICAL);
@@ -364,6 +364,9 @@ final class SettingsDialog {
                         changed.get("lsfg_flow_scale"),lsfgPerformance.isChecked());
                     android.widget.Toast.makeText(activity,ok ? "Lossless Scaling: applied"
                         : "Lossless Scaling: could not apply",android.widget.Toast.LENGTH_SHORT).show();
+                    // layer 已按新倍率热更新 toml；这里同步重选设备显示模式，否则层参数和刷新率会
+                    // 分叉（4.3 复评）。
+                    if (ok && onLiveApplied!=null) onLiveApplied.run();
                 } else if (!"0".equals(multiplier) && gameRunning.getAsBoolean()) {
                     apply(changed); // the layer loads at start only
                 } else if (!save(changed)) {

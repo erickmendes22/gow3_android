@@ -45,6 +45,12 @@ export GOW3_CONFIG="$base/gow3.ini"
 # One setting from gow3.ini, last value wins (the launcher writes whole-file on changes).
 setting() { sed -n "s/^$1=//p" "$GOW3_CONFIG" 2>/dev/null | tail -n 1; }
 
+# vk_swapchain.cpp 在 lsfg-vk 创建/present 失败时以这个码退出（kLsfgFailureExitCode）。两边必须一致。
+lsfg_failure_code=46
+# LSFG 自动回退时写这个标记，launcher（GameActivity.pollFrames）轮询到后会重新选 display mode，
+# 避免回退到普通 Vulkan 后仍停留在 LSFG 倍率对应的高刷新率（4.1 复评）。
+lsfg_fallback_marker="$base/lsfg-fallback.marker"
+
 # Lossless Scaling frame generation (lsfg_multiplier 2-4): the lsfg-vk 1.0 layer with our Turnip
 # patches (gow3port/arm64/lsfg, build_lsfg.sh) and Lossless.dll from the player's own Lossless
 # Scaling (Steam), next to the game folder or in gow3port/. Its messages (lsfg-vk: ...) go to the
@@ -52,7 +58,12 @@ setting() { sed -n "s/^$1=//p" "$GOW3_CONFIG" 2>/dev/null | tail -n 1; }
 # consumer); LSFG is the only frame-generation path.
 lsfg=$(setting lsfg_multiplier)
 case $lsfg in 2|3|4) ;; *) lsfg= ;; esac
-if [ -n "$lsfg" ] && [ -f "$base/arm64/lsfg/VkLayer_LS_frame_generation.json" ]; then
+lsfg_layer="$base/arm64/lsfg"
+# 层可用性 preflight：manifest 和 liblsfg-vk.so 缺一不可（RuntimeInstaller 正常会验证这两个文件，
+# 但直接跑脚本 / 旧 runtime / 残缺 runtime 时仍可能出现「配置认为可用、layer 其实加载不了」，
+# 见 4.2 复评）。launcher 侧 pickRefreshRate 必须用同一套规则判断是否真的可用。
+if [ -n "$lsfg" ] && [ -f "$lsfg_layer/VkLayer_LS_frame_generation.json" ] && \
+   [ -f "$lsfg_layer/liblsfg-vk.so" ]; then
     lsfg_dll=
     for dll in "${GOW3_GAME_DIR:+${GOW3_GAME_DIR%/*}/Lossless.dll}" "$base/Lossless.dll"; do
         [ -n "$dll" ] && [ -f "$dll" ] && { lsfg_dll=$dll; break; }
@@ -68,7 +79,7 @@ if [ -n "$lsfg" ] && [ -f "$base/arm64/lsfg/VkLayer_LS_frame_generation.json" ];
         # layer's own framegen instance skips it (DISABLE_LSFG). Present mode: FIFO paces the
         # generated frames (LSFG_PRESENT=mailbox|immediate to try).
         export GOW3_LSFG=1 LSFG_CONFIG="$base/lsfg-vk.toml"
-        export VK_ADD_IMPLICIT_LAYER_PATH="$base/arm64/lsfg"
+        export VK_ADD_IMPLICIT_LAYER_PATH="$lsfg_layer"
         cat > "$LSFG_CONFIG.tmp" <<EOF
 version = 1
 
@@ -83,7 +94,7 @@ performance_mode = $performance
 experimental_present_mode = "${LSFG_PRESENT:-fifo}"
 EOF
         mv -f "$LSFG_CONFIG.tmp" "$LSFG_CONFIG"
-        echo "LSFG: enabled (x$lsfg, flow $flow, $lsfg_dll); toml=$LSFG_CONFIG; layer=$base/arm64/lsfg"
+        echo "LSFG: enabled (x$lsfg, flow $flow, $lsfg_dll); toml=$LSFG_CONFIG; layer=$lsfg_layer"
     else
         echo "LSFG: requested (lsfg_multiplier=$lsfg) but Lossless.dll was not found at either"
         echo "      ${GOW3_GAME_DIR:+${GOW3_GAME_DIR%/*}/Lossless.dll}${GOW3_GAME_DIR:+\\n      }$base/Lossless.dll"
@@ -91,8 +102,10 @@ EOF
         echo "      or next to the game folder, then restart the game."
         lsfg=
     fi
-elif [ -n "$lsfg" ] && [ ! -f "$base/arm64/lsfg/VkLayer_LS_frame_generation.json" ]; then
-    echo "LSFG: requested (lsfg_multiplier=$lsfg) but the runtime is missing $base/arm64/lsfg/VkLayer_LS_frame_generation.json"
+elif [ -n "$lsfg" ]; then
+    echo "LSFG: requested (lsfg_multiplier=$lsfg) but the runtime is missing the lsfg-vk layer:"
+    [ -f "$lsfg_layer/VkLayer_LS_frame_generation.json" ] || echo "      $lsfg_layer/VkLayer_LS_frame_generation.json"
+    [ -f "$lsfg_layer/liblsfg-vk.so" ] || echo "      $lsfg_layer/liblsfg-vk.so"
     echo "      This APK/runtime build does not include the lsfg-vk layer; reinstall the latest runtime."
     lsfg=
 elif [ -z "$lsfg" ] && grep -q '^lsfg_multiplier=' "$GOW3_CONFIG" 2>/dev/null; then
@@ -240,9 +253,27 @@ PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/patches.py" --out "$ou
 
 cd "$base"
 echo "God of War III: starting (DMEM ${GOW3_DMEM_MB} MiB, vblank ${GOW3_VBLANK_HZ} Hz)"
-rc=0
-"$loader" "$probe" "$out/boot-linked.bin" \
-    --content-profile "$out/content.bin" --patches "$out/patches.bin" \
-    --app0 "$game" --user "$base/user" --timeout "${GOW3_TIMEOUT:-0}" || rc=$?
+# LSFG 失败的一次性回退（OpenSpec harden-gow3-lsfg-integration 任务 2.3）：vk_swapchain 在 lsfg-vk
+# 创建/present 失败时以 lsfg_failure_code 退出。当时若 LSFG 是启用的，就清掉 LSFG 状态、设
+# DISABLE_LSFG=1 后重试一次普通 Vulkan。guard（lsfg_retry）保证最多重试一次：绝不会出现重启循环，
+# 普通的游戏崩溃也不会被当成 LSFG 故障（专用退出码才触发）。
+lsfg_retry=0
+while :; do
+    rc=0
+    "$loader" "$probe" "$out/boot-linked.bin" \
+        --content-profile "$out/content.bin" --patches "$out/patches.bin" \
+        --app0 "$game" --user "$base/user" --timeout "${GOW3_TIMEOUT:-0}" || rc=$?
+    if [ "$rc" = "$lsfg_failure_code" ] && [ -n "${GOW3_LSFG:-}" ] && [ "$lsfg_retry" = 0 ]; then
+        lsfg_retry=1
+        echo "Lossless Scaling: frame generation failed (exit $lsfg_failure_code); retrying once without it" >&2
+        unset GOW3_LSFG LSFG_CONFIG
+        export DISABLE_LSFG=1
+        rm -f "$base/lsfg-vk.toml"
+        # 标记 LSFG 已自动关闭：launcher 轮询到后会按 LSFG off 重选 display mode（4.1 复评）。
+        : > "$lsfg_fallback_marker"
+        continue
+    fi
+    break
+done
 # When an update view was created, its removal runs in the EXIT trap (the dumps stay untouched).
 exit $rc
