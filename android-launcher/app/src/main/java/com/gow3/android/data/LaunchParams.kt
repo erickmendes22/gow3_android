@@ -66,7 +66,7 @@ internal object LaunchParams {
                 LaunchOption("2560x1440", R.string.param_option_1440p),
                 LaunchOption("3840x2160", R.string.param_option_4k),
             ),
-            defaultValue = "1280x720",
+            defaultValue = "1920x1080",
             descriptionRes = R.string.param_desc_output_resolution,
         ),
         LaunchParam(
