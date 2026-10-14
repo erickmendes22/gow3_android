@@ -37,9 +37,11 @@ import com.gow3.android.ui.components.LauncherColors
 @Composable
 internal fun LaunchParameters(
     gameDir: String?,
+    updateDir: String?,
     ini: Map<String, String>,
     save: (String, String) -> Unit,
     onChooseGameFolder: () -> Unit,
+    onChooseUpdateFolder: () -> Unit,
 ) {
     val groups = LaunchParams.all.groupBy { it.group }
     Column(
@@ -76,6 +78,28 @@ internal fun LaunchParameters(
                 softWrap = false,
             )
             Text("Tap to choose a different folder", color = LauncherColors.textMuted, fontSize = 10.sp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onChooseUpdateFolder)
+                    .padding(vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Update folder", color = LauncherColors.textMuted, fontSize = 13.sp)
+                Text("CHANGE  ›", color = LauncherColors.gold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp)
+            }
+            Text(
+                updateDir ?: "Not set (use the game folder as-is)",
+                color = if (updateDir != null) LauncherColors.textPrimary else LauncherColors.textMuted,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+            )
+            Text("Optional: the game's update (patch) folder, e.g. CUSA01740-patch. Laid over the game at start.", color = LauncherColors.textMuted, fontSize = 10.sp)
         }
         groups.forEach { (title, params) ->
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {

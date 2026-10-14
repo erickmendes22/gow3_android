@@ -83,6 +83,7 @@
     {"path": "gow3port/scripts/patches.py", "type": "data"},
     {"path": "gow3port/scripts/content_profile.py", "type": "data"},
     {"path": "gow3port/scripts/game_identity.py", "type": "data"},
+    {"path": "gow3port/scripts/game_update.py", "type": "data"},
     {"path": "gow3port/scripts/texture_diagnostics.py", "type": "data"},
     {"path": "gow3port/scripts/graphics_options.py", "type": "data"},
     {"path": "gow3port/scripts/link_libc.py", "type": "data"},

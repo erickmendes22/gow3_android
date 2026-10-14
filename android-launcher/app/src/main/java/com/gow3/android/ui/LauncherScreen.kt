@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -49,6 +50,7 @@ internal fun LauncherScreen(
     losslessDlls: LosslessDllManager,
     onGetFromSteam: ((Boolean, String) -> Unit) -> Unit,
     onChooseGameFolder: () -> Unit,
+    onChooseUpdateFolder: () -> Unit,
     saves: SaveManager,
     logs: LogManager,
 ) {
@@ -76,7 +78,7 @@ internal fun LauncherScreen(
                     .background(Brush.radialGradient(listOf(LauncherColors.backgroundTop.copy(alpha = 0.55f), LauncherColors.backgroundBottom.copy(alpha = 0.85f)), radius = 950f)),
             )
             when (tab) {
-                LauncherTab.HOME -> HomeScreen(onStartGame, losslessDlls, onGetFromSteam, onChooseGameFolder)
+                LauncherTab.HOME -> HomeScreen(onStartGame, losslessDlls, onGetFromSteam, onChooseGameFolder, onChooseUpdateFolder)
                 LauncherTab.MODS -> ModsScreen()
                 LauncherTab.ABOUT -> AboutScreen(saves, logs)
             }
@@ -86,21 +88,29 @@ internal fun LauncherScreen(
 
 @Composable
 private fun BottomNavigation(selectedTab: LauncherTab, onTabSelected: (LauncherTab) -> Unit) {
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(LauncherColors.backgroundBottom)
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .background(LauncherColors.navSurface)
-            .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)), RoundedCornerShape(28.dp))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+            .background(LauncherColors.backgroundBottom),
+        contentAlignment = Alignment.Center,
     ) {
-        NavItem(LauncherTab.HOME, selectedTab == LauncherTab.HOME, "HOME", "⌂", onTabSelected)
-        NavItem(LauncherTab.MODS, selectedTab == LauncherTab.MODS, "MOD & PATCH", "⚙", onTabSelected)
-        NavItem(LauncherTab.ABOUT, selectedTab == LauncherTab.ABOUT, "ABOUT", "ⓘ", onTabSelected)
+        Row(
+            modifier = Modifier
+                .widthIn(max = 420.dp)
+                .background(LauncherColors.backgroundBottom)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .background(LauncherColors.navSurface)
+                .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)), RoundedCornerShape(28.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            NavItem(LauncherTab.HOME, selectedTab == LauncherTab.HOME, "HOME", "⌂", onTabSelected)
+//        NavItem(LauncherTab.MODS, selectedTab == LauncherTab.MODS, "MOD & PATCH", "⚙", onTabSelected)
+            NavItem(LauncherTab.ABOUT, selectedTab == LauncherTab.ABOUT, "ABOUT", "ⓘ", onTabSelected)
+        }
     }
+
 }
 
 @Composable

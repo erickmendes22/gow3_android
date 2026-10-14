@@ -93,6 +93,20 @@ esac
 game=${GOW3_GAME_DIR:-$base/game}
 [ -f "$game/eboot.bin" ] || { echo "Game missing: $game (no eboot.bin)" >&2; exit 2; }
 
+# GOW3_PATCH_DIR: an update folder (eboot.bin, sce_sys) laid over the game at start. The merged
+# read-only view (scripts/game_update.py) is what prepare/patches/probe use; both dumps stay intact.
+update_view=
+if [ -n "${GOW3_PATCH_DIR:-}" ]; then
+    [ -f "$GOW3_PATCH_DIR/eboot.bin" ] || { echo "Update missing: $GOW3_PATCH_DIR (no eboot.bin)" >&2; exit 2; }
+    if ! update_view=$(PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/game_update.py" view "$game" "$GOW3_PATCH_DIR" "$out"); then
+        echo "Game update: cannot combine the game and its update (see above)" >&2
+        exit 2
+    fi
+    game=$update_view
+    echo "Game and update combined from $GOW3_PATCH_DIR" >&2
+    trap 'if [ -n "${update_view:-}" ]; then PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/game_update.py" remove "$update_view" 2>/dev/null || true; fi' EXIT
+fi
+
 # A reproducible capture: the tester names it (GOW3_CAPTURE_ID) and the display-boundary marker
 # is written outside the repository/APK so frame captures can be matched to a run without ever
 # bundling game content. The launcher reads this marker to expose the capture directory.
@@ -150,6 +164,9 @@ PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/patches.py" --out "$ou
 
 cd "$base"
 echo "God of War III: starting (DMEM ${GOW3_DMEM_MB} MiB, vblank ${GOW3_VBLANK_HZ} Hz)"
-exec "$loader" "$probe" "$out/boot-linked.bin" \
+rc=0
+"$loader" "$probe" "$out/boot-linked.bin" \
     --content-profile "$out/content.bin" --patches "$out/patches.bin" \
-    --app0 "$game" --user "$base/user" --timeout "${GOW3_TIMEOUT:-0}"
+    --app0 "$game" --user "$base/user" --timeout "${GOW3_TIMEOUT:-0}" || rc=$?
+# When an update view was created, its removal runs in the EXIT trap (the dumps stay untouched).
+exit $rc

@@ -144,12 +144,12 @@ final class RuntimeInstaller {
         }
     }
 
-    static void ensure(Context context, File files, Consumer<String> status) throws Exception {
+    static boolean ensure(Context context, File files, Consumer<String> status) throws Exception {
         String expected;
         try (InputStream in = context.getAssets().open("runtime.sha256")) {
             expected = new String(readAll(in), StandardCharsets.US_ASCII).trim();
         } catch (java.io.FileNotFoundException missing) {
-            try { validateRuntime(files); return; }
+            try { validateRuntime(files); return false; }
             catch (Exception incomplete) {
                 throw new IllegalStateException("This APK does not contain a complete runtime", missing);
             }
@@ -157,7 +157,7 @@ final class RuntimeInstaller {
         if (!expected.matches("[0-9a-f]{64}")) throw new IllegalStateException("Invalid runtime digest");
         File marker = new File(files, ".runtime.sha256");
         if (marker.isFile() && expected.equals(new String(Files.readAllBytes(marker.toPath()), StandardCharsets.US_ASCII).trim())) {
-            try { validateRuntime(files); return; }
+            try { validateRuntime(files); return false; }
             catch (Exception ignored) { /* stale marker: reinstall from the signed asset */ }
         }
 
@@ -186,6 +186,7 @@ final class RuntimeInstaller {
                         new String(log, 0, Math.min(log.length, 2048), StandardCharsets.UTF_8));
             validateRuntime(stage);
             promote(files, stage, expected);
+            return true;
         } finally {
             archive.delete();
             deleteTree(stage);

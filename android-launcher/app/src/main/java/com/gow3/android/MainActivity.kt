@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
                         }.show()
                     },
                     onChooseGameFolder = { gameFolderManager.chooseGameFolder() },
+                    onChooseUpdateFolder = { gameFolderManager.chooseUpdateFolder() },
                     saves = saveManager,
                     logs = logManager,
                 )

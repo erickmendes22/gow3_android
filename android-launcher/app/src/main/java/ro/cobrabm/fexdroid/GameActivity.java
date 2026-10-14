@@ -45,6 +45,8 @@ public final class GameActivity extends Activity {
     private String FILES, ROOT, BASE;
     /** The game (e.g. CUSA01740, with eboot.bin) in shared storage, chosen by the player. */
     private String gameDir;
+    /** An optional update folder (e.g. CUSA01740-patch): laid over the game at start. */
+    private String updateDir;
     private static final int REQUEST_FOLDER=1, REQUEST_STORAGE=2;
     private SurfaceHolder pendingHolder;
     private final Handler main=new Handler(Looper.getMainLooper());
@@ -73,6 +75,7 @@ public final class GameActivity extends Activity {
         FILES=getFilesDir().getAbsolutePath();
         ROOT=FILES+"/rootfs"; BASE=FILES+"/gow3port";
         gameDir=getSharedPreferences("gow3",MODE_PRIVATE).getString("game_dir",null);
+        updateDir=getSharedPreferences("gow3",MODE_PRIVATE).getString("update_dir",null);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if (Build.VERSION.SDK_INT>=28) {
             WindowManager.LayoutParams attrs=getWindow().getAttributes();
@@ -81,7 +84,7 @@ public final class GameActivity extends Activity {
         }
         displayOnly="x".equals(getIntent().getStringExtra("action"));
         pad=new PadBridge(new File(BASE,"android-pad.state"));
-        audio=new AudioBridge(new File(BASE,"audio.fifo")); audio.start();
+        audio=new AudioBridge(new File(BASE,"audio.fifo"));
         buildScreen();
         immersive();
     }
@@ -428,13 +431,16 @@ public final class GameActivity extends Activity {
         // Its libc emulates SysV shared memory through fxshmd (started below).
         env.put("FXD_SHM_SOCKET",ROOT+"/tmp/.fxshm/sock");
         if (gameDir!=null) env.put("GOW3_GAME_DIR",gameDir);
+        if (updateDir!=null) env.put("GOW3_PATCH_DIR",updateDir);
         if (target.endsWith("/Xvfb")) env.put("LD_PRELOAD",ROOT+"/usr/lib/fexdroid/libfxpath.so");
         env.put("LIBGL_DRIVERS_PATH",ROOT+"/usr/lib/aarch64-linux-gnu/dri");
         return b.start();
     }
     private void startX(SurfaceHolder holder) {
         try {
-            RuntimeInstaller.ensure(this, new File(FILES), message -> main.post(() -> status.setText(message)));
+            boolean installed=RuntimeInstaller.ensure(this, new File(FILES), message -> main.post(() -> status.setText(message)));
+            android.util.Log.i("God of War III","runtime installed="+installed);
+            if (audio!=null) audio.start();
             if (audio==null || !audio.awaitReady(5000))
                 throw new java.io.IOException("Android audio bridge did not become ready; see logcat for details.");
             if (!new File(ROOT,"usr/bin/Xvfb").canExecute() ||

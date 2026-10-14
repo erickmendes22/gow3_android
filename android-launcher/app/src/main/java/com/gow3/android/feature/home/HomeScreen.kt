@@ -48,11 +48,13 @@ internal fun HomeScreen(
     losslessDlls: LosslessDllManager,
     onGetFromSteam: ((Boolean, String) -> Unit) -> Unit,
     onChooseGameFolder: () -> Unit,
+    onChooseUpdateFolder: () -> Unit,
 ) {
     val context = LocalContext.current
     var iniValues by remember { mutableStateOf(loadIni(context)) }
     var dllState by remember { mutableStateOf(losslessDlls.resolve()) }
     var gameDir by remember { mutableStateOf(currentGameDir(context)) }
+    var updateDir by remember { mutableStateOf(currentUpdateDir(context)) }
     var notice by remember { mutableStateOf<String?>(null) }
 
     fun refreshDll() {
@@ -72,6 +74,7 @@ internal fun HomeScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 refreshDll()
                 gameDir = currentGameDir(context)
+                updateDir = currentUpdateDir(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -93,7 +96,7 @@ internal fun HomeScreen(
         Spacer(Modifier.height(28.dp))
         LaunchButton(onStartGame)
         Spacer(Modifier.height(20.dp))
-        LaunchParameters(gameDir, iniValues, ::save, onChooseGameFolder)
+        LaunchParameters(gameDir, updateDir, iniValues, ::save, onChooseGameFolder, onChooseUpdateFolder)
         Spacer(Modifier.height(16.dp))
         FrameGenerationCard(
             state = dllState,
@@ -144,6 +147,9 @@ private fun loadIni(context: Context): Map<String, String> = Gow3Ini.read(gow3In
 
 private fun currentGameDir(context: Context): String? =
     context.getSharedPreferences("gow3", Context.MODE_PRIVATE).getString("game_dir", null)
+
+private fun currentUpdateDir(context: Context): String? =
+    context.getSharedPreferences("gow3", Context.MODE_PRIVATE).getString("update_dir", null)
 
 @Composable
 private fun LaunchButton(onClick: () -> Unit) {

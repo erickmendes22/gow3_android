@@ -243,3 +243,24 @@ jobs:
         run: |
           set +x
           rm -f -- "$GOW3_KEYSTORE"
+
+  publish-release:
+    name: Publish Android release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download signed APK and checksum
+        uses: actions/download-artifact@v4
+        with:
+          name: gow3-android-arm64-${{ github.sha }}
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.apk
+            *.apk.sha256
+          generate_release_notes: true
