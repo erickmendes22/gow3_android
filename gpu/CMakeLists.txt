@@ -174,7 +174,19 @@ if (NOT WIN32)
     target_link_options(gow3gpu PRIVATE -Wl,--allow-shlib-undefined)
 endif()
 target_link_libraries(gow3gpu PRIVATE ffx-vulkan::portable ffx-vulkan::fsr4-v07-vulkan)
-target_link_libraries(gow3gpu PUBLIC Vulkan::Headers fmt::fmt Boost::headers magic_enum::magic_enum
+# Android cross builds include host-side code-generation headers from conda;
+# conda's fmt headers can be v12 while Debian aarch64 libfmt is v10/11.
+# Using fmt header-only eliminates the missing fmt::v12 dynamic symbol that
+# caused game process exit 127 on Android, without changing desktop linking.
+if(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+    if(NOT TARGET fmt::fmt-header-only)
+        message(FATAL_ERROR "ARM64 build needs fmt::fmt-header-only to avoid host/target ABI mismatch")
+    endif()
+    set(GOW3_FMT_TARGET fmt::fmt-header-only)
+else()
+    set(GOW3_FMT_TARGET fmt::fmt)
+endif()
+target_link_libraries(gow3gpu PUBLIC Vulkan::Headers ${GOW3_FMT_TARGET} Boost::headers magic_enum::magic_enum
     tsl::robin_map GPUOpen::VulkanMemoryAllocator PkgConfig::XXHASH PkgConfig::SDL3 PkgConfig::FFMPEG miniz::miniz Zydis::Zydis sirit)
 if (WIN32)
     # Guest code is entered with the System V ABI; NOMINMAX/WIN32_LEAN_AND_MEAN keep

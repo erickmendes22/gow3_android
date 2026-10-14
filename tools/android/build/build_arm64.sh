@@ -173,10 +173,12 @@ if ! build_ninja "$out/gpu" gow3gpu "$out/gpu-build.log"; then
     grep -v '^\[' "$out/gpu-build.log" | tail -40 >&2
     exit 1
 fi
-# Fail during CI, not on the phone: headers generated for fmt::v12 must
-# never be combined with the Debian ARM64 runtime fmt::v10/v11 library.
-if llvm-readelf --dyn-syms --wide "$out/gpu/libgow3gpu.so" | grep -qE 'UND.*_ZN3fmt3v12'; then
-    echo 'FATAL: ARM64 libgow3gpu.so refers to fmt::v12; verify fmt_DIR/sysroot compiler includes' >&2
+# Prevent recurring game exit code 127 before an APK is signed.
+# The ARM64 GPU module must be self-contained for fmt (host fmt v12
+# headers are incompatible with Debian's libfmt v10/v11 runtime).
+if llvm-readelf --dyn-syms --wide "$out/gpu/libgow3gpu.so" | grep -Eq 'UND.*_ZN3fmt3v[0-9]+'; then
+    echo 'FATAL: ARM64 libgow3gpu.so still has an undefined fmt symbol; enforce fmt-header-only' >&2
+    llvm-readelf --dyn-syms --wide "$out/gpu/libgow3gpu.so" | grep -E 'UND.*_ZN3fmt3v[0-9]+' | head -12 >&2 || true
     exit 1
 fi
 end_stage "libgow3gpu.so"

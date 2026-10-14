@@ -296,12 +296,11 @@ bool TemporalUpscaler::OnFrameStart() {
     const bool active = Active();
     const bool jitter_on = active && settings.jitter && !Gow3Toggle::Disabled(1u << 25);
     const int upscaler = settings.upscaler.load();
-    // Android's Vulkan/PS4 output stays at 720p. Only the FSR scene-input
-    // preset is selectable; ignore legacy 1080p/4K output_res from menus.
-    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) {
-        settings.output_res.store(0); // OutputWidths[0] = 1280
-    }
-    const int output = settings.output_res.load();
+    // Android has one immutable output target (720p). Use a local effective
+    // value, not a write through the const settings reference. This also
+    // ignores legacy UI/preset-file values that request 1080p or above.
+    const int output = std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")
+                           ? 0 : settings.output_res.load();
     const bool output_changed = !scaled_session && applied_output != output;
     if (output_changed) {
         target_width = Gow3Settings::OutputWidths[output];

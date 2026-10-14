@@ -24,8 +24,14 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         for number in ("0", "1", "3", "4"):
             self.assertIn('LaunchOption("' + number + '",', ui)
         self.assertIn('private static final String[] PRESET_VALUES={"0","1","3","4"}', java)
-        self.assertIn('settings.output_res.store(0)', (
+        self.assertIn('const int output = std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")', (
             ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp").read_text())
+
+    def test_arm64_fmt_dynamic_dependency_is_not_required(self):
+        cmake = (ROOT / "gpu/CMakeLists.txt").read_text()
+        build = (ROOT / "tools/android/build/build_arm64.sh").read_text()
+        self.assertIn('set(GOW3_FMT_TARGET fmt::fmt-header-only)', cmake)
+        self.assertIn('UND.*_ZN3fmt3v[0-9]+', build)
 
     def test_verified_shadow_patch_exists(self):
         metas = ET.parse(ROOT / "patches/God_of_War_III_Remastered.xml").getroot().iter("Metadata")
