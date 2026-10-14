@@ -9,6 +9,33 @@ ANDROID = ROOT / 'tools/android'
 
 
 class AndroidBuildInputTests(unittest.TestCase):
+    def test_critical_android_scripts_keep_executable_git_modes(self):
+        """Reject 100644 regressions before compiling FEX, Turnip and LSFG.
+
+        tar.add() preserves the tracked source mode for run-gow3.sh.
+        The last APK CI compiled every native component, then failed because
+        the launch script had silently changed from 100755 to 100644.
+        """
+        paths = (
+            "tools/android/device/run-gow3.sh",
+            "tools/android/build/build_arm64.sh",
+            "tools/android/build/build_turnip.sh",
+            "tools/android/build/build_lsfg.sh",
+            "tools/android/apk/build_release_apk.sh",
+            "android-launcher/gradlew",
+        )
+        for relative in paths:
+            with self.subTest(path=relative):
+                file = ROOT / relative
+                self.assertTrue(file.is_file(), relative)
+                self.assertTrue(file.stat().st_mode & 0o111,
+                                f"{relative} is not executable on disk")
+                status = subprocess.check_output(
+                    ["git", "ls-files", "--stage", "--", relative],
+                    cwd=ROOT, text=True).strip()
+                self.assertTrue(status.startswith("100755 "),
+                                f"{relative} must be tracked as git mode 100755, got {status!r}")
+
     def test_bridge_provenance_matches_allow_list(self):
         provenance = json.loads((ANDROID / 'bridges/provenance.json').read_text())
         self.assertEqual(provenance['abi'], 'arm64-v8a')

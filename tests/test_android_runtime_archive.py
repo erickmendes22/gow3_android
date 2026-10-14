@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = json.loads((ROOT / 'tools/android/runtime/runtime-manifest.json').read_text())
 
 
-def write_fixture(path, forbidden=None):
+def write_fixture(path, forbidden=None, non_executable=None):
     with tarfile.open(path, 'w:gz') as archive:
         manifest = (ROOT / 'tools/android/runtime/runtime-manifest.json').read_bytes()
         info = tarfile.TarInfo('runtime-manifest.json')
@@ -34,6 +34,8 @@ def write_fixture(path, forbidden=None):
             item.mode = 0o755 if any(entry['path'] == name and
                                      entry['type'] == 'executable'
                                      for entry in MANIFEST['required_paths']) else 0o644
+            if name == non_executable:
+                item.mode = 0o644
             archive.addfile(item, __import__('io').BytesIO(data))
 
 
@@ -52,6 +54,13 @@ class RuntimeArchiveTests(unittest.TestCase):
             archive = Path(directory) / 'runtime.tar.gz'
             write_fixture(archive, 'eboot.bin')
             with self.assertRaisesRegex(ArchiveError, 'forbidden'):
+                validate_archive(archive)
+
+    def test_archive_rejects_nonexecutable_game_launcher(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / 'runtime.tar.gz'
+            write_fixture(archive, non_executable='gow3port/run-gow3.sh')
+            with self.assertRaisesRegex(ArchiveError, 'required executable is not executable: gow3port/run-gow3.sh'):
                 validate_archive(archive)
 
     def test_nested_rootfs_is_rejected(self):
