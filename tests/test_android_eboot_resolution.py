@@ -65,11 +65,11 @@ class Cusa01715ResolutionTests(unittest.TestCase):
         writes = patches.compile_patches(
             XML, ["Disable Dynamic Shadows"], "01.02",
             [(0, len(image))], image)
-        self.assertEqual(writes, [(0x005b739b - patches.EBOOT_BASE, b"\\xeb\\x32")])
+        self.assertEqual(writes, [(0x005b739b - patches.EBOOT_BASE, b"\xeb\x32")])
         # The source ELF uses je +0x32, not an unconditional branch.
         self.assertEqual(
             image[0x005b739b - patches.EBOOT_BASE:
-                  0x005b739d - patches.EBOOT_BASE], b"\\x74\\x32")
+                  0x005b739d - patches.EBOOT_BASE], b"\x74\x32")
 
     def test_mismatched_original_byte_rejects_entire_patch(self):
         image = sample_image()
@@ -95,8 +95,8 @@ class Cusa01715ResolutionTests(unittest.TestCase):
             with self.subTest(preset=preset), tempfile.TemporaryDirectory() as t:
                 folder = Path(t)
                 config = folder / "gow3.ini"
-                config.write_text(f"upscaler=fsr3\\npreset={preset}\\n"
-                                  "render_resolution=720p\\noutput_res=1280x720\\n")
+                config.write_text(f"upscaler=fsr3\npreset={preset}\n"
+                                  "render_resolution=720p\noutput_res=1280x720\n")
                 with patch.object(patches, "patch_profile_status", return_value=verified):
                     plan = launch_env.derive(folder, config, folder / "state.json",
                                              {"GOW3_ANDROID_FSR_FIXED_OUTPUT": "1"})
