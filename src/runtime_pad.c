@@ -267,8 +267,18 @@ static void read_inject(void) {
         for (int i=0;i<4;++i) if (!strncmp(token,sticks[i],3)) { int v=atoi(token+3); injected.stick[i]=v<0 ? 0 : v>255 ? 255 : v; }
     }
     fclose(f);
-    printf("Runtime: pad file: buttons 0x%x sticks %d %d %d %d\n",injected.buttons,
-           injected.stick[0],injected.stick[1],injected.stick[2],injected.stick[3]);
+    // The touch overlay rewrites the same state frequently. Only report a
+    // semantic input change, not each file mtime; avoids thousands of repeated
+    // lines and excessive logging overhead during gameplay.
+    static uint32_t last_buttons = UINT32_MAX;
+    static int last_stick[4] = {-2,-2,-2,-2};
+    if (injected.buttons != last_buttons ||
+        memcmp(injected.stick, last_stick, sizeof(last_stick)) != 0) {
+        printf("Runtime: pad file: buttons 0x%x sticks %d %d %d %d\n",injected.buttons,
+               injected.stick[0],injected.stick[1],injected.stick[2],injected.stick[3]);
+        last_buttons = injected.buttons;
+        memcpy(last_stick, injected.stick, sizeof(last_stick));
+    }
 }
 /* GOW3_PAD_RECORD=<file>: F9 starts and stops recording the pad state (gamepad or keyboard) with
  * the time since F9; GOW3_PAD_REPLAY=<file> plays such a recording back, started by the token

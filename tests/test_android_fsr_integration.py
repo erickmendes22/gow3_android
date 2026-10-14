@@ -77,6 +77,16 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn('depth != camera_motion.Depth()', source)
         self.assertIn('GOW3_CAMERA_CONSTANTS block=', camera)
 
+    def test_fsr_diagnostics_sample_actual_gameplay_frames(self):
+        camera = (ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_camera_motion.cpp").read_text()
+        fsr = (ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp").read_text()
+        raster = (ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp").read_text()
+        self.assertIn("frame_number == 600", camera)
+        self.assertIn("frame_number == 3600", camera)
+        self.assertIn("index == 8192", fsr)
+        self.assertIn("GOW3_CAMERA_BUFFER sample=", raster)
+        self.assertIn("GOW3_FSR_TOPOLOGY", raster)
+
     def test_shadow_toggle_semantics(self):
         from launch_env import disable_shadows_requested
         self.assertTrue(disable_shadows_requested({"disable_dynamic_shadows": "1"}))

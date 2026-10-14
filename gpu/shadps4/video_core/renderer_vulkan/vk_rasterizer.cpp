@@ -264,6 +264,54 @@ void Rasterizer::PrepareRenderState(const GraphicsPipeline* pipeline) {
     } else {
         db_desc.first = {};
     }
+    // GoW3 CUSA01715 scene instrumentation. Record actual depth/MRT topology,
+    // not just the >=5 MRT assumption copied from Bloodborne. One compact
+    // aggregate per 65,536 calls, max 16 lines; no per-frame logging.
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) {
+        struct Topology {
+            u64 draws = 0;
+            u64 with_depth = 0;
+            u64 full_depth = 0;
+            u64 matching_color_depth = 0;
+            u64 original_gbuffer = 0;
+            std::array<u64, 9> mrt{};
+        };
+        static Topology topology;
+        auto& t = topology;
+        if (t.draws < 1048576) {
+            const u32 attachments = std::popcount(key.mrt_mask);
+            ++t.mrt[std::min<u32>(attachments, 8u)];
+            if (db_desc.first) {
+                ++t.with_depth;
+                const auto& depth = texture_cache.GetImage(db_desc.first);
+                const auto guest = scene_targets->GuestSize();
+                if (depth.info.size.width == guest.width &&
+                    depth.info.size.height == guest.height) {
+                    ++t.full_depth;
+                }
+                if (cb_descs[0].first) {
+                    const auto& color = texture_cache.GetImage(cb_descs[0].first);
+                    if (color.info.size.width == depth.info.size.width &&
+                        color.info.size.height == depth.info.size.height)
+                        ++t.matching_color_depth;
+                }
+                if (attachments >= 5) ++t.original_gbuffer;
+            }
+            if (++t.draws % 65536 == 0) {
+                std::printf("GOW3_FSR_TOPOLOGY draws=%llu depth=%llu guest_depth=%llu color_depth=%llu mrt5=%llu mrt=[%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu]\n",
+                            (unsigned long long)t.draws,
+                            (unsigned long long)t.with_depth,
+                            (unsigned long long)t.full_depth,
+                            (unsigned long long)t.matching_color_depth,
+                            (unsigned long long)t.original_gbuffer,
+                            (unsigned long long)t.mrt[0], (unsigned long long)t.mrt[1],
+                            (unsigned long long)t.mrt[2], (unsigned long long)t.mrt[3],
+                            (unsigned long long)t.mrt[4], (unsigned long long)t.mrt[5],
+                            (unsigned long long)t.mrt[6], (unsigned long long)t.mrt[7],
+                            (unsigned long long)t.mrt[8]);
+            }
+        }
+    }
     // gow3: the G-buffer pass (5+ color targets) holds the scene depth, and its constants the
     // main camera (shadow passes bind the same layout with the light's camera).
     gbuffer_draw = camera_motion->Enabled() && std::popcount(key.mrt_mask) >= 5 && db_desc.first;
@@ -2069,6 +2117,41 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                              Shader::Backend::Bindings& binding,
                              Shader::PushData& push_data, u32& write_index) {
     const u64 alignment = instance.StorageMinAlignment();
+    // Identify the real scene camera buffer layout on CUSA01715. The prior
+    // hard-coded 864-byte / 5-MRT Bloodborne signature never reported a hit.
+    // Sample only full-scene vertex buffers with a depth attachment, one
+    // sample at a few widely spaced points, maximum five buffers per run.
+    const auto probe_camera_constants = [&](u64 address, u32 bytes) {
+        if (stage.sw_stage != Shader::SwStage::Vertex ||
+            !std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") ||
+            !db_desc.first || !cb_descs[0].first || bytes < 256 || address == 0)
+            return;
+        const auto& color = texture_cache.GetImage(cb_descs[0].first);
+        const auto& depth = texture_cache.GetImage(db_desc.first);
+        const auto guest = scene_targets->GuestSize();
+        if (depth.info.size.width != guest.width || depth.info.size.height != guest.height ||
+            color.info.size.width != depth.info.size.width ||
+            color.info.size.height != depth.info.size.height)
+            return;
+        static u32 seen = 0;
+        if (seen >= 196608) return;
+        const u32 sample = ++seen;
+        if (!(sample == 1 || sample == 16385 || sample == 65537 ||
+              sample == 131073 || sample == 196607))
+            return;
+        const u32 copy_bytes = std::min<u32>(bytes, 864);
+        if (!memory->IsValidGpuMapping(address, copy_bytes)) return;
+        const u32* data = reinterpret_cast<const u32*>(address);
+        std::printf("GOW3_CAMERA_BUFFER sample=%u shader=%llx bytes=%u gbuffer5=%u words=",
+                    sample, static_cast<unsigned long long>(stage.pgm_hash),
+                    bytes, unsigned(gbuffer_draw));
+        // The size and shader hash are recorded together with a bounded
+        // copy of the actual vertex constants, to locate GoW3's own
+        // view/projection matrices instead of guessing Bloodborne offsets.
+        for (u32 j = 0; j < copy_bytes / 4; ++j)
+            std::printf("%08x", data[j]);
+        std::printf("\n");
+    };
     for (u32 buffer_index = 0; buffer_index < stage.buffers.size(); ++buffer_index) {
         const auto& desc = stage.buffers[buffer_index];
         const RingBinding* ring = num_ring_stages ? FindRingBinding(stage, buffer_index) : nullptr;
@@ -2079,6 +2162,7 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                                      reinterpret_cast<const void*>(ring->address), ring->size);
             }
             if (!desc.IsSpecial()) {
+                probe_camera_constants(ring->address, u32(ring->size));
                 if (ring->size == 864 && gbuffer_draw &&
                     memory->IsValidGpuMapping(ring->address, 0)) {
                     camera_motion->OnConstants(reinterpret_cast<const float*>(ring->address));
@@ -2140,6 +2224,7 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
         } else {
             const auto vsharp =
                 prepared ? prepared->buffer_sharps[buffer_index] : desc.GetSharp(stage);
+            probe_camera_constants(vsharp.base_address, u32(vsharp.GetSize()));
             if (vsharp.GetSize() == 864 && gbuffer_draw &&
                 memory->IsValidGpuMapping(vsharp.base_address, 0)) {
                 camera_motion->OnConstants(reinterpret_cast<const float*>(vsharp.base_address));

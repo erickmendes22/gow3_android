@@ -1356,7 +1356,10 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
            (scaled_session && native_viewport));
     if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && native_viewport && !movie) {
         static unsigned candidates = 0;
-        if (candidates++ < 6) {
+        const unsigned index = ++candidates;
+        // The first six UI hashes were all captured during the intro.
+        if (index == 1 || index == 128 || index == 512 ||
+            index == 2048 || index == 8192 || index == 32768) {
             const auto& candidate = texture_cache.GetImage(color);
             std::printf("GOW3_FSR_UI_CANDIDATE hash=%llx size=%ux%u camera=%d matched_ldr=%d\n",
                         static_cast<unsigned long long>(vs_hash),
