@@ -2,6 +2,11 @@
 
 [简体中文](README.md) | **English** | [Português (Brasil)](README.pt-BR.md)
 
+<p align="center">
+  <img src="docs/a.jpg" alt="游戏截图 1" width="45%"/>
+  <img src="docs/b.jpg" alt="游戏截图 2" width="45%"/>
+</p>
+
 This document is an English translation of the repository README.
 
 The **Android / ARM64 port** of *God of War III Remastered* (PlayStation 4) — under development, see below.

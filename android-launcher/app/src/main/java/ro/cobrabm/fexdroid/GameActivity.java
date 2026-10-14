@@ -258,7 +258,7 @@ public final class GameActivity extends Activity {
     private LinearLayout menuItem(String icon,String title,String detail,Runnable action) {
         LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(10),dp(8),dp(10),dp(8));
-        row.setFocusable(true); row.setClickable(true); row.setOnClickListener(v -> action.run());
+        row.setFocusable(true); row.setClickable(true); row.setTag(action); row.setOnClickListener(v -> ((Runnable)row.getTag()).run());
         android.graphics.drawable.StateListDrawable states=new android.graphics.drawable.StateListDrawable();
         GradientDrawable lit=new GradientDrawable(); lit.setColor(0x33c6ad76); lit.setCornerRadius(dp(10));
         lit.setStroke(dp(1),0x99c6ad76);
@@ -290,6 +290,15 @@ public final class GameActivity extends Activity {
         TextView detail=row==null ? null : (TextView)row.findViewWithTag("detail");
         if (detail!=null) detail.setText(value);
     }
+    /** 抽屉里的一行不可用时：不可点击、不可获焦（手柄/键盘导航会跳过它），并整体变灰。
+     *  action 存在 row 的 tag 里，监听器保持挂着——setClickable(false) 会让点击不再分发，
+     *  这样重新启用时不必再重挂一次监听器。 */
+    private static void setRowEnabled(LinearLayout row,boolean on) {
+        if (row==null) return;
+        row.setClickable(on);
+        row.setFocusable(on);
+        row.setAlpha(on ? 1.0f : 0.4f);
+    }
     /** The rows' second lines: the current settings, read when the drawer opens. */
     private void refreshDrawer() {
         java.util.List<String> game=new java.util.ArrayList<>();
@@ -308,7 +317,13 @@ public final class GameActivity extends Activity {
             : (limit==null || !limit.matches("40|45|60") ? "30" : limit)+" FPS limit"));
         String lsfg=setting("lsfg_multiplier");
         boolean lsfgOn="2".equals(lsfg) || "3".equals(lsfg) || "4".equals(lsfg);
-        setDetail(losslessItem,lsfgOn ? lsfg+"× frames · flow "
+        // 没导入 Lossless.dll 就开不了插帧：lsfg-vk 只加载玩家自带的 DLL，run-gow3.sh 的
+        //  preflight 找不到它时会静默不开 layer（只剩 30 FPS），玩家看不出是自己漏了导入。
+        //  所以直接把这一行置灰不可点，并说明去 Home 页导入，而不是让它"看着能开却不生效"。
+        boolean dllPresent=hasFrameGenDll();
+        setRowEnabled(losslessItem,dllPresent);
+        setDetail(losslessItem,!dllPresent ? "Import Lossless.dll on the Home page first"
+            : lsfgOn ? lsfg+"× frames · flow "
             +(setting("lsfg_flow_scale")==null ? "1.0" : setting("lsfg_flow_scale")) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
     }
@@ -653,6 +668,14 @@ public final class GameActivity extends Activity {
         if (!"2".equals(lsfg) && !"3".equals(lsfg) && !"4".equals(lsfg)) return false;
         if (!new File(BASE,"arm64/lsfg/VkLayer_LS_frame_generation.json").isFile()) return false;
         if (!new File(BASE,"arm64/lsfg/liblsfg-vk.so").isFile()) return false;
+        return hasFrameGenDll();
+    }
+    /** 玩家是否已经导入 Lossless.dll——只是给菜单项/刷新率用的只读闸门，不导入、不删除、
+     *  也不持有 DLL 状态（那些都在 Home 页的 LosslessDllManager 里）。查找顺序与运行时一致：
+     *  游戏目录旁的同名副本优先，其次应用私有的 gow3port 副本（LosslessDllManager.appCopy()
+     *  写入的位置），和 run-gow3.sh 的 preflight 是同一套规则。这里不查第三个位置，因为
+     *  run-gow3.sh 也不查。 */
+    private boolean hasFrameGenDll() {
         File parent=gameDir!=null ? new File(gameDir).getParentFile() : null;
         if (parent!=null && new File(parent,"Lossless.dll").isFile()) return true;
         return new File(BASE,"Lossless.dll").isFile();

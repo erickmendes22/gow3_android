@@ -166,6 +166,27 @@ class LsfgFailureContractTests(unittest.TestCase):
         self.assertIn('onLiveApplied', dialog)
         self.assertRegex(dialog, r'if \(ok && onLiveApplied!=null\) onLiveApplied\.run\(\);')
 
+    def test_drawer_loses_scaling_entry_is_disabled_without_the_player_dll(self):
+        """Without Lossless.dll lsfg-vk cannot load, so the entry must not be clickable."""
+        activity = _read(GAME_ACTIVITY)
+        refresh = activity[activity.index('private void refreshDrawer()'):
+                           activity.index('private void openDrawer()')]
+        # The gate is re-evaluated every time the drawer opens, so importing the DLL on the
+        # Home page re-enables it without a restart of the drawer.
+        self.assertIn('hasFrameGenDll()', refresh)
+        self.assertRegex(refresh, r'setRowEnabled\(losslessItem,\s*dllPresent\)')
+        # Disabling has to cover click and focus, otherwise a gamepad/keyboard can still
+        # land on the row and fire the action.
+        helper = activity[activity.index('private static void setRowEnabled('):
+                          activity.index('private void refreshDrawer()')]
+        self.assertIn('setClickable', helper)
+        self.assertIn('setFocusable', helper)
+        # The row's action lives in its tag so the listener survives being disabled and
+        # re-enabled; nothing here may provision the DLL itself.
+        self.assertIn('row.setTag(action)', activity)
+        self.assertNotIn('losslessDll', activity,
+                         'DLL resolution/provisioning stays in LosslessDllManager')
+
 
 if __name__ == '__main__':
     unittest.main()
