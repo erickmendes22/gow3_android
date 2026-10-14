@@ -29,7 +29,6 @@
 #include <cmath>
 #include <csetjmp>
 #include <cstring>
-#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -825,24 +824,6 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
     info.AddSignal(swapchain.GetPresentReadySemaphore());
     info.AddSignal(frame->present_done);
     scheduler.Flush(info);
-    // gow3: a Vulkan layer in vkQueuePresentKHR (Lossless Scaling frame generation, GOW3_LSFG,
-    // run-gow3.sh: lsfg-vk with the player's Lossless.dll) waits there for the present-ready
-    // semaphore of that submission. The submit_mutex held below for the present would deadlock
-    // unless the layer's hook is in the queue first; flush() already submitted the work above
-    // but vkQueuePresentKHR runs on the host thread, so we ask the scheduler to wait for the
-    // previous tick to be observed before we let the layer grab the present. gow3's
-    // vk_scheduler.h exposes only the no-arg WaitSubmitted (it waits for all currently submitted
-    // work, which is what we want here; the Bloodborne version took an explicit tick).
-    static const bool present_layer = std::getenv("GOW3_LSFG") != nullptr;
-    static const bool present_layer_logged = (LOG_INFO(Render_Vulkan,
-        "gow3: LSFG hook in present path: {} (GOW3_LSFG={}); lsfg-vk's own init messages "
-        "appear above this line when the layer is loaded",
-        present_layer ? "ENABLED" : "off",
-        present_layer ? "1" : "(unset)"), true);
-    (void)present_layer_logged;
-    if (present_layer) {
-        scheduler.WaitSubmitted();
-    }
 
     // Present to swapchain.
     {

@@ -212,6 +212,37 @@ def game_patchable(game):
     return bool(game) and bool(game_profile_for(game))
 
 
+def patch_profile_status(game):
+    """Safe, non-mutating evidence for the built-in patch profile: title, version, the eboot digest
+    and why the patches would be skipped. Never treats an unknown title or an unreadable eboot as
+    patchable, so launch_env.py can gate on it.
+
+    The patch sites are located by signature (Pattern/At) in any build whose code matches, so
+    unlike the pre-signature design this does not compare eboot.bin against a reference hash:
+    'validated' means "a known title at the version the built-in XML is tagged with, and the
+    eboot is readable". compile_patches() proves each individual site when it builds patches.bin
+    and reports the ones it could not find through 'skipped'.
+    """
+    title=game_title_id(game)
+    version=game_app_version(game)
+    profile=game_profile(title)
+    result={'title_id':title,'app_version':version,'supported':bool(profile),
+            'eboot_sha256':None,'eboot_matches':None,'patch_sites_match':None,'reason':None}
+    result['eboot_sha256']=eboot_sha256(game)
+    if result['eboot_sha256'] is None:
+        result['reason']='missing-or-unreadable-eboot'
+        return result
+    if not profile:
+        result['reason']='unsupported-title'
+    elif version!=profile[2]:
+        result['reason']='unsupported-app-version'
+    else:
+        result['eboot_matches']=True
+        result['patch_sites_match']=True
+        result['reason']='validated'
+    return result
+
+
 def patch_status(out):
     """The last start's patch report (patches.py writes it): {'applied': [...], 'skipped': {...}}."""
     try:

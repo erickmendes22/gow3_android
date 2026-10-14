@@ -42,65 +42,6 @@ export GLIBC_TUNABLES='glibc.cpu.hwcaps=-AVX2,-AVX,-AVX_Fast_Unaligned_Load,-AVX
 
 export GOW3_CONFIG="$base/gow3.ini"
 [ -f "$GOW3_CONFIG" ] || cp "$base/gow3.default.ini" "$GOW3_CONFIG"
-# One setting from gow3.ini, last value wins (the launcher writes whole-file on changes).
-setting() { sed -n "s/^$1=//p" "$GOW3_CONFIG" 2>/dev/null | tail -n 1; }
-
-# Lossless Scaling frame generation (lsfg_multiplier 2-4): the lsfg-vk 1.0 layer with our Turnip
-# patches (gow3port/arm64/lsfg, build_lsfg.sh) and Lossless.dll from the player's own Lossless
-# Scaling (Steam), next to the game folder or in gow3port/. Its messages (lsfg-vk: ...) go to the
-# game log. FSR 3.1 frame generation is not wired on this tree (shadps4 has no GOW3_FRAME_GEN
-# consumer); LSFG is the only frame-generation path.
-lsfg=$(setting lsfg_multiplier)
-case $lsfg in 2|3|4) ;; *) lsfg= ;; esac
-if [ -n "$lsfg" ] && [ -f "$base/arm64/lsfg/VkLayer_LS_frame_generation.json" ]; then
-    lsfg_dll=
-    for dll in "${GOW3_GAME_DIR:+${GOW3_GAME_DIR%/*}/Lossless.dll}" "$base/Lossless.dll"; do
-        [ -n "$dll" ] && [ -f "$dll" ] && { lsfg_dll=$dll; break; }
-    done
-    if [ -n "$lsfg_dll" ]; then
-        flow=$(setting lsfg_flow_scale)
-        case $flow in 0.25|0.5|0.75|1|1.0) ;; *) flow=1.0 ;; esac
-        performance=$([ "$(setting lsfg_performance)" = 1 ] && echo true || echo false)
-        # Config file mode: lsfg-vk watches it, so the app changes the multiplier (1: off), flow
-        # scale and performance mode while the game runs (SettingsDialog.showLossless). The file
-        # exists only while the layer is loaded; GOW3_LSFG: vk_swapchain.cpp / vk_presenter.cpp
-        # check it and (re)coordinate with the layer's present hook. An implicit layer, so the
-        # layer's own framegen instance skips it (DISABLE_LSFG). Present mode: FIFO paces the
-        # generated frames (LSFG_PRESENT=mailbox|immediate to try).
-        export GOW3_LSFG=1 LSFG_CONFIG="$base/lsfg-vk.toml"
-        export VK_ADD_IMPLICIT_LAYER_PATH="$base/arm64/lsfg"
-        cat > "$LSFG_CONFIG.tmp" <<EOF
-version = 1
-
-[global]
-dll = "$lsfg_dll"
-
-[[game]]
-exe = "gow3-probe"
-multiplier = $lsfg
-flow_scale = $flow
-performance_mode = $performance
-experimental_present_mode = "${LSFG_PRESENT:-fifo}"
-EOF
-        mv -f "$LSFG_CONFIG.tmp" "$LSFG_CONFIG"
-        echo "LSFG: enabled (x$lsfg, flow $flow, $lsfg_dll); toml=$LSFG_CONFIG; layer=$base/arm64/lsfg"
-    else
-        echo "LSFG: requested (lsfg_multiplier=$lsfg) but Lossless.dll was not found at either"
-        echo "      ${GOW3_GAME_DIR:+${GOW3_GAME_DIR%/*}/Lossless.dll}${GOW3_GAME_DIR:+\\n      }$base/Lossless.dll"
-        echo "      Drop the player's Lossless.dll into the launcher Home's FRAME GENERATION card,"
-        echo "      or next to the game folder, then restart the game."
-        lsfg=
-    fi
-elif [ -n "$lsfg" ] && [ ! -f "$base/arm64/lsfg/VkLayer_LS_frame_generation.json" ]; then
-    echo "LSFG: requested (lsfg_multiplier=$lsfg) but the runtime is missing $base/arm64/lsfg/VkLayer_LS_frame_generation.json"
-    echo "      This APK/runtime build does not include the lsfg-vk layer; reinstall the latest runtime."
-    lsfg=
-elif [ -z "$lsfg" ] && grep -q '^lsfg_multiplier=' "$GOW3_CONFIG" 2>/dev/null; then
-    echo "LSFG: disabled (lsfg_multiplier=0 in gow3.ini)"
-else
-    echo "LSFG: not requested (no lsfg_multiplier in gow3.ini)"
-fi
-[ -n "$lsfg" ] || rm -f "$base/lsfg-vk.toml"
 
 # Bridges the app provides (it sets GOW3_ANDROID_INPUT=1 when they are up).
 if [ "${GOW3_ANDROID_INPUT:-0}" = 1 ]; then
@@ -178,30 +119,13 @@ fi
 
 # Vulkan/Turnip must initialize before the game claims texture integrity: a driver failure here
 # must reach the launcher/log and must not be reported as validated. The self-check is the same
-# probe --vulkan-only the launcher's "vulkan" mode runs. We capture stderr so that lsfg-vk's
-# own init messages ("lsfg-vk: ...") are visible in the game log when the check fails.
-#
-# The smoke test (src/vulkan_smoke.c) calls vkCreateDevice with pNext=NULL, which the lsfg-vk
-# device layer rejects ("No layer creation info found in pNext chain" -> VK_ERROR_INITIALIZATION_FAILED).
-# That throw is not a driver failure; the real probe --vulkan-only check is meaningful only
-# against the bare driver, not the LSFG layer. Set DISABLE_LSFG=1 in the child only (the layer's
-# disable_environment) so the smoke can validate Turnip without lsfg-vk on its pNext.
+# probe --vulkan-only the launcher's "vulkan" mode runs.
 vulkan_status=unknown
-vulkan_log="$out/.vulkan-check.log"
-if DISABLE_LSFG=1 "$loader" "$probe" --vulkan-only >"$vulkan_log" 2>&1; then
+if "$loader" "$probe" --vulkan-only >/dev/null 2>&1; then
     vulkan_status=ok
-    rm -f "$vulkan_log"
 else
     vulkan_status=failed
     echo "Graphics: Vulkan/Turnip initialization FAILED (turnip=${turnip}, icd=${icd##*/}); texture integrity is NOT validated" >&2
-    # Surface the last 40 lines of the Vulkan check (typically lsfg-vk's "lsfg-vk: ..." messages
-    # or the driver stack) so the player can see what the layer did. We never write the game's
-    # own texture assets here; only Vulkan / lsfg-vk / driver output.
-    if [ -f "$vulkan_log" ]; then
-        echo "Vulkan check output (last 40 lines):" >&2
-        tail -n 40 "$vulkan_log" >&2 || true
-        mv -f "$vulkan_log" "$out/vulkan-check-last.log"
-    fi
 fi
 export GOW3_VULKAN_STATUS="$vulkan_status"
 # A driver failure is fatal: the game cannot present, and the log must say so distinctly. Write a
