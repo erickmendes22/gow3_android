@@ -177,7 +177,11 @@ jobs:
             --sysroot .local-deps/android/arm64-sysroot
 
       - name: Build Turnip and LSFG variants
+        shell: bash -el {0}
         run: |
+          # Meson requires glslangValidator from the activated conda environment.
+          command -v glslangValidator
+          glslangValidator --version
           bash tools/android/build/build_turnip.sh main
           bash tools/android/build/build_turnip.sh gen8
           bash tools/android/build/build_lsfg.sh
