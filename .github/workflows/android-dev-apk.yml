@@ -26,7 +26,6 @@ env:
 jobs:
   source-check:
     name: Android source checks
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - name: Check out source
@@ -39,14 +38,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Validate Android manifests and packaging tests
+      - name: Validate Android manifests, resource strings and packaging tests
         run: |
-          python -m unittest \
-            discover -s tests -p 'test_android_*.py'
-          python -m py_compile tools/android/*.py
+          python -m unittest discover -s tests -p 'test_android_*.py'
+          python -m compileall -q tools/android scripts
 
   release:
     name: Build Android development APK (local signing key)
+    needs: source-check
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     permissions:
@@ -95,6 +94,15 @@ jobs:
             platform-tools
             platforms;android-${{ env.ANDROID_PLATFORM }}
             build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+
+      # Detect invalid XML and Android resource escapes before the native builds.
+      - name: Preflight all Android resources (AAPT2)
+        shell: bash
+        run: |
+          set -euo pipefail
+          aapt2="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS/aapt2"
+          test -x "$aapt2"
+          "$aapt2" compile --dir android-launcher/app/src/main/res -o "$RUNNER_TEMP/android-resources-preflight.zip"
 
       - name: Install Android and native build tools
         run: |
@@ -156,6 +164,14 @@ jobs:
             libexpat1-dev libxcb1-dev libx11-xcb-dev libxcb-xfixes0-dev libxcb-randr0-dev \
             libxcb-dri3-dev libxcb-present-dev libxcb-sync-dev libxcb-shm0-dev libxshmfence-dev \
             libx11-dev libxrandr-dev libdrm-dev
+
+      # Resolve/compile actual release resources and Kotlin with fetched Steam jars
+      # before spending time on FEXCore, Turnip, LSFG and runtime archives.
+      - name: Preflight Android release resources and Kotlin
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash android-launcher/gradlew -p android-launcher :app:mergeReleaseResources :app:compileReleaseKotlin --no-daemon
 
       - name: Build ARM64 native runtime
         shell: bash -el {0}
