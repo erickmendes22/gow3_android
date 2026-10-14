@@ -1315,7 +1315,8 @@ void TemporalUpscaler::OnColorTarget(VideoCore::ImageId color) {
     }
     const auto& image = texture_cache.GetImage(color);
     const auto& depth = texture_cache.GetImage(camera_motion.Depth());
-    if (image.info.pixel_format == vk::Format::eR8G8B8A8Unorm &&
+    if ((image.info.pixel_format == vk::Format::eR8G8B8A8Unorm ||
+         image.info.pixel_format == vk::Format::eR8G8B8A8Srgb) &&
         image.info.size.width == depth.info.size.width &&
         image.info.size.height == depth.info.size.height) {
         ldr_target = color;
@@ -1339,8 +1340,21 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
         return;
     }
     const auto& image = texture_cache.GetImage(color);
+    // Android's patched 720p UI shaders may not retain the PC build's VS
+    // hashes. Report plausible full-viewport candidates without prematurely
+    // compositing FSR before we have a valid camera and scene.
     const bool movie = vs_hash == ui_trigger_vs || UiComposition::MovieShader(vs_hash) ||
                        (scaled_session && native_viewport);
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && native_viewport && !movie) {
+        static unsigned candidates = 0;
+        if (candidates++ < 6) {
+            const auto& candidate = texture_cache.GetImage(color);
+            std::printf("GOW3_FSR_UI_CANDIDATE hash=%llx size=%ux%u camera=%d matched_ldr=%d\n",
+                        static_cast<unsigned long long>(vs_hash),
+                        candidate.info.size.width, candidate.info.size.height,
+                        int(camera_motion.Ready()), int(ldr_target == color));
+        }
+    }
     const bool ui_draw = movie &&
         (image.info.pixel_format == vk::Format::eR8G8B8A8Unorm ||
          image.info.pixel_format == vk::Format::eR8G8B8A8Srgb) &&

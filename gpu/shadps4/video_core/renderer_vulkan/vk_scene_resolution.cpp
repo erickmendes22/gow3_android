@@ -100,6 +100,34 @@ bool SceneTargets::Eligible(const VideoCore::Image& image) const {
     }
     return Blittable(image.backing->image.image_ci.format) || ShaderResampled(image);
 }
+void SceneTargets::ObserveGuestScene(u32 width, u32 height) {
+    // Called only for a credible 5+ MRT G-buffer depth attachment, and
+    // never inferred from the configured output resolution alone.
+    if (guest_scene_observed || !std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) return;
+    if (!((width == 1280 && height == 720) ||
+          (width == 1920 && height == 1080))) {
+        static u32 unsupported = 0;
+        if (unsupported++ < 3) {
+            std::printf("GOW3_GBUFFER_UNKNOWN size=%ux%u expected=1280x720 or 1920x1080\n",
+                        width, height);
+        }
+        return;
+    }
+    guest_scene_observed = true;
+    const SceneResolution::Size actual{width, height};
+    if (guest_size != actual) {
+        // No surviving proxy can be reused with a different guest extent.
+        ResolveAll();
+        scheduler.Finish();
+        entries.clear();
+        tracked.clear();
+        recent = {};
+        ++generation;
+        guest_size = actual;
+    }
+    std::printf("GOW3_GBUFFER_ACTUAL guest=%ux%u scene=%ux%u scaled=%u\n",
+                width, height, size.width, size.height, unsigned(size != guest_size));
+}
 bool SceneTargets::EligibleScene(const VideoCore::Image& image) const {
     return image.info.size.width == guest_size.width &&
            image.info.size.height == guest_size.height && Eligible(image);

@@ -2726,8 +2726,30 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
     std::pair<vk::ImageView, vk::ImageLayout> original_color{};
     const auto& regs = Regs();
     const auto& key = pipeline->GetGraphicsKey();
-    if (std::popcount(key.mrt_mask & 0x7f) >= 5 && db_desc.first &&
-        scene_targets->EligibleScene(texture_cache.GetImage(db_desc.first))) scene_started = true;
+    if (std::popcount(key.mrt_mask & 0x7f) >= 5 && db_desc.first) {
+        const auto& depth = texture_cache.GetImage(db_desc.first);
+        // The 720p eboot patch changes guest allocations, but checking the
+        // actual G-buffer is essential: a wrong patch/address or an aligned
+        // image must not masquerade as a real 640x360 proxy draw.
+        if (cb_descs[0].first) {
+            const auto& primary = texture_cache.GetImage(cb_descs[0].first);
+            if (primary.info.size.width == depth.info.size.width &&
+                primary.info.size.height == depth.info.size.height) {
+                scene_targets->ObserveGuestScene(depth.info.size.width,
+                                                 depth.info.size.height);
+            }
+        }
+        const bool eligible = scene_targets->EligibleScene(depth);
+        if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) {
+            static unsigned gbuffer_traces = 0;
+            if (gbuffer_traces++ < 4) {
+                std::printf("GOW3_GBUFFER_INPUT size=%ux%u eligible=%d depth_format=%u mrt=%u\n",
+                            depth.info.size.width, depth.info.size.height, int(eligible),
+                            unsigned(depth.info.pixel_format), unsigned(std::popcount(key.mrt_mask & 0x7f)));
+            }
+        }
+        if (eligible) scene_started = true;
+    }
     // A proxy attachment cannot represent MSAA or a feedback loop that reads the
     // same image through the guest's native descriptor during this draw.
     bool reduced = scene_started && upscaler->RasterScaling() && key.num_samples == 1;
@@ -2784,6 +2806,20 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
                                depth.info.size.height, scene_targets->Eligible(depth));
         }
         std::printf("Scene pass: reduced %d %s\n", reduced, why.c_str());
+    }
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) {
+        static u32 inspected = 0, accepted = 0;
+        if (inspected < 1024) {
+            ++inspected;
+            accepted += unsigned(reduced);
+            if (inspected == 128 || inspected == 512 || inspected == 1024) {
+                const auto actual = scene_targets->GuestSize();
+                const auto raster = scene_targets->Size();
+                std::printf("GOW3_SCENE_ACTUAL passes=%u reduced=%u guest=%ux%u raster=%ux%u scene_started=%d scaling=%d\n",
+                            inspected, accepted, actual.width, actual.height, raster.width,
+                            raster.height, int(scene_started), int(upscaler->RasterScaling()));
+            }
+        }
     }
     push_data.scene_size = reduced ? SceneResolution::Pack(scene_targets->Size()) : 0;
     if (Gow3Stats::enabled) {

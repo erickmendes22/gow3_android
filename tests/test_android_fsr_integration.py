@@ -53,6 +53,18 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn('float(size.width) / float(guest.width)', raster)
         self.assertNotIn('target_scale = {float(size.width) / 1920.0f', raster)
 
+    def test_guest_dimensions_are_observed_not_assumed(self):
+        root = ROOT / "gpu/shadps4/video_core/renderer_vulkan"
+        scene = (root / "vk_scene_resolution.cpp").read_text()
+        raster = (root / "vk_rasterizer.cpp").read_text()
+        fsr = (root / "vk_temporal_upscaler.cpp").read_text()
+        self.assertIn('ObserveGuestScene(u32 width, u32 height)', scene)
+        self.assertIn('scene_targets->ObserveGuestScene(', raster)
+        self.assertIn('GOW3_SCENE_ACTUAL passes=', raster)
+        self.assertIn('GOW3_GBUFFER_ACTUAL guest=', scene)
+        self.assertIn('vk::Format::eR8G8B8A8Srgb', fsr)
+        self.assertIn('GOW3_FSR_UI_CANDIDATE', fsr)
+
     def test_shadow_toggle_semantics(self):
         from launch_env import disable_shadows_requested
         self.assertTrue(disable_shadows_requested({"disable_dynamic_shadows": "1"}))

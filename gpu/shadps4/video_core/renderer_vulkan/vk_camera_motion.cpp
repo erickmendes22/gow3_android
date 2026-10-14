@@ -245,6 +245,15 @@ void CameraMotion::OnGBufferPass(VideoCore::ImageId depth) {
 }
 
 void CameraMotion::OnDisplayPass(VideoCore::ImageId frame) {
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) {
+        static u32 camera_traces = 0;
+        if (camera_traces++ < 6) {
+            std::printf("GOW3_FSR_CAMERA frame=%u captured=%d current=%d previous=%d depth=%d scene=%ux%u\n",
+                        camera_traces, int(frame_has_camera), int(current.valid),
+                        int(previous.valid), int(bool(depth_id)),
+                        render_size[0], render_size[1]);
+        }
+    }
     if (debug_overlay && frame && depth_id && current.valid && previous.valid) {
         Overlay(frame);
     }

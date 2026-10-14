@@ -24,6 +24,9 @@ public:
     SceneTargets(const Instance&, Scheduler&, Runtime&, Lookup);
     ~SceneTargets();
     bool SetSize(SceneResolution::Size);
+    // Detect the real G-buffer dimensions before claiming a render target
+    // actually uses the requested 640x360 FSR input.
+    void ObserveGuestScene(u32 width, u32 height);
     SceneResolution::Size Size() const { return size; }
     // Native guest buffers are 720p in Android, 1080p on desktop.
     bool Reduced() const { return size != guest_size; }
@@ -104,6 +107,7 @@ private:
     std::unordered_set<u64> tracked; ///< uids with proxies
     bool copying = false;
     bool force_stencil_bits = false; ///< test the portable resampler on any driver
+    bool guest_scene_observed = false;
     u64 generation = 0;
     mutable std::unordered_map<vk::Format, vk::FormatFeatureFlags> format_features;
     mutable std::array<vk::FormatFeatureFlags, 256> format_table{};
