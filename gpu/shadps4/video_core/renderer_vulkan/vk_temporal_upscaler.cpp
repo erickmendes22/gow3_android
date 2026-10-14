@@ -1340,11 +1340,16 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
         return;
     }
     const auto& image = texture_cache.GetImage(color);
-    // Android's patched 720p UI shaders may not retain the PC build's VS
-    // hashes. Report plausible full-viewport candidates without prematurely
-    // compositing FSR before we have a valid camera and scene.
+    // Android's patched 720p guest may compile different UI shader hashes.
+    // The alternate trigger is deliberately limited to a new UI depth target
+    // drawn over the CURRENT LDR scene color with valid camera/depth. Generic
+    // fullscreen postprocess passes reusing scene depth must not trigger FSR.
+    const bool android_hud_transition =
+        std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && !scaled_session &&
+        native_viewport && camera_motion.Ready() && ldr_target == color &&
+        depth && depth != camera_motion.Depth();
     const bool movie = vs_hash == ui_trigger_vs || UiComposition::MovieShader(vs_hash) ||
-                       (scaled_session && native_viewport);
+                       (scaled_session && native_viewport) || android_hud_transition;
     if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && native_viewport && !movie) {
         static unsigned candidates = 0;
         if (candidates++ < 6) {

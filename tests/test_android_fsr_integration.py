@@ -64,6 +64,8 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn('GOW3_GBUFFER_ACTUAL guest=', scene)
         self.assertIn('vk::Format::eR8G8B8A8Srgb', fsr)
         self.assertIn('GOW3_FSR_UI_CANDIDATE', fsr)
+        self.assertIn('android_hud_transition', fsr)
+        self.assertIn('depth != camera_motion.Depth()', fsr)
 
     def test_shadow_toggle_semantics(self):
         from launch_env import disable_shadows_requested
