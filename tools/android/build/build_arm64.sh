@@ -8,7 +8,10 @@
 #   .local-deps/root/usr                host header-only deps: Boost, tsl-robin-map, VMA, glslang
 #   GOW3_FEX_SOURCE                     FEXCore source; defaults to third_party/FEX
 #   gpu/third_party/{miniz,magic_enum,imgui,xbyak,fsr-vulkan,sirit}  submodules/vendored
-set -euo pipefail
+set -Eeuo pipefail
+# CI logs a bare "exit code 1" when a step dies without a diagnostic; name the failing command so
+# the log points straight at it. -E (errtrace) keeps this working inside functions and subshells.
+trap 'printf "build_arm64.sh: line %s failed: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 cd -- "$(dirname -- "$0")/../../.."
 # A conda-forge gcc activation leaks host-only x86-64 flags (CFLAGS=-march=nocona -mtune=haswell,
 # CPATH=$CONDA_PREFIX/include) that clang rejects for the aarch64 target. conda also sets
