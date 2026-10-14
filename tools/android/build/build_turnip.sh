@@ -15,6 +15,14 @@ die() { echo "build_turnip: $*" >&2; exit 1; }
 step=0; total=6; _t0=0
 begin()    { step=$((step + 1)); _t0=$(date +%s); printf '\n==> [%d/%d] %s\n' "$step" "$total" "$*"; }
 end_stage(){ local sec=$(( $(date +%s) - _t0 )); printf '    %s (%dm%02ds)\n' "$*" "$((sec / 60))" "$((sec % 60))"; }
+# The activated conda environment supplies host tools (glslangValidator, meson), but
+# its x86-64 compiler/linker flags must never be passed to the ARM64 cross compiler.
+# In CI this otherwise adds -L$CONDA_PREFIX/lib to clang and ld.lld selects the
+# host libgcc_s.so.1, making Meson's libatomic probe fail before any Turnip build.
+# Keep PATH intact so the host tools remain executable.
+unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH \\
+    LIBRARY_PATH CMAKE_PREFIX_PATH PKG_CONFIG_PATH
+
 if [[ -n ${GOW3_LLVM_PREFIX:-} && -d $GOW3_LLVM_PREFIX/bin ]]; then
     export PATH="$GOW3_LLVM_PREFIX/bin:$PATH"
 fi
