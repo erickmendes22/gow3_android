@@ -358,11 +358,28 @@ bool TemporalUpscaler::OnFrameStart() {
 }
 
 void TemporalUpscaler::OnDispatch(u64 cs_hash) {
-    if (cs_hash != trigger_hash || done_this_frame || failed || Scaled()) {
-        return;
+    // Sample the decision once per 256 matching dispatches, at most 24 times.
+    // Distinguishes a missing scene/motion feed from a disabled or failed FSR,
+    // without flooding Android logcat on every compute dispatch.
+    if (cs_hash != trigger_hash) return;
+    static u32 matched_dispatches = 0;
+    static u32 trace_lines = 0;
+    const bool sample = (++matched_dispatches % 256 == 1) && trace_lines < 24;
+    const bool ready_color = bool(scene_color);
+    const bool ready_motion = camera_motion.Ready();
+    const bool scaled = Scaled();
+    const bool active = Active();
+    if (sample) {
+        ++trace_lines;
+        std::printf("GOW3_FSR_DISPATCH hash=%llx expected=%llx scaled=%d done=%d failed=%d active=%d color=%d motion=%d\n",
+                    static_cast<unsigned long long>(cs_hash),
+                    static_cast<unsigned long long>(trigger_hash),
+                    int(scaled), int(done_this_frame), int(failed),
+                    int(active), int(ready_color), int(ready_motion));
     }
+    if (done_this_frame || failed || scaled) return;
     done_this_frame = true;
-    if (!scene_color || !camera_motion.Ready() || !Active()) {
+    if (!ready_color || !ready_motion || !active) {
         reset = true;
         return;
     }
