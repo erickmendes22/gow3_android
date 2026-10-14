@@ -36,6 +36,49 @@ export PATH="$headers/bin:$PATH"   # glslangValidator for gpu/host_shaders
 }
 mkdir -p "$out"
 
+# ---- pkg-config cross sanity check ------------------------------------------
+# conda-forge's pkg-config (pkgconf) enables --define-prefix by default: it relocates the Debian
+# "/usr" prefix inside the sysroot's .pc files and then prefixes PKG_CONFIG_SYSROOT_DIR on top of
+# that, so CMake gets <sysroot>/<sysroot>/usr/lib/... and the generate step dies with
+# 'Imported target "PkgConfig::XXHASH" includes non-existent path'. Resolve an invocation that
+# returns real directories before FEX spends four minutes compiling.
+export PKG_CONFIG_SYSROOT_DIR=$sysroot
+export PKG_CONFIG_LIBDIR=$sysroot/usr/lib/aarch64-linux-gnu/pkgconfig:$sysroot/usr/share/pkgconfig
+export PKG_CONFIG_PATH=
+export PKG_CONFIG_DONT_DEFINE_PREFIX=1
+export PKG_CONFIG_FDO_SYSROOT_RULES=1
+pc_flags=()
+if pkg-config --dont-define-prefix --version >/dev/null 2>&1; then
+    pc_flags=(--dont-define-prefix)
+fi
+pc_dirs_resolve() {
+    local dir cflags
+    cflags=$(pkg-config "${pc_flags[@]}" --cflags-only-I libxxhash libavcodec 2>/dev/null) || return 1
+    [[ -n $cflags ]] || return 1
+    while IFS= read -r dir; do
+        [[ -d $dir ]] || return 1
+    done < <(printf '%s\n' $cflags | tr ' ' '\n' | sed -n 's/^-I//p')
+    return 0
+}
+if ! pc_dirs_resolve; then
+    pc_flags=()
+    if ! pc_dirs_resolve; then
+        echo 'pkg-config cannot resolve the sysroot include directories.' >&2
+        printf 'pkg-config: %s (%s)\n' "$(command -v pkg-config)" \
+            "$(pkg-config --version 2>/dev/null)" >&2
+        printf 'PKG_CONFIG_SYSROOT_DIR=%s\n' "$PKG_CONFIG_SYSROOT_DIR" >&2
+        printf 'PKG_CONFIG_LIBDIR=%s\n' "$PKG_CONFIG_LIBDIR" >&2
+        echo 'raw --cflags-only-I libxxhash libavcodec:' >&2
+        pkg-config --cflags-only-I libxxhash libavcodec >&2 || true
+        exit 1
+    fi
+fi
+printf '    pkg-config: %s (%s), flags: %s\n' "$(command -v pkg-config)" \
+    "$(pkg-config --version 2>/dev/null)" "${pc_flags[*]:-<none>}"
+pkg-config "${pc_flags[@]}" --cflags-only-I libxxhash libavcodec 2>/dev/null |
+    tr ' ' '\n' | sed -n 's/^-I/    include: /p'
+unset PKG_CONFIG_SYSROOT_DIR PKG_CONFIG_LIBDIR
+
 # ---- progress helpers -------------------------------------------------------
 # Banners/elapsed time print on every run; the rolling "[N/M]" line only shows on a TTY
 # (no-op when output is piped, so CI logs stay clean).

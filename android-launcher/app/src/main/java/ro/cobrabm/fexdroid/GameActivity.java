@@ -628,15 +628,15 @@ public final class GameActivity extends Activity {
         } catch (Exception ignored) {}
         return value;
     }
-    /** Frame generation (Lossless Scaling or FSR 3.1) presents 2-4 frames per game frame. Lossless
+    /** Frame generation (Lossless Scaling only) presents 2-4 frames per game frame. Lossless
      *  Scaling presents them back to back and FIFO spaces them, evenly only when the display runs at
      *  FPS limit x frames: that mode when the display has it (30x2: 60 Hz, 30x4, 40x3, 60x2: 120 Hz),
      *  else the fastest one (at the system's 60 Hz generated frames were dropped). Without frame
-     *  generation, the system's choice. */
+     *  generation, the system's choice. FSR 3.1 frame generation is not wired on this tree
+     *  (shadps4 has no GOW3_FRAME_GEN consumer), so the multiplier is LSFG-only. */
     private void pickRefreshRate() {
         String lsfg=setting("lsfg_multiplier");
-        int frames="2".equals(lsfg) || "3".equals(lsfg) || "4".equals(lsfg) ? Integer.parseInt(lsfg)
-            : "1".equals(setting("frame_generation")) ? 2 : 1;
+        int frames="2".equals(lsfg) || "3".equals(lsfg) || "4".equals(lsfg) ? Integer.parseInt(lsfg) : 1;
         String limit=setting("fps_limit"); // as run-gow3.sh: 40, 45, 60, 0 (none), else 30
         final float target=frames*("40".equals(limit) || "45".equals(limit) || "60".equals(limit)
             ? Integer.parseInt(limit) : "0".equals(limit) ? 1000 : 30);

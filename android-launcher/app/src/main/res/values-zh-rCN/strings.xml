@@ -35,7 +35,7 @@
     <string name="dialog_ok">确定</string>
 
     <!-- 启动参数：参数名 -->
-    <string name="param_upscaler">升采样</string>
+    <string name="param_upscaler">超分</string>
     <string name="param_resolution">分辨率</string>
     <string name="param_fps_limit">帧率上限</string>
     <string name="param_engine_fps">引擎帧率</string>

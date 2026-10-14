@@ -57,3 +57,11 @@ set(ENV{PKG_CONFIG_PATH} "")
 # pkg-config and therefore harmless there.
 set(ENV{PKG_CONFIG_DONT_DEFINE_PREFIX} "1")
 set(ENV{PKG_CONFIG_FDO_SYSROOT_RULES} "1")
+# The env vars above are ignored by older pkgconf; --dont-define-prefix is the authoritative switch
+# and is only understood by pkgconf, so probe for it before handing it to pkg_check_modules.
+execute_process(COMMAND pkg-config --dont-define-prefix --version
+                RESULT_VARIABLE GOW3_PKG_CONFIG_DONT_DEFINE_PREFIX
+                OUTPUT_QUIET ERROR_QUIET)
+if(GOW3_PKG_CONFIG_DONT_DEFINE_PREFIX EQUAL 0)
+    set(PKG_CONFIG_ARGN "--dont-define-prefix")
+endif()

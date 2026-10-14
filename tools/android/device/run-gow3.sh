@@ -42,6 +42,65 @@ export GLIBC_TUNABLES='glibc.cpu.hwcaps=-AVX2,-AVX,-AVX_Fast_Unaligned_Load,-AVX
 
 export GOW3_CONFIG="$base/gow3.ini"
 [ -f "$GOW3_CONFIG" ] || cp "$base/gow3.default.ini" "$GOW3_CONFIG"
+# One setting from gow3.ini, last value wins (the launcher writes whole-file on changes).
+setting() { sed -n "s/^$1=//p" "$GOW3_CONFIG" 2>/dev/null | tail -n 1; }
+
+# Lossless Scaling frame generation (lsfg_multiplier 2-4): the lsfg-vk 1.0 layer with our Turnip
+# patches (gow3port/arm64/lsfg, build_lsfg.sh) and Lossless.dll from the player's own Lossless
+# Scaling (Steam), next to the game folder or in gow3port/. Its messages (lsfg-vk: ...) go to the
+# game log. FSR 3.1 frame generation is not wired on this tree (shadps4 has no GOW3_FRAME_GEN
+# consumer); LSFG is the only frame-generation path.
+lsfg=$(setting lsfg_multiplier)
+case $lsfg in 2|3|4) ;; *) lsfg= ;; esac
+if [ -n "$lsfg" ] && [ -f "$base/arm64/lsfg/VkLayer_LS_frame_generation.json" ]; then
+    lsfg_dll=
+    for dll in "${GOW3_GAME_DIR:+${GOW3_GAME_DIR%/*}/Lossless.dll}" "$base/Lossless.dll"; do
+        [ -n "$dll" ] && [ -f "$dll" ] && { lsfg_dll=$dll; break; }
+    done
+    if [ -n "$lsfg_dll" ]; then
+        flow=$(setting lsfg_flow_scale)
+        case $flow in 0.25|0.5|0.75|1|1.0) ;; *) flow=1.0 ;; esac
+        performance=$([ "$(setting lsfg_performance)" = 1 ] && echo true || echo false)
+        # Config file mode: lsfg-vk watches it, so the app changes the multiplier (1: off), flow
+        # scale and performance mode while the game runs (SettingsDialog.showLossless). The file
+        # exists only while the layer is loaded; GOW3_LSFG: vk_swapchain.cpp / vk_presenter.cpp
+        # check it and (re)coordinate with the layer's present hook. An implicit layer, so the
+        # layer's own framegen instance skips it (DISABLE_LSFG). Present mode: FIFO paces the
+        # generated frames (LSFG_PRESENT=mailbox|immediate to try).
+        export GOW3_LSFG=1 LSFG_CONFIG="$base/lsfg-vk.toml"
+        export VK_ADD_IMPLICIT_LAYER_PATH="$base/arm64/lsfg"
+        cat > "$LSFG_CONFIG.tmp" <<EOF
+version = 1
+
+[global]
+dll = "$lsfg_dll"
+
+[[game]]
+exe = "gow3-probe"
+multiplier = $lsfg
+flow_scale = $flow
+performance_mode = $performance
+experimental_present_mode = "${LSFG_PRESENT:-fifo}"
+EOF
+        mv -f "$LSFG_CONFIG.tmp" "$LSFG_CONFIG"
+        echo "LSFG: enabled (x$lsfg, flow $flow, $lsfg_dll); toml=$LSFG_CONFIG; layer=$base/arm64/lsfg"
+    else
+        echo "LSFG: requested (lsfg_multiplier=$lsfg) but Lossless.dll was not found at either"
+        echo "      ${GOW3_GAME_DIR:+${GOW3_GAME_DIR%/*}/Lossless.dll}${GOW3_GAME_DIR:+\\n      }$base/Lossless.dll"
+        echo "      Drop the player's Lossless.dll into the launcher Home's FRAME GENERATION card,"
+        echo "      or next to the game folder, then restart the game."
+        lsfg=
+    fi
+elif [ -n "$lsfg" ] && [ ! -f "$base/arm64/lsfg/VkLayer_LS_frame_generation.json" ]; then
+    echo "LSFG: requested (lsfg_multiplier=$lsfg) but the runtime is missing $base/arm64/lsfg/VkLayer_LS_frame_generation.json"
+    echo "      This APK/runtime build does not include the lsfg-vk layer; reinstall the latest runtime."
+    lsfg=
+elif [ -z "$lsfg" ] && grep -q '^lsfg_multiplier=' "$GOW3_CONFIG" 2>/dev/null; then
+    echo "LSFG: disabled (lsfg_multiplier=0 in gow3.ini)"
+else
+    echo "LSFG: not requested (no lsfg_multiplier in gow3.ini)"
+fi
+[ -n "$lsfg" ] || rm -f "$base/lsfg-vk.toml"
 
 # Bridges the app provides (it sets GOW3_ANDROID_INPUT=1 when they are up).
 if [ "${GOW3_ANDROID_INPUT:-0}" = 1 ]; then
