@@ -37,6 +37,9 @@
     <!-- 启动参数：参数名 -->
     <string name="param_upscaler">Upscaler</string>
     <string name="param_resolution">Resolution</string>
+    <string name="param_output_resolution">FSR output resolution</string>
+    <string name="param_desc_output_resolution">Final target resolution for FSR. Render resolution and internal FSR preset can be lower; changing this does not directly change the game's native rendering resolution.</string>
+    <string name="param_option_1080p">1080p</string>
     <string name="param_fps_limit">FPS limit</string>
     <string name="param_engine_fps">Engine FPS</string>
     <string name="param_vsync">VSync</string>
