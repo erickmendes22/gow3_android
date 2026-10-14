@@ -39,8 +39,10 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     losslessDlls = losslessDllManager,
-                    onGetFromSteam = {
-                        ro.cobrabm.fexdroid.SteamDllDialog(this, losslessDllManager.appCopy()).show()
+                    onGetFromSteam = { onDownloaded ->
+                        ro.cobrabm.fexdroid.SteamDllDialog(this, losslessDllManager.appCopy()) { ok, msg ->
+                            onDownloaded(ok, msg)
+                        }.show()
                     },
                     onChooseGameFolder = { gameFolderManager.chooseGameFolder() },
                     saves = saveManager,

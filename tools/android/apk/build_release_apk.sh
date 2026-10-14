@@ -4,6 +4,8 @@ cd -- "$(dirname -- "$0")/../../.."
 root=$PWD
 version=$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' android-launcher/app/build.gradle.kts)
 apk="out/release/God of War III-$version.apk"
+# Steam sign-in libraries (SteamDllDialog.java); fetched on demand like the fexdroid payload.
+[[ -f .local-deps/android/steam-libs/jars.txt ]] || bash tools/android/inputs/fetch_steam_libs.sh
 python3 tools/android/runtime/build_release_runtime.py
 
 # Stage the release runtime payload where the Kotlin launcher's release source set reads it

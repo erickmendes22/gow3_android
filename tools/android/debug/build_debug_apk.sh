@@ -5,6 +5,9 @@ cd -- "$script_dir/../../.."
 
 bash tools/android/debug/stage_debug_runtime.sh
 
+# Steam sign-in libraries (SteamDllDialog.java); fetched on demand like the debug payload.
+[[ -f .local-deps/android/steam-libs/jars.txt ]] || bash tools/android/inputs/fetch_steam_libs.sh
+
 bash tools/android/apk/build_kotlin_launcher.sh
 version=$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' android-launcher/app/build.gradle.kts)
 mkdir -p out/debug

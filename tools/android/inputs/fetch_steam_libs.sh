@@ -45,7 +45,9 @@ for file in "$work"/deps/*; do
         *.aar) # zstd-jni for Android: its classes and the arm64 JNI library
             unzip -q -o "$file" classes.jar 'jni/arm64-v8a/*' -d "$work/aar"
             cp "$work/aar/classes.jar" "$out/jars/zstd-jni-$ZSTD.jar"
-            cp "$work"/aar/jni/arm64-v8a/*.so "$out/jni/" ;;
+            # Gradle jniLibs layout: <abi>/libzstd-jni.so (zstd-jni loads it as "zstd-jni").
+            mkdir -p "$out/jni/arm64-v8a"
+            cp "$work"/aar/jni/arm64-v8a/*.so "$out/jni/arm64-v8a/libzstd-jni.so" ;;
     esac
 done
 ls "$out/jars" > "$out/jars.txt"

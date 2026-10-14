@@ -47,7 +47,7 @@ private enum class LauncherTab { HOME, MODS, ABOUT }
 internal fun LauncherScreen(
     onStartGame: () -> Unit,
     losslessDlls: LosslessDllManager,
-    onGetFromSteam: () -> Unit,
+    onGetFromSteam: ((Boolean, String) -> Unit) -> Unit,
     onChooseGameFolder: () -> Unit,
     saves: SaveManager,
     logs: LogManager,

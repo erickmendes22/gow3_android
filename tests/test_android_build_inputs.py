@@ -88,14 +88,38 @@ class AndroidBuildInputTests(unittest.TestCase):
 
     def test_launcher_provides_frame_generation_from_home(self):
         launcher = ROOT / 'android-launcher/app/src/main/java/com/gow3/android'
-        screen = (launcher / 'LauncherScreen.kt').read_text()
-        manager = (launcher / 'LosslessDllManager.kt').read_text()
-        self.assertIn('FrameGenerationCard', screen)
-        self.assertIn('IMPORT .DLL', screen)
-        self.assertIn('GET FROM STEAM', screen)
+        screen = (launcher / 'ui/LauncherScreen.kt').read_text()
+        home = (launcher / 'feature/home/HomeScreen.kt').read_text()
+        card = (launcher / 'feature/home/FrameGenerationCard.kt').read_text()
+        manager = (launcher / 'data/LosslessDllManager.kt').read_text()
+        self.assertIn('HomeScreen', screen)
+        self.assertIn('FrameGenerationCard', home)
+        self.assertIn('IMPORT .DLL', card)
+        self.assertIn('GET FROM STEAM', card)
         # The runtime's fallback location, quoted verbatim: drifting it breaks run-gow3.sh.
         self.assertIn('"gow3port/$FILE_NAME"', manager)
         self.assertIn('Lossless.dll', manager)
-        # Cross-package access from com.gow3.android needs the class to be public.
-        steam = (ROOT / 'android-launcher/app/src/main/java/ro/cobrabm/fexdroid/SteamDllDialog.java')
-        self.assertIn('public final class SteamDllDialog', steam.read_text())
+        # Cross-package access from com.gow3.android needs the class to be public in both source sets.
+        for steam in (
+            ROOT / 'android-launcher/app/src/steamStub/java/ro/cobrabm/fexdroid/SteamDllDialog.java',
+            ROOT / 'android-launcher/app/src/steam/java/ro/cobrabm/fexdroid/SteamDllDialog.java',
+        ):
+            self.assertTrue(steam.is_file(), steam)
+            self.assertIn('public final class SteamDllDialog', steam.read_text())
+
+    def test_steam_download_gated_on_fetched_libraries(self):
+        """The real JavaSteam implementation is compiled only when steam-libs/jars.txt exists."""
+        gradle = (ROOT / 'android-launcher/app/build.gradle.kts').read_text()
+        self.assertIn('steam-libs', gradle)
+        self.assertIn('jars.txt', gradle)
+        self.assertIn('src/steam/java', gradle)
+        self.assertIn('src/steamStub/java', gradle)
+        # The fetcher that produces steam-libs/jars.txt must stay reachable and pinned to Lossless Scaling.
+        fetcher = (ANDROID / 'inputs/fetch_steam_libs.sh').read_text()
+        self.assertIn('javasteam', fetcher)
+        self.assertIn('993090', fetcher)
+        # The Home page callback lets a finished download refresh the card without re-entering.
+        main_activity = (
+            ROOT / 'android-launcher/app/src/main/java/com/gow3/android/MainActivity.kt'
+        ).read_text()
+        self.assertIn('onGetFromSteam', main_activity)

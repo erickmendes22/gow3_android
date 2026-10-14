@@ -245,7 +245,7 @@ ARM64 libraries 属于初始化缓存、`.local-deps/` 或 `out/`。`Lossless.dl
 | `out/release/God of War III-<version>.apk` | Kotlin launcher 已签名 release APK：`com.gow3.android` / arm64-v8a；`assets/runtime.payload` + `runtime.sha256`，`lib/arm64-v8a/{libfxdisplay.so,libfxio.so}` |
 
 Release 一条命令：`bash tools/android/apk/build_release_apk.sh`（`build_release_runtime.py` 由脚本内部调用，再走 `android-launcher` Gradle `assembleRelease` + apksigner 签名）。
-Debug 一条命令：`bash tools/android/debug/build_debug_apk.sh`。Debug payload 不执行 Turnip、LSFG 或 Steam libraries 的构建，而是复用 `.local-deps/android/` 中的现成产物；如果存在 `steam-libs/jars.txt`，还会启用真实 JavaSteam UI，否则使用 debug stub。
+Debug 一条命令：`bash tools/android/debug/build_debug_apk.sh`。Debug payload 不执行 Turnip、LSFG 或 Steam libraries 的构建，而是复用 `.local-deps/android/` 中的现成产物；如果存在 `steam-libs/jars.txt`，`GET FROM STEAM` 使用真实 JavaSteam UI（QR 扫码或账号密码 + Steam Guard 登录，只下载玩家自有的 Lossless Scaling 中 `Lossless.dll` 单文件并校验 SHA-1，不保存凭据），否则使用降级 stub 提示走 `IMPORT .DLL`。两个构建脚本都会在缺 `steam-libs/jars.txt` 时自动执行 `tools/android/inputs/fetch_steam_libs.sh`。
 
 Kotlin/Compose frontend 位于 `android-launcher/`，使用 `com.gow3.android`，主页 `MainActivity` 只提供启动按钮，游戏 Surface、bridge 和 runtime 生命周期在 `ro.cobrabm.fexdroid.GameActivity`；旧 Java frontend（`tools/android/frontend/`）已删除。构建 Kotlin APK：
 

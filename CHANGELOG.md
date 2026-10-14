@@ -5,6 +5,16 @@ and the commits for the exact changes.
 
 ## Android
 
+### Added
+- **`GET FROM STEAM` 现在是真实的 Steam 下载**。Home 上的 `GET FROM STEAM` 此前只是 stub，
+  提示 “Steam downloads are not part of this build”；现移植了 Bloodborne-Android 的真实
+  JavaSteam 实现（`android-launcher/app/src/steam/java/ro/cobrabm/fexdroid/SteamDllDialog.java`）：
+  QR 扫码或账号密码 + Steam Guard 登录，只从玩家自有的 Lossless Scaling（Steam app 993090）
+  Windows depot 下载 `Lossless.dll` 单文件并校验 SHA-1，不保存任何 Steam 凭据。依赖由
+  `tools/android/inputs/fetch_steam_libs.sh` 拉取到 `.local-deps/android/steam-libs`，Gradle
+  据此在真实实现与降级 stub（`src/steamStub/java`）间切换；缺依赖时仍会明确提示走
+  `IMPORT .DLL`。下载成功后 Home 卡片自动刷新。
+
 ### Fixed
 - **游戏画面比屏幕更大、菜单文字被切掉**。真机上画面宽高都超出屏幕，右侧和底部的 UI 完全看
   不到。原因不在游戏内部分辨率，而在于送显链路上的尺寸不一致：guest 请求 1920×1080 的窗口，

@@ -46,7 +46,7 @@ import java.io.File
 internal fun HomeScreen(
     onStartGame: () -> Unit,
     losslessDlls: LosslessDllManager,
-    onGetFromSteam: () -> Unit,
+    onGetFromSteam: ((Boolean, String) -> Unit) -> Unit,
     onChooseGameFolder: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -111,9 +111,12 @@ internal fun HomeScreen(
                 }
             },
             onSteam = {
-                onGetFromSteam()
-                // 下载（当该构建附带下载时）在 launcher 外部进行；返回时重新读取，
-                // 以便完成的下载无需手动下拉刷新即可显示。
+                // Steam 下载成功后（该构建不含 Steam 时则由 stub 自行提示）回到这里刷新，
+                // 让完成的下载无需重新进入页面即可显示。
+                onGetFromSteam { _, message ->
+                    refreshDll()
+                    toast(message)
+                }
             },
             onRemove = {
                 when (val result = losslessDlls.remove()) {
