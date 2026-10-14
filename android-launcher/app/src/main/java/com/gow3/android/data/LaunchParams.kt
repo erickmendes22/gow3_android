@@ -21,6 +21,11 @@ internal data class LaunchOption(val value: String, val label: String)
  * 以及 `gpu/shim/gow3_graphics.h` / `gpu/shim/gow3_settings.cpp` 中的运行时解析器；
  * 当两者不一致时（fps_limit：Java 前端提供 40/45，但 `ParseFpsLimit` 把它们映射为 0）
  * 以运行时取值域为准，确保每个选项都实际生效。
+ *
+ * 各参数的默认值均为移动端优化值（render_resolution=720p、fps_limit=60、
+ * engine_fps=60；display_mode 已从可编辑项移除，固定 fullscreen）。这些默认值
+ * MUST 与 `tools/android/config/gow3-default.ini`（首启落盘为 gow3.ini 的基准）
+ * 保持一致，避免 UI 展示默认与实际运行默认漂移。
  */
 internal object LaunchParams {
     val all: List<LaunchParam> = listOf(
@@ -44,16 +49,9 @@ internal object LaunchParams {
                 LaunchOption("1800p", "1800p"),
                 LaunchOption("4K", "4K"),
             ),
-            defaultValue = "native",
-        ),
-        LaunchParam(
-            key = "display_mode", label = "Display mode", group = "DISPLAY",
-            options = listOf(
-                LaunchOption("windowed", "Windowed"),
-                LaunchOption("borderless", "Borderless"),
-                LaunchOption("fullscreen", "Fullscreen"),
-            ),
-            defaultValue = "windowed",
+            // 移动端优化默认值：720p 内部分辨率 + FSR 升采样，手机/平板上更流畅省电。
+            // 与 tools/android/config/gow3-default.ini 保持一致。
+            defaultValue = "720p",
         ),
         LaunchParam(
             key = "fps_limit", label = "FPS limit", group = "PERFORMANCE",
@@ -64,7 +62,9 @@ internal object LaunchParams {
                 LaunchOption("240", "240"),
                 LaunchOption("0", "Unlimited"),
             ),
-            defaultValue = "0",
+            // 移动端优化默认值：以 60 封顶，避免无限帧率导致发热与耗电。
+            // 与 tools/android/config/gow3-default.ini 保持一致。
+            defaultValue = "60",
         ),
         LaunchParam(
             key = "engine_fps", label = "Engine FPS", group = "PERFORMANCE",
@@ -73,7 +73,9 @@ internal object LaunchParams {
                 LaunchOption("120", "120"),
                 LaunchOption("240", "240"),
             ),
-            defaultValue = "120",
+            // 移动端优化默认值：游戏原生引擎速度，最稳定、最省电。
+            // 与 tools/android/config/gow3-default.ini 保持一致。
+            defaultValue = "60",
             description = "How fast the game engine itself updates the game world, separate from the display. 60 is the game's original speed; higher values make motion smoother but use more power.",
         ),
         LaunchParam(
