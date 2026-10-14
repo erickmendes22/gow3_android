@@ -49,3 +49,11 @@ set(ENV{PKG_CONFIG_SYSROOT_DIR} "${GOW3_ARM64_SYSROOT}")
 set(ENV{PKG_CONFIG_LIBDIR}
     "${GOW3_ARM64_SYSROOT}/usr/lib/aarch64-linux-gnu/pkgconfig:${GOW3_ARM64_SYSROOT}/usr/share/pkgconfig")
 set(ENV{PKG_CONFIG_PATH} "")
+# pkgconf (conda-forge builds of it) enables --define-prefix by default, which rewrites the
+# "/usr" prefix of the Debian .pc files to a sysroot-relative path. Combined with
+# PKG_CONFIG_SYSROOT_DIR that yields a double-prefixed, non-existent include path
+# (<sysroot>/<sysroot>/usr/lib/include). These two switches restore freedesktop pkg-config
+# behaviour, which prefixes the sysroot exactly once. Both are unknown to freedesktop
+# pkg-config and therefore harmless there.
+set(ENV{PKG_CONFIG_DONT_DEFINE_PREFIX} "1")
+set(ENV{PKG_CONFIG_FDO_SYSROOT_RULES} "1")

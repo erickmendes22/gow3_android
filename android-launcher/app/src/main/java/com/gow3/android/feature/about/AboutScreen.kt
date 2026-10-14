@@ -80,6 +80,7 @@ internal fun AboutScreen(
         Text(stringResource(R.string.about_description), color = LauncherColors.textMuted, fontSize = 13.sp, lineHeight = 19.sp)
         Spacer(Modifier.height(8.dp))
         ContactCard()
+        GitHubCard()
         SaveCard(
             hasSaves = hasSaves,
             onExport = {

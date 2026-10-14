@@ -122,6 +122,14 @@
     <string name="contact_no_app_fmt">No app can open %1$s</string>
     <string name="contact_description">Bug reports, crashes and feature requests are all welcome — attach the exported logs when you report an issue so it can be reproduced.</string>
 
+    <!-- GitHub 卡片 -->
+    <string name="github_title">GITHUB</string>
+    <string name="github_star_label">Star us</string>
+    <string name="github_star_description">Enjoying the project? Give it a star to support development.</string>
+    <string name="github_issue_label">Issues &amp; feedback</string>
+    <string name="github_issue_description">Report bugs, crashes or feature requests on the Issues page.</string>
+    <string name="github_open">OPEN</string>
+
     <!-- Mods 页 -->
     <string name="mods_title">MOD &amp; PATCH</string>
     <string name="mods_description">Manage game file mods and third-party shadPS4 patches for God of War III.</string>

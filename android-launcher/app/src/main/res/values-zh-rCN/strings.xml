@@ -122,6 +122,14 @@
     <string name="contact_no_app_fmt">没有应用可以打开 %1$s</string>
     <string name="contact_description">欢迎提交 bug 反馈、崩溃报告与功能建议——反馈问题时请附上导出的日志，以便复现。</string>
 
+    <!-- GitHub 卡片 -->
+    <string name="github_title">GitHub</string>
+    <string name="github_star_label">求 Star</string>
+    <string name="github_star_description">喜欢这个项目？点个 Star 支持一下吧。</string>
+    <string name="github_issue_label">问题与反馈</string>
+    <string name="github_issue_description">遇到 bug、崩溃或有功能建议，请到 Issues 页面提交。</string>
+    <string name="github_open">打开</string>
+
     <!-- Mods 页 -->
     <string name="mods_title">MOD 与补丁</string>
     <string name="mods_description">管理《战神 III》的游戏文件 MOD 与第三方 shadPS4 补丁。</string>

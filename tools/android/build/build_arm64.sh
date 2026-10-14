@@ -126,6 +126,9 @@ end_stage "libgow3gpu.so"
 cc=(clang --target=aarch64-linux-gnu --sysroot="$sysroot" -fuse-ld=lld)
 export PKG_CONFIG_SYSROOT_DIR=$sysroot
 export PKG_CONFIG_LIBDIR=$sysroot/usr/lib/aarch64-linux-gnu/pkgconfig:$sysroot/usr/share/pkgconfig
+# See aarch64-toolchain.cmake: keep pkgconf's --define-prefix off so the sysroot is applied once.
+export PKG_CONFIG_DONT_DEFINE_PREFIX=1
+export PKG_CONFIG_FDO_SYSROOT_RULES=1
 read -r -a includes <<< "$(pkg-config --cflags vulkan sdl3 libavcodec libavutil libswscale)"
 read -r -a libraries <<< "$(pkg-config --libs vulkan sdl3 libavcodec libavutil libswscale)"
 

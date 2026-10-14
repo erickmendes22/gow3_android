@@ -81,7 +81,7 @@ internal fun LaunchParameters(
                 overflow = TextOverflow.Ellipsis,
                 softWrap = false,
             )
-            Text(stringResource(R.string.game_folder_hint), color = LauncherColors.textMuted, fontSize = 10.sp)
+//            Text(stringResource(R.string.game_folder_hint), color = LauncherColors.textMuted, fontSize = 10.sp)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
