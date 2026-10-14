@@ -113,7 +113,12 @@ def validate_tree(root, expected_loader, reject=(), explicit_paths=(), allow_no_
     results = []
     explicit_paths = set(explicit_paths)
     allow_no_interp = set(allow_no_interp)
-    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+    # Archive entries that are symlinks must be validated as links, not by
+    # dereferencing them on the x86-64 CI host. For example rootfs/etc/alternatives/awk
+    # can point to /usr/bin/mawk: is_file() follows that absolute link and would
+    # incorrectly inspect the runner's x86-64 mawk as an ARM64 runtime executable.
+    # Tar packaging uses dereference=False and normalizes absolute links separately.
+    for path in sorted(p for p in root.rglob("*") if p.is_file() and not p.is_symlink()):
         try:
             info = inspect(path)
         except ElfError as error:
