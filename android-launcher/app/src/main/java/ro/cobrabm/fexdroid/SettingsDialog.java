@@ -57,7 +57,6 @@ final class SettingsDialog {
     };
     private static final String[] UPSCALER_VALUES={"off","fsr3"};
     private static final String[] UPSCALER_NAMES={"Off (render at 1280×720)","FSR 3.1"};
-    private static final int FSR3=1;
     private static final String[] LSFG_VALUES={"0","2","3","4"};
     private static final String[] LSFG_NAMES={"Off","2× frames","3× frames","4× frames"};
     private static final String[] LSFG_FLOW_VALUES={"1.0","0.75","0.5"};
@@ -174,18 +173,16 @@ final class SettingsDialog {
         int preset=0;
         try { preset=Math.max(0,Math.min(4,Integer.parseInt(get("preset","3")))); } catch (NumberFormatException ignored) { preset=3; }
         final RadioGroup presets=choices(box,PRESETS,preset);
-        final Switch frameGen=toggle(box,"FSR 3.1 frame generation","1".equals(get("frame_generation","0")));
-        TextView frameGenNote=new TextView(activity); frameGenNote.setTextSize(13); frameGenNote.setAlpha(0.7f);
-        frameGenNote.setText("Shows a generated frame between each two (about twice the frames on screen); "
-            +"adds about half a frame of input delay. Best with a steady frame rate.");
-        box.addView(frameGenNote);
+        // FSR 3.1 frame generation (frame_generation=1) is not wired: shadps4 has no
+        // GOW3_FRAME_GEN consumer and no FSR 3.1 frame-gen patch on this tree, so the
+        // option would have been a no-op. LSFG is the only frame-generation path here;
+        // tune its multiplier / flow scale / performance mode from the in-game drawer.
         final TextView presetNote=new TextView(activity); presetNote.setTextSize(13); presetNote.setAlpha(0.7f);
         box.addView(presetNote);
         RadioGroup.OnCheckedChangeListener upscaling=(g,id) -> {
             int upscaler=checkedIndex(upscalers);
             boolean on=upscaler!=0;
             for (int i=0;i<presets.getChildCount();++i) presets.getChildAt(i).setEnabled(on);
-            frameGen.setEnabled(upscaler==FSR3);
             presetNote.setText(on ? "Lower is faster; the upscaler fills the screen." : "Without upscaling the game renders at 1280×720.");
         };
         upscalers.setOnCheckedChangeListener(upscaling); upscaling.onCheckedChanged(upscalers,0);
@@ -240,7 +237,6 @@ final class SettingsDialog {
                 Map<String,String> changed=new LinkedHashMap<>();
                 changed.put("upscaler",UPSCALER_VALUES[Math.max(0,checkedIndex(upscalers))]);
                 changed.put("fps_limit",FPS_VALUES[Math.max(0,checkedIndex(fpsLimit))]);
-                changed.put("frame_generation",frameGen.isChecked() && checkedIndex(upscalers)!=0 ? "1" : "0");
                 changed.put("thor_cpus",cpuList(cores));
                 changed.put("preset",String.valueOf(Math.max(0,checkedIndex(presets))));
                 changed.put("sharpen",sharpen.isChecked() ? "1" : "0");
