@@ -198,9 +198,10 @@ internal class PkgInstallManager(
             throw IOException("Sem permissão de escrita na pasta escolhida: ${dest.path}")
         if (pkg.canonicalFile == dest.canonicalFile || pkg.canonicalFile.parentFile == dest.canonicalFile)
             throw IOException("Escolha outra pasta: o PKG não pode ficar dentro do destino")
-        if (dest.listFiles()?.isNotEmpty() != false)
-            throw IOException("A pasta escolhida precisa estar vazia para evitar arquivos duplicados " +
-                "ou sobrescritas. Selecione uma pasta vazia, separada do jogo base.")
+        val selectedUpdate = preferences.getString("update_dir", null)?.let(::File)
+        val replacingUpdate = update && selectedUpdate?.canonicalFile == dest.canonicalFile
+        if (dest.listFiles()?.isNotEmpty() != false && !replacingUpdate)
+            throw IOException("Escolha uma pasta vazia: não criaremos outra cópia nem sobrescreveremos arquivos de terceiros")
         // Do not install an update over the game: our existing runtime overlays
         // the two directories and should never copy the patch into the base.
         val base = preferences.getString("game_dir", null)?.let(::File)
@@ -229,22 +230,32 @@ internal class PkgInstallManager(
                 ?: throw IOException("TITLE_ID do jogo base indisponível")
             if (baseTitle != title)
                 throw IOException("Atualização ${title} não corresponde ao jogo ${baseTitle}")
+            if (replacingUpdate) {
+                val previousTitle = ParamSfoTitle.readTitleId(File(dest, "sce_sys/param.sfo"))
+                    ?: throw IOException("O update anterior não tem TITLE_ID válido")
+                if (previousTitle != title)
+                    throw IOException("O destino contém um update de outro jogo")
+            }
         }
 
-        // Native extractor writes DIRECTLY to dest; no stage directory, no
-        // second game copy and no second PKG copy. Destination is empty.
+        // Native extractor writes directly to the selected directory; an
+        // already selected update path is overwritten in-place with --force,
+        // rather than producing a duplicate folder. No temporary game/PKG copy.
         try {
-            execute(loader, helper, listOf("extract", pkg.canonicalPath, "--output",
-                dest.canonicalPath, "--quiet"), dest)
+            val arguments = mutableListOf("extract", pkg.canonicalPath,
+                "--output", dest.canonicalPath, "--quiet")
+            if (replacingUpdate) arguments.add("--force")
+            execute(loader, helper, arguments, dest)
             val extractedTitle = ParamSfoTitle.readTitleId(File(dest, "sce_sys/param.sfo"))
                 ?: throw IOException("Extração incompleta: sce_sys/param.sfo inválido")
             if (extractedTitle != title || !File(dest, "eboot.bin").isFile)
                 throw IOException("Conteúdo extraído não corresponde ao PKG ou está incompleto")
         } catch (failure: Exception) {
-            // The chosen directory was verified EMPTY before extraction. Remove
-            // only content that this failed attempt could have created, leaving
-            // the user's chosen directory itself intact. No second game copy.
-            dest.listFiles()?.forEach { created -> created.deleteRecursively() }
+            // Roll back outputs only when the user explicitly selected an empty
+            // directory. Never delete a previously installed update on failure:
+            // in-place replacement cannot be transactional without extra storage.
+            if (!replacingUpdate)
+                dest.listFiles()?.forEach { created -> created.deleteRecursively() }
             throw failure
         }
         val key = if (update) "update_dir" else "game_dir"
