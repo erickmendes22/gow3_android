@@ -163,6 +163,21 @@ float CameraMotion::Near() const noexcept {
     return -current.proj[3] / current.proj[2];
 }
 
+std::array<float, 2> CameraMotion::EstimatedMotion(u32 width, u32 height) const noexcept {
+    if (!Ready() || !width || !height) return {};
+    const auto reproject = Multiply(previous.view, current.inv_view);
+    const float scene_z = 10.0f; // fixed reference point in view space, not a guessed game camera
+    const float px = reproject[2] * scene_z + reproject[3];
+    const float py = reproject[6] * scene_z + reproject[7];
+    const float pz = reproject[10] * scene_z + reproject[11];
+    if (!std::isfinite(px) || !std::isfinite(py) ||
+        !std::isfinite(pz) || pz <= 0.001f) return {};
+    const float dx = px / pz * previous.proj[0] * float(width) * 0.5f;
+    const float dy = -py / pz * previous.proj[1] * float(height) * 0.5f;
+    if (!std::isfinite(dx) || !std::isfinite(dy)) return {};
+    return {dx, dy};
+}
+
 std::array<std::array<float, 4>, 3> CameraMotion::TaaDepthParameters() const noexcept {
     const auto transform = Multiply(previous.view, current.inv_view);
     return {current.proj, previous.proj,
