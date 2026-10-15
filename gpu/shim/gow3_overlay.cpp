@@ -298,7 +298,10 @@ const Vulkan::Instance* overlay_instance = nullptr; // for the overlay's measure
 std::string OverlayText() {
     namespace P = Gow3PerfStats;
     const auto& s = Gow3Settings::Get();
-    const unsigned items = s.overlay_items;
+    // Android presents direct game frames; hide the obsolete scaler status
+    // from the HUD even if an older gow3.ini still has the legacy bit set.
+    const unsigned items = s.overlay_items &
+        (std::getenv("GOW3_ANDROID_PORT") ? ~unsigned(P::Upscaler) : ~0u);
     if ((items & (P::Gpu | P::Cpu | P::Ram | P::Vram)) && overlay_instance) {
         P::Start(*overlay_instance);
     }
@@ -399,7 +402,7 @@ void ImageTab() {
         ImGui::BeginDisabled(rcas_blocked);
         CheckRow("Sharpening (RCAS)", s.rcas,
                  rcas_blocked && downscaling ? "No effect: the game's image is larger than the window."
-                 : rcas_blocked              ? "Needs FSR 1: the game's image is smaller than the window."
+                 : rcas_blocked              ? "Unavailable at the current output size."
                                              : "Sharpens the final image.");
         ImGui::EndDisabled();
         ImGui::BeginDisabled(!s.rcas || rcas_blocked);
@@ -477,6 +480,7 @@ void OverlayTab() {
         static const char* const names[] = {"FPS", "Frametime", "Upscaler", "GPU (name and use)", "CPU (game)",
                                             "RAM (game / total)", "VRAM (used / available)"};
         for (unsigned item = 0; item < 7; ++item) {
+            if (item == 2 && std::getenv("GOW3_ANDROID_PORT")) continue;
             const unsigned bit = 1u << item;
             bool on = (s.overlay_items & bit) != 0;
             if (ImGui::Checkbox(names[item], &on)) {
