@@ -41,54 +41,46 @@ def derive(game, config, state_path, env):
     from patches import game_profile, game_title_id, patch_profile_status, patch_requirements, selected_patches
 
     graphics, reverted = graphics_options.prepare(config, state_path)
-    android_fixed_output = env.get('GOW3_ANDROID_FSR_FIXED_OUTPUT') == '1'
-    if android_fixed_output:
-        # Upgrade pre-existing gow3.ini installations silently: the output is
-        # never a selectable setting on Android, and the 720p game patch is
-        # independent of the FSR scene-input preset.
-        fixed = {'render_resolution': '720p', 'output_res': '1280x720'}
-        ini_before = graphics_options.read_ini(config)
-        if any(ini_before.get(key) != value for key, value in fixed.items()):
-            graphics_options.write_keys(config, fixed)
-        graphics['render_resolution'] = '720p'
+    android_port = env.get('GOW3_ANDROID_PORT') == '1'
     ini = graphics_options.read_ini(config)
+    if android_port and ini.get('upscaler') != 'off':
+        graphics_options.write_keys(config, {'upscaler': 'off', 'preset': '0',
+                                             'fsr1': '0', 'rcas': '0'})
+        ini = graphics_options.read_ini(config)
     updates = dict(graphics_options.environment(graphics))
-    # Do not disable temporal FSR unconditionally on Android: it made the FSR
-    # menu a no-op. Explicit environment overrides still win.
-    if 'GOW3_UPSCALER' not in env:
-        requested = ini.get('upscaler', 'fsr3')
-        updates['GOW3_UPSCALER'] = ('none' if requested == 'off' else 'fsr3') if android_fixed_output else 'none'
-    updates['GOW3_UPSCALER_SOURCE'] = 'override' if 'GOW3_UPSCALER' in env else ('gow3.ini' if android_fixed_output else 'desktop-safe-default')
+    if android_port:
+        # Off in the guest Vulkan core, not merely hidden from the Android UI.
+        updates['GOW3_UPSCALER'] = 'none'
+        updates['GOW3_FSR1'] = '0'
+        updates['GOW3_RCAS'] = '0'
+        updates['GOW3_UPSCALER_SOURCE'] = 'disabled-android'
+        updates['GOW3_RESOLUTION_STATUS'] = 'native-game-patch-no-fsr'
+    elif 'GOW3_UPSCALER' not in env:
+        updates['GOW3_UPSCALER'] = 'none'
+        updates['GOW3_UPSCALER_SOURCE'] = 'desktop-safe-default'
     if 'GOW3_READBACK_LINEAR' not in env:
         updates['GOW3_READBACK_LINEAR'] = '1'
-    updates['GOW3_READBACK_LINEAR_SOURCE'] = 'override' if 'GOW3_READBACK_LINEAR' in env else 'android-safe-default'
-    if android_fixed_output:
-        updates['GOW3_OUTPUT_RES'] = '1280x720'
-        # Startup patch follows the game's own dimension operands, not a live
-        # Vulkan-only proxy. On this exact CUSA01715 01.02 ELF the patch
-        # generator validates eight locations and their original bytes.
-        # Preserve the full-resolution 720p output of the FSR composition.
+    updates['GOW3_READBACK_LINEAR_SOURCE'] = (
+        'override' if 'GOW3_READBACK_LINEAR' in env else 'android-safe-default')
+    identity_check = patch_profile_status(game)
+    resolution = graphics['render_resolution']
+    if android_port and resolution in graphics_options.DIRECT_RESOLUTIONS:
         from patches import CUSA01715_0102_ANDROID_SHA
-        verified = (identity_check := patch_profile_status(game))['eboot_sha256'] == CUSA01715_0102_ANDROID_SHA
-        if verified and identity_check['title_id'] == 'CUSA01715' and identity_check['app_version'] == '01.02':
-            preset = ini.get('preset', '3')
-            input_sizes = {'0': '1280x720', '1': '854x480', '2': '752x424',
-                           '3': '640x360', '4': '426x240'}
-            input_size = input_sizes.get(preset, '640x360')
-            if ini.get('upscaler', 'fsr3') == 'off':
-                input_size = '1280x720'
-            updates['GOW3_RENDER_RES'] = input_size
-            updates['GOW3_PATCH_INPUT_RES'] = input_size
-            updates['GOW3_FSR_INPUT_STATUS'] = 'cusa01715-verified-startup-patch'
+        if (identity_check['title_id'] == 'CUSA01715' and
+            identity_check['app_version'] == '01.02' and
+            identity_check['eboot_sha256'] == CUSA01715_0102_ANDROID_SHA and
+            identity_check['reason'] == 'validated'):
+            updates['GOW3_PATCH_INPUT_RES'] = resolution
+            updates['GOW3_RESOLUTION_STATUS'] = 'verified-direct-game-patch'
         else:
-            updates['GOW3_UPSCALER'] = 'none'
-            updates['GOW3_FSR_INPUT_STATUS'] = 'unsupported-eboot-no-temporal-fsr'
+            graphics['render_resolution'] = 'native'
+            updates['GOW3_RESOLUTION_STATUS'] = 'unsupported-eboot-native-fallback'
 
     names, dmem, vblank = [], None, None
     shadow_requested = disable_shadows_requested(ini)
     updates['GOW3_SHADOWS_REQUESTED'] = 'off' if shadow_requested else 'on'
     updates['GOW3_SHADOWS_STATUS'] = 'pending' if shadow_requested else 'enabled'
-    identity = identity_check if android_fixed_output else patch_profile_status(game)
+    identity = identity_check
     profile = game_profile(identity['title_id'])
     reason = identity['reason'] or 'unknown'
     if identity['reason'] != 'validated':
