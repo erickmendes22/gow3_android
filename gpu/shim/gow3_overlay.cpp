@@ -393,8 +393,9 @@ void ImageTab() {
     const bool rcas_blocked = s.rcas && !s.rcas_applied;
     ImGui::SeparatorText("Scaling and sharpening");
     if (BeginRows("##scaling")) {
-        CheckRow("Upscale with FSR 1", s.fsr1,
-                 "Enlarges a smaller game image to the window. For more FPS: Render resolution 720p + FSR 1.");
+        if (!std::getenv("GOW3_ANDROID_PORT"))
+            CheckRow("Upscale with FSR 1", s.fsr1,
+                     "Enlarges a smaller game image to the window.");
         ImGui::BeginDisabled(rcas_blocked);
         CheckRow("Sharpening (RCAS)", s.rcas,
                  rcas_blocked && downscaling ? "No effect: the game's image is larger than the window."
@@ -413,7 +414,8 @@ void ImageTab() {
         InfoRow("Game image", text);
         std::snprintf(text, sizeof(text), "%d x %d", ww, wh);
         InfoRow("Window", text);
-        InfoRow("FSR 1", !s.fsr1 ? "off" : upscaling ? "active" : "no effect (image not smaller than window)");
+        if (!std::getenv("GOW3_ANDROID_PORT"))
+            InfoRow("FSR 1", !s.fsr1 ? "off" : upscaling ? "active" : "no effect");
         InfoRow("Sharpening", s.rcas_applied ? "applied" : "not applied");
         ImGui::EndTable();
     }
@@ -445,7 +447,8 @@ void PerformanceTab() {
     }
     ImGui::SeparatorText("Applied on restart");
     if (BeginRows("##restart")) {
-        static const char* const resolution_labels[] = {"Native (1080p)", "480p", "720p", "1440p", "1800p", "4K"};
+        static const char* const resolution_labels[] = {"Native (1080p)", "480p", "720p", "800p", "1440p", "1800p", "4K",
+            "1280x720", "960x540", "854x480", "752x424", "640x360", "426x240"};
         ChoiceRow("Render resolution", s.render_resolution, resolution_labels, nullptr, int(G::Resolutions.size()),
                   "The resolution the game draws at. Higher is sharper and slower.");
         static const char* const engine_labels[] = {"60 (original)", "120", "240"};
