@@ -40,6 +40,14 @@ def derive(game, config, state_path, env):
     import graphics_options
     from patches import game_profile, game_title_id, patch_profile_status, patch_requirements, selected_patches
 
+    # Upgrade previous duplicated pixel-size entries before preparing the launch
+    # state, so both launchers and the persisted ini agree on one canonical name.
+    old_ini = graphics_options.read_ini(config)
+    previous = old_ini.get('render_resolution')
+    if previous is not None:
+        canonical = graphics_options.canonical_resolution(previous)
+        if canonical != previous:
+            graphics_options.write_keys(config, {'render_resolution': canonical})
     graphics, reverted = graphics_options.prepare(config, state_path)
     android_port = env.get('GOW3_ANDROID_PORT') == '1'
     ini = graphics_options.read_ini(config)
@@ -70,7 +78,7 @@ def derive(game, config, state_path, env):
             identity_check['app_version'] == '01.02' and
             identity_check['eboot_sha256'] == CUSA01715_0102_ANDROID_SHA and
             identity_check['reason'] == 'validated'):
-            updates['GOW3_PATCH_INPUT_RES'] = resolution
+            updates['GOW3_PATCH_INPUT_RES'] = graphics_options.DIRECT_PIXEL_RESOLUTIONS[resolution]
             updates['GOW3_RESOLUTION_STATUS'] = 'verified-direct-game-patch'
         else:
             graphics['render_resolution'] = 'native'
