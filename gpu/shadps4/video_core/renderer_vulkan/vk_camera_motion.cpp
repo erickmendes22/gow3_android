@@ -257,7 +257,12 @@ void CameraMotion::OnConstants(const float* data, size_t float_count) {
     if (!depth_id || !data || float_count < 16 || float_count > 1024)
         return;
     if (frame_has_camera && frame_pose_votes >= 3) return;
-    if (++frame_scanned_buffers > 96) return; // bound work on mobile CPUs
+    // The forward renderer binds many constant buffers per draw. An exhaustive
+    // affine-pair search can consume the GPU command CPU thread, becoming more
+    // expensive than the FSR dispatch it is trying to enable. Cap expensive
+    // discovery to six blocks per frame while no verified layout is known.
+    // Retain this across present frames only for the current selected frame.
+    if (++frame_scanned_buffers > 6) return;
 
     if (!have_projection) {
         const auto lens = Gow3CameraLayout::FindProjection(data, float_count);
