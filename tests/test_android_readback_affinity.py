@@ -29,6 +29,23 @@ class ReadbackAffinityTests(unittest.TestCase):
         self.assertIn("has_pending_readbacks.store(true", texture_cache)
         self.assertIn("pending_readbacks.Push(", texture_cache)
 
+    def test_empty_download_queue_skips_host_copy_barrier(self):
+        code = (ROOT / "gpu/shadps4/video_core/texture_cache/texture_cache.cpp").read_text()
+        begin = code.index("void TextureCache::ProcessDownloadImages()")
+        end = code.index("std::optional<TextureCache::PendingDownload>", begin)
+        method = code[begin:end]
+        empty = method.index("if (!has_new_downloads)")
+        wait = method.index("scheduler.WaitHostCopies();")
+        self.assertLess(empty, wait)
+        self.assertIn("download_images_mutex", method[:wait])
+        self.assertIn("has_pending_readbacks.load(std::memory_order_acquire)", method[:wait])
+        self.assertIn("RetireReadbacks();", method[:wait])
+        self.assertIn("return;", method[empty:wait])
+        # If a copy will be enqueued, host workers MUST finish before a
+        # guest page is protected for the GPU transfer.
+        self.assertLess(wait, method.index("WatchReadback<true>"))
+        self.assertLess(wait, method.index("pending_readbacks.Push("))
+
     def test_cpu_guest_affinity_remains_semantic_not_host_pinning(self):
         runtime = (ROOT / "src/runtime_thread.c").read_text()
         self.assertIn("t->attr.affinity=mask", runtime)
