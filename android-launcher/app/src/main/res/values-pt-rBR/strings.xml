@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Gow3Launcher</string>
+    <string name="app_name">God of War III — Daedalus Fork</string>
     <string name="title_god_of_war_iii">GOD OF WAR III</string>
     <string name="title_remastered">REMASTERED</string>
     <string name="launch_button">INICIAR</string>
@@ -82,9 +82,9 @@
     <string name="frame_gen_get_from_steam">OBTER PELA STEAM</string>
     <string name="frame_gen_remove">REMOVER</string>
     <string name="frame_gen_footer">Os arquivos importados ficam na pasta privada do aplicativo e são usados na próxima abertura do jogo. A importação funciona sem a Steam.</string>
-    <string name="about_title">God of War III para Android</string>
+    <string name="about_title">God of War III — Daedalus Fork</string>
     <string name="about_version_fmt">Versão %1$s</string>
-    <string name="about_description">Aplicativo da comunidade para jogar God of War III Remastered no Android por emulação.</string>
+    <string name="about_description">Fork Daedalus do projeto Android de God of War III Remastered, com modificações de erickmendes22. Créditos da base: zFitness e colaboradores.</string>
     <string name="about_third_party_licenses">Licenças de terceiros</string>
     <string name="language_setting">Idioma</string>
     <string name="language_follow_system">Seguir o sistema</string>
@@ -104,7 +104,7 @@
     <string name="log_export">EXPORTAR LOGS</string>
     <string name="log_export_footer">A exportação apenas lê os logs do jogo, sem modificá-los nem coletar o logcat do sistema.</string>
     <string name="contact_title">AUTOR E SUPORTE</string>
-    <string name="contact_author_label">Autor</string>
+    <string name="contact_author_label">Fork e modificações</string>
     <string name="contact_qq_label">Grupo QQ</string>
     <string name="contact_telegram_label">Telegram</string>
     <string name="contact_open">ABRIR</string>
@@ -187,4 +187,6 @@
     <string name="fps_size_200" formatted="false">200%</string>
     <string name="fps_size_250" formatted="false">250%</string>
     <string name="fps_size_300" formatted="false">300%</string>
+    <string name="contact_base_label">Projeto base</string>
+    <string name="contact_youtube_label">YouTube</string>
 </resources>

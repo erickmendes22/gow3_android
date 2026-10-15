@@ -1,8 +1,6 @@
 package com.gow3.android.feature.about
 
 import android.content.ActivityNotFoundException
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
@@ -31,31 +29,14 @@ import com.gow3.android.R
 import com.gow3.android.ui.components.ActionButton
 import com.gow3.android.ui.components.LauncherColors
 
-private const val AUTHOR = "zfitness"
-private const val QQ_GROUP = "1105902080"
-private const val TELEGRAM_URL = "https://t.me/gow3_android"
-private const val TELEGRAM_HANDLE = "@gow3_android"
-private const val QQ_GROUP_SCHEME =
-    "mqqapi://card/show_pslcard?src_type=internal&version=1&card_type=group&source=qrcode&uin=$QQ_GROUP"
+private const val AUTHOR = "erickmendes22 — Daedalus Emulator"
+private const val BASE_URL = "https://github.com/zFitness/gow3_android"
+private const val YOUTUBE_URL = "https://www.youtube.com/@daedalusemulator"
 
-/** 致谢移植作者，并引导玩家前往反馈群。 */
+/** Fork authorship, upstream credits and the fork maintainer's channel. */
 @Composable
 internal fun ContactCard() {
     val context = LocalContext.current
-
-    fun copy(label: String, value: String) {
-        copyToClipboard(context, label, value)
-        Toast.makeText(context, context.getString(R.string.copied_fmt, value), Toast.LENGTH_SHORT).show()
-    }
-
-    /** 用 QQ 打开群卡片；未安装 QQ 返回 false。 */
-    fun openQqGroup(context: Context, group: String): Boolean =
-        try {
-            context.startActivity(Intent(Intent.ACTION_VIEW, QQ_GROUP_SCHEME.toUri()))
-            true
-        } catch (error: ActivityNotFoundException) {
-            false
-        }
 
     Column(
         modifier = Modifier
@@ -79,20 +60,12 @@ internal fun ContactCard() {
         )
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             ContactRow(context.getString(R.string.contact_author_label), AUTHOR)
-            ContactRow(context.getString(R.string.contact_qq_label), QQ_GROUP, context.getString(R.string.contact_open)) {
-                if (!openQqGroup(context, QQ_GROUP)) {
-                    copyToClipboard(context, context.getString(R.string.contact_qq_label), QQ_GROUP)
-                    Toast.makeText(
-                        context,
-                        context.getString(R.string.contact_qq_not_installed),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
+            ContactRow(context.getString(R.string.contact_base_label), "zFitness/gow3_android", context.getString(R.string.contact_open)) {
+                openUrl(context, BASE_URL)
             }
-            ContactRow(context.getString(R.string.contact_telegram_label), TELEGRAM_HANDLE, context.getString(R.string.contact_open)) {
-                if (!openUrl(context, TELEGRAM_URL)) {
-                    Toast.makeText(context, context.getString(R.string.contact_no_app_fmt, TELEGRAM_URL), Toast.LENGTH_SHORT)
-                        .show()
+            ContactRow(context.getString(R.string.contact_youtube_label), "@daedalusemulator", context.getString(R.string.contact_open)) {
+                if (!openUrl(context, YOUTUBE_URL)) {
+                    Toast.makeText(context, context.getString(R.string.contact_no_app_fmt, YOUTUBE_URL), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -139,11 +112,6 @@ private fun ContactRow(
             ActionButton(action, false, onClick = onAction)
         }
     }
-}
-
-private fun copyToClipboard(context: Context, label: String, value: String) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
 }
 
 /** 在能够处理 [url] 的应用中打开它；当没有任何应用可以打开时（例如未安装浏览器）返回 false。 */

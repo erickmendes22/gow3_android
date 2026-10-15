@@ -1,4 +1,9 @@
-# God of War III Remastered para Android
+# God of War III — Daedalus Fork
+
+Fork Daedalus mantido por erickmendes22. Baseado no trabalho Android de zFitness e dos colaboradores dos projetos de origem.
+
+**Version: 2.1.6-android2** · [YouTube: @daedalusemulator](https://www.youtube.com/@daedalusemulator) · [Base: zFitness/gow3_android](https://github.com/zFitness/gow3_android)
+
 
 [简体中文](README.md) | [English](README.en.md) | **Português (Brasil)**
 

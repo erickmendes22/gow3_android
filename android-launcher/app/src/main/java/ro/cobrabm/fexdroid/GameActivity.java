@@ -244,7 +244,7 @@ public final class GameActivity extends Activity {
         String version="";
         try { version=" "+getPackageManager().getPackageInfo(getPackageName(),0).versionName; }
         catch (Exception ignored) {}
-        TextView about=text("God of War III for Android"+version,12,0xff8e9097);
+        TextView about=text(getString(com.gow3.android.R.string.app_name)+version,12,0xff8e9097);
         about.setPadding(dp(24),dp(8),dp(14),dp(14));
         drawer.addView(about,new LinearLayout.LayoutParams(-1,-2));
         screen.addView(drawer,frame(dp(320),-1,Gravity.LEFT));

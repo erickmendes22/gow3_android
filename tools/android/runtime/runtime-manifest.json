@@ -251,5 +251,8 @@
     "gow3port/bin",
     "gow3port/lib"
   ],
-  "game_content_policy": "external-only"
+  "game_content_policy": "external-only",
+  "runtime_name": "gow3-android-2.1.6-android2-daedalus-fork",
+  "version": "2.1.6-android2",
+  "maintainer": "erickmendes22"
 }

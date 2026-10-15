@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Gow3Launcher</string>
+    <string name="app_name">God of War III — Daedalus Fork</string>
 
     <!-- 品牌与关键动作按钮：双语同值，不翻译 -->
     <string name="title_god_of_war_iii">GOD OF WAR III</string>
@@ -105,9 +105,9 @@
     <string name="frame_gen_footer">Imported files stay in the app\'s private folder and take effect the next time the game starts. IMPORT .DLL also works when Steam is unavailable.</string>
 
     <!-- About 页 -->
-    <string name="about_title">God of War III for Android</string>
+    <string name="about_title">God of War III — Daedalus Fork</string>
     <string name="about_version_fmt">Version %1$s</string>
-    <string name="about_description">A community launcher bringing the God of War III Remastered experience to Android via emulation.</string>
+    <string name="about_description">Daedalus fork of the God of War III Remastered Android project, with modifications by erickmendes22. Base project credits: zFitness and contributors.</string>
     <string name="about_third_party_licenses">Third-party licenses</string>
     <string name="language_setting">Language</string>
     <string name="language_follow_system">Follow system</string>
@@ -133,7 +133,7 @@
 
     <!-- 联系卡片 -->
     <string name="contact_title">AUTHOR &amp; SUPPORT</string>
-    <string name="contact_author_label">Author</string>
+    <string name="contact_author_label">Fork and modifications</string>
     <string name="contact_qq_label">QQ group</string>
     <string name="contact_telegram_label">Telegram</string>
     <string name="contact_open">OPEN</string>
@@ -224,4 +224,6 @@
     <string name="fps_size_200" formatted="false">200%</string>
     <string name="fps_size_250" formatted="false">250%</string>
     <string name="fps_size_300" formatted="false">300%</string>
+    <string name="contact_base_label">Base project</string>
+    <string name="contact_youtube_label">YouTube</string>
 </resources>

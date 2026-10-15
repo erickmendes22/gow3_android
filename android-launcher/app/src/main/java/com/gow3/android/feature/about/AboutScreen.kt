@@ -76,7 +76,7 @@ internal fun AboutScreen(
 
     ScreenColumn {
         Text(stringResource(R.string.about_title), color = LauncherColors.textPrimary, fontFamily = FontFamily.Serif, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text(stringResource(R.string.about_version_fmt, "1.2.4"), color = LauncherColors.gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.about_version_fmt, context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""), color = LauncherColors.gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         Text(stringResource(R.string.about_description), color = LauncherColors.textMuted, fontSize = 13.sp, lineHeight = 19.sp)
         Spacer(Modifier.height(8.dp))
         ContactCard()
