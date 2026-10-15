@@ -104,7 +104,7 @@ internal object LaunchParams {
                 LaunchOption("2", R.string.param_option_frames_2),
                 LaunchOption("0", R.string.param_option_unlimited),
             ),
-            defaultValue = "1",
+            defaultValue = "2",
             descriptionRes = R.string.param_desc_frames_queued,
         ),
         LaunchParam(
