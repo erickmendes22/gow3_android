@@ -86,8 +86,10 @@ internal class PkgInstallManager(
         val root = File(activity.getExternalFilesDir(null) ?: activity.filesDir, "installed-ps4")
         if (!root.isDirectory && !root.mkdirs()) throw IOException("Sem permissão para criar ${root.path}")
         val helper = File(activity.filesDir, "gow3port/arm64/bin/orbis-pkg-util")
-        if (!helper.isFile || !helper.canExecute()) {
-            throw IOException("Extrator PS4 não incluído neste runtime: ${helper.name}")
+        val loader = File(activity.filesDir,
+            "rootfs/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1")
+        if (!helper.isFile || !helper.canExecute() || !loader.isFile) {
+            throw IOException("Extrator PS4 ARM64 não incluído neste runtime: ${helper.name}")
         }
         val transaction = UUID.randomUUID().toString()
         val input = File(root, ".input-${transaction}.pkg")
@@ -118,7 +120,7 @@ internal class PkgInstallManager(
                 }
             }
 
-            val details = execute(helper, listOf("info", input.absolutePath), root)
+            val details = execute(loader, helper, listOf("info", input.absolutePath), root)
             val title = TITLE_PATTERN.find(Regex("(?m)^\\s*Title ID:\\s*(CUSA[0-9]{5})\\s*$",
                 RegexOption.IGNORE_CASE).find(details)?.groupValues?.get(1) ?: "")
                 ?.value?.uppercase()
@@ -141,7 +143,7 @@ internal class PkgInstallManager(
             if (!update && target.exists())
                 throw IOException("O jogo ${title} já está instalado; não sobrescrevi os dados")
 
-            execute(helper, listOf("extract", input.absolutePath, "--output",
+            execute(loader, helper, listOf("extract", input.absolutePath, "--output",
                 stage.absolutePath, "--quiet"), root)
             if (!File(stage, "eboot.bin").isFile)
                 throw IOException("Extração incompleta: eboot.bin ausente")
@@ -180,11 +182,21 @@ internal class PkgInstallManager(
         }
     }
 
-    private fun execute(executable: File, args: List<String>, workingDir: File): String {
-        val process = ProcessBuilder(listOf(executable.absolutePath) + args)
+    private fun execute(loader: File, executable: File, args: List<String>,
+                        workingDir: File): String {
+        // Native tools use a Debian aarch64 PT_INTERP which does not exist at
+        // /lib inside Android. Launch the rootfs's dynamic linker explicitly,
+        // exactly as run-gow3.sh does for gow3-probe.
+        val processBuilder = ProcessBuilder(
+            listOf(loader.absolutePath, executable.absolutePath) + args)
             .directory(workingDir)
             .redirectErrorStream(true)
-            .start()
+        val files = activity.filesDir
+        processBuilder.environment()["LD_LIBRARY_PATH"] =
+            File(files, "gow3port/arm64/lib").path + ":" +
+            File(files, "rootfs/usr/lib/aarch64-linux-gnu").path + ":" +
+            File(files, "rootfs/usr/lib").path
+        val process = processBuilder.start()
         val output = StringBuilder()
         process.inputStream.bufferedReader().useLines { lines ->
             lines.forEach { line ->
