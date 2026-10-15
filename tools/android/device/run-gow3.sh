@@ -54,7 +54,7 @@ lsfg_fallback_marker="$base/lsfg-fallback.marker"
 # Lossless Scaling frame generation (lsfg_multiplier 2-4): the lsfg-vk 1.0 layer with our Turnip
 # patches (gow3port/arm64/lsfg, build_lsfg.sh) and Lossless.dll from the player's own Lossless
 # Scaling (Steam), next to the game folder or in gow3port/. Its messages (lsfg-vk: ...) go to the
-# game log. FSR 3.1 frame generation is not wired on this tree (shadps4 has no GOW3_FRAME_GEN
+# game log. External frame generation uses its own layer (no GOW3_FRAME_GEN
 # consumer); LSFG is the only frame-generation path.
 lsfg=$(setting lsfg_multiplier)
 case $lsfg in 2|3|4) ;; *) lsfg= ;; esac
@@ -235,7 +235,7 @@ PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/content_profile.py" "$
 # GOW3_DEVICE_MEM_MB lets launch_env.py gate the patches by the device's RAM (insufficient-memory-budget).
 mem_kb=$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || true)
 [ -n "$mem_kb" ] && [ "$mem_kb" -gt 0 ] && export GOW3_DEVICE_MEM_MB=${GOW3_DEVICE_MEM_MB:-$((mem_kb/1024))}
-# Select native guest resolution patches, without any FSR or temporal path.
+# Select game rendering resolution directly.
 export GOW3_ANDROID_PORT=1
 unset GOW3_ANDROID_FSR_FIXED_OUTPUT GOW3_RENDER_RES GOW3_PATCH_INPUT_RES
 export GOW3_UPSCALER=none
@@ -245,13 +245,13 @@ eval "$(PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/launch_env.py"
 # Report what will actually be patched into the verified CUSA01715 eboot, not
 # merely the preset selected by the UI. scripts/patches.py checks the signature
 # and original bytes again before writing patches.bin.
-echo "GOW3_NATIVE_RESOLUTION: status=${GOW3_RESOLUTION_STATUS:-unknown} patch=${GOW3_PATCH_INPUT_RES:-standard} fsr=disabled"
+echo "GOW3_NATIVE_RESOLUTION: status=${GOW3_RESOLUTION_STATUS:-unknown} patch=${GOW3_PATCH_INPUT_RES:-standard}"
 # The retail pool is 5056 MiB; the resolution/texture patches ask for more (7104+ for the default
 # set). On a phone RAM is the binding constraint: lower the patch set / resolution if the app is
 # killed. See docs/ANDROID_PORT.md.
 export GOW3_DMEM_MB=${GOW3_DMEM_MB:-0}; [ "${GOW3_DMEM_MB:-0}" -ge 5056 ] 2>/dev/null || export GOW3_DMEM_MB=7104
 export GOW3_VBLANK_HZ=${GOW3_VBLANK_HZ:-0}; [ "${GOW3_VBLANK_HZ:-0}" -ge 1 ] 2>/dev/null || export GOW3_VBLANK_HZ=60
-echo "Texture integrity: title=${GOW3_GAME_TITLE:-unknown} version=${GOW3_GAME_VERSION:-unknown} patch=${GOW3_PATCH_STATUS:-unknown} shadows=${GOW3_SHADOWS_REQUESTED:-unknown}(${GOW3_SHADOWS_STATUS:-unknown}) upscaler=${GOW3_UPSCALER:-none}(${GOW3_UPSCALER_SOURCE:-unknown}) readback_linear=${GOW3_READBACK_LINEAR:-1}(${GOW3_READBACK_LINEAR_SOURCE:-unknown}) deferred=${GOW3_DEFERRED_READBACK:-unknown} stale=${GOW3_STALE_READBACK:-unknown} dmem=${GOW3_DMEM_MB}MiB vblank=${GOW3_VBLANK_HZ}Hz turnip=${turnip}"
+echo "Texture integrity: title=${GOW3_GAME_TITLE:-unknown} version=${GOW3_GAME_VERSION:-unknown} patch=${GOW3_PATCH_STATUS:-unknown} shadows=${GOW3_SHADOWS_REQUESTED:-unknown}(${GOW3_SHADOWS_STATUS:-unknown}) readback_linear=${GOW3_READBACK_LINEAR:-1}(${GOW3_READBACK_LINEAR_SOURCE:-unknown}) deferred=${GOW3_DEFERRED_READBACK:-unknown} stale=${GOW3_STALE_READBACK:-unknown} dmem=${GOW3_DMEM_MB}MiB vblank=${GOW3_VBLANK_HZ}Hz turnip=${turnip}"
 profile_file="$out/texture-profile.json"
 profile_supported=false
 [ "${GOW3_PATCH_STATUS:-}" = validated ] && profile_supported=true
