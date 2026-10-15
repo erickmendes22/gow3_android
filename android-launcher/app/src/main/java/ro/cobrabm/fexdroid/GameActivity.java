@@ -530,12 +530,14 @@ public final class GameActivity extends Activity {
     }
     // ---- Game folder: the extracted retail game in shared storage ----
     /** Known retail folder names; the selected folder is still validated by eboot.bin. */
-    private static final String[] SERIALS={"CUSA01740","CUSA00900","CUSA00207","CUSA00208","CUSA00299",
+    private static final String[] SERIALS={"CUSA01715","CUSA01740","CUSA00900","CUSA00207","CUSA00208","CUSA00299",
         "CUSA01363","CUSA03179","CUSA03014","CUSA03023"};
     private static boolean isGame(File dir) { return dir!=null && new File(dir,"eboot.bin").isFile(); }
     private boolean hasGame() {
-        if (Build.VERSION.SDK_INT>=23 && checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE)
-                !=android.content.pm.PackageManager.PERMISSION_GRANTED) return false;
+        // Match GameFolderManager: the selected real path is the source of truth.
+        // Android 11+ all-files access and app-owned PKG destinations do not need
+        // READ_EXTERNAL_STORAGE. Requiring that obsolete permission here rejected
+        // folders the launcher had already validated, before starting the runtime.
         return gameDir!=null && isGame(new File(gameDir));
     }
     /** Explains, asks for storage access when needed, then opens the folder picker. */
