@@ -335,6 +335,7 @@ bool TemporalUpscaler::OnFrameStart() {
     applied_upscaler = upscaler;
     last_active = active;
     last_jitter = jitter_on;
+    completed_temporal_frame = dispatched_last_frame;
     dispatched_last_frame = false;
 
     // The display pass of an upscaled frame reads the upscaled UI image.
@@ -1892,10 +1893,15 @@ void TemporalUpscaler::RunScaled() {
         // is not success. Keep one initial sample and periodic heartbeats.
         static u64 successful_scaled_dispatches = 0;
         ++successful_scaled_dispatches;
-        if (successful_scaled_dispatches == 1 || successful_scaled_dispatches % 600 == 0) {
-            std::printf("GOW3_FSR_STATUS state=DISPATCH_RECORDED count=%llu input=%ux%u output=%ux%u camera=%d depth=%d\n",
+        if (successful_scaled_dispatches == 1 || successful_scaled_dispatches % 600 == 0 ||
+            (successful_scaled_dispatches == 2 && !info.reset)) {
+            const auto motion = camera_motion.EstimatedMotion(w, h);
+            std::printf("GOW3_FSR_STATUS state=%s count=%llu input=%ux%u output=%ux%u camera=%d depth=%d reset=%d motion_px=%.3f,%.3f\n",
+                        successful_scaled_dispatches >= 2 && !info.reset
+                            ? "TEMPORAL_HISTORY_ACTIVE" : "DISPATCH_RECORDED",
                         static_cast<unsigned long long>(successful_scaled_dispatches),
-                        w, h, ow, oh, int(reprojection), int(bool(camera_motion.Depth())));
+                        w, h, ow, oh, int(reprojection), int(bool(camera_motion.Depth())),
+                        int(info.reset), motion[0], motion[1]);
         }
         ExtraSharpen(cmdbuf, vk::Image(ui_image), true, ow, oh);
     }
@@ -2041,6 +2047,15 @@ bool TemporalUpscaler::DisplayOverride(VAddr address, Display& display) {
         return false;
     }
     display = {vk::Image(it->second.image), it->second.format, it->second.width, it->second.height};
+    // This runs in the actual presenter, after guest draw redirection. A
+    // recorded dispatch alone is not evidence that its image was displayed.
+    if (completed_temporal_frame) {
+        static u64 presented_temporal_frames = 0;
+        if (++presented_temporal_frames == 1 || presented_temporal_frames % 600 == 0)
+            std::printf("GOW3_FSR_STATUS state=TEMPORAL_PRESENTED count=%llu output=%ux%u\n",
+                        static_cast<unsigned long long>(presented_temporal_frames),
+                        display.width, display.height);
+    }
     // Diagnostic capture of the actual completed display buffer, including native UI.
     // GOW3_PRESENT_DUMP_COUNT=N: the trigger dumps N consecutive frames (temporal stability).
     static const char* dump = std::getenv("GOW3_PRESENT_DUMP_TRIGGER");
