@@ -45,13 +45,13 @@ class Cusa01715ResolutionTests(unittest.TestCase):
     def test_signatures_are_unique_and_identify_exact_operands(self):
         image = sample_image()
         segs = [(0, len(image))]
-        for preset in ["1280x720", "854x480", "752x424", "640x360", "426x240"]:
+        for preset in ["1280x720", "960x540", "854x480", "752x424", "640x360", "426x240"]:
             with self.subTest(preset=preset):
-                writes, evidence = patches.android_fsr_input_writes(
+                writes, evidence = patches.android_native_resolution_writes(
                     XML, image, segs, HASH, preset, ["Resolution Patch - 720p"])
                 self.assertEqual(len(writes), 8)
                 self.assertEqual(evidence["render"], preset)
-                self.assertEqual(evidence["output"], "1280x720")
+                self.assertEqual(evidence["output"], preset)
                 self.assertEqual(tuple(int(x, 16) for x in evidence["verified_sites"]),
                                  patches.CUSA01715_0102_SITES)
                 for i, site in enumerate(patches.CUSA01715_0102_SITES):
@@ -75,7 +75,7 @@ class Cusa01715ResolutionTests(unittest.TestCase):
         image = sample_image()
         image[0x005f0c5b - patches.EBOOT_BASE] ^= 0x80
         with self.assertRaises(ValueError):
-            patches.android_fsr_input_writes(
+            patches.android_native_resolution_writes(
                 XML, image, [(0, len(image))], HASH, "640x360",
                 ["Resolution Patch - 720p"])
 
@@ -83,26 +83,24 @@ class Cusa01715ResolutionTests(unittest.TestCase):
         image = sample_image()
         for sha, names in [("0"*64, ["Resolution Patch - 720p"]), (HASH, [])]:
             with self.subTest(sha=sha, names=names), self.assertRaises(ValueError):
-                patches.android_fsr_input_writes(
+                patches.android_native_resolution_writes(
                     XML, image, [(0, len(image))], sha, "640x360", names)
 
-    def test_launcher_sets_real_guest_input_per_preset(self):
+    def test_launcher_sets_direct_resolution_without_fsr(self):
         verified = {"title_id": "CUSA01715", "app_version": "01.02",
                     "eboot_sha256": HASH, "eboot_matches": True,
                     "reason": "validated"}
-        for preset, expected in [("0", "1280x720"), ("1", "854x480"),
-                                 ("3", "640x360"), ("4", "426x240")]:
-            with self.subTest(preset=preset), tempfile.TemporaryDirectory() as t:
+        for render in ("1280x720","960x540","854x480","752x424","640x360","426x240"):
+            with self.subTest(render=render), tempfile.TemporaryDirectory() as t:
                 folder = Path(t)
                 config = folder / "gow3.ini"
-                config.write_text(f"upscaler=fsr3\npreset={preset}\n"
-                                  "render_resolution=720p\noutput_res=1280x720\n")
+                config.write_text(f"upscaler=fsr3\\nrender_resolution={render}\\n")
                 with patch.object(patches, "patch_profile_status", return_value=verified):
                     plan = launch_env.derive(folder, config, folder / "state.json",
-                                             {"GOW3_ANDROID_FSR_FIXED_OUTPUT": "1"})
-                self.assertEqual(plan["updates"]["GOW3_RENDER_RES"], expected)
-                self.assertEqual(plan["updates"]["GOW3_PATCH_INPUT_RES"], expected)
-                self.assertEqual(plan["updates"]["GOW3_OUTPUT_RES"], "1280x720")
+                                             {"GOW3_ANDROID_PORT": "1"})
+                self.assertEqual(plan["updates"]["GOW3_PATCH_INPUT_RES"], render)
+                self.assertEqual(plan["updates"]["GOW3_UPSCALER"], "none")
+                self.assertNotIn("GOW3_RENDER_RES", plan["updates"])
                 self.assertIn("Resolution Patch - 720p", plan["patch_names"])
 
 
