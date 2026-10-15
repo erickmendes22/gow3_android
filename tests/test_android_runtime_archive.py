@@ -40,6 +40,18 @@ def write_fixture(path, forbidden=None, non_executable=None):
 
 
 class RuntimeArchiveTests(unittest.TestCase):
+    def test_pkg_extractor_has_explicit_loader_entrypoint(self):
+        # Native aarch64 binaries retain /lib/ld-linux-aarch64.so.1 as
+        # PT_INTERP, but Android intentionally launches them via the Debian
+        # loader in the app-private rootfs; do not reject the working binary.
+        pkg = 'gow3port/arm64/bin/orbis-pkg-util'
+        entrypoints = [e for e in MANIFEST['entrypoints'] if e['path'] == pkg]
+        self.assertEqual(len(entrypoints), 1)
+        self.assertTrue(entrypoints[0]['launch_via_loader'])
+        self.assertEqual(entrypoints[0]['owner'], 'PkgInstallManager')
+        self.assertIn({'path': pkg, 'type': 'executable'}, MANIFEST['required_paths'])
+
+
     def test_fixture_passes_layout_and_digest_gate(self):
         with tempfile.TemporaryDirectory() as directory:
             archive = Path(directory) / 'runtime.tar.gz'
