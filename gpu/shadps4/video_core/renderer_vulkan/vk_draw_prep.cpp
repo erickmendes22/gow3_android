@@ -49,10 +49,21 @@ void ForEachPacket(std::span<const u32> commands, Func&& func) {
 
 u32 DefaultWorkerCount() {
     if (const char* env = std::getenv("GOW3_PREP_WORKERS")) {
+        // Explicit A/B override; a value of 0 disables both the scanner and
+        // preparation workers. Build() then returns null and the ordinary
+        // Vulkan draw path remains fully functional.
         return static_cast<u32>(std::clamp(std::atoi(env), 0, 16));
     }
-    // Workers are SCHED_IDLE and claim whole buffers, so more of them only use more idle
-    // cores: half the hardware threads (Steam Deck 4, 16-thread desktop 8).
+    // Android already defaults to the direct Vulkan draw path. The older
+    // policy still launched four SCHED_IDLE workers plus a scanner, copied
+    // command buffers and replayed registers speculatively on every frame.
+    // With only eight heterogeneous CPU cores, those threads compete with
+    // FEX, GPU submission and shader compilation yet seldom supply prepared
+    // results. Prefer no speculative preparation unless explicitly opted in.
+    if (std::getenv("GOW3_ANDROID_PORT")) {
+        return 0;
+    }
+    // Desktop retains the previously measured policy.
     return std::clamp<u32>(Gow3Threads::Available() / 2, 1, 8);
 }
 
