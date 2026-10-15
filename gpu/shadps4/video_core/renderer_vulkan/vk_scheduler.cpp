@@ -413,6 +413,24 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
     std::scoped_lock lk{submit_mutex};
     const u64 signal_value = work_semaphore.NextTick();
 
+    // BACHATA ARM64's bounded timeline policy: do not issue
+    // vkGetSemaphoreCounterValue on every submit (a costly Turnip ioctl).
+    // Instead, at most eight submissions remain in flight. We block on an
+    // exact, already submitted GPU tick only if the producer outruns the GPU.
+    // Readback demand paths retain their own mandatory waits; no guest memory
+    // becomes visible until its matching timeline tick is complete.
+    constexpr u64 MaxAndroidInFlightSubmissions = 8;
+    // Cache the policy once: this is the hot path for thousands of submissions.
+    // GOW3_VK_POLL_EACH_SUBMIT=1 re-enables the old path for device A/B testing.
+    static const bool bounded_submit = [] {
+        const char* opt_out = std::getenv("GOW3_VK_POLL_EACH_SUBMIT");
+        return std::getenv("GOW3_ANDROID_PORT") != nullptr &&
+               !(opt_out && opt_out[0] == '1');
+    }();
+    if (bounded_submit && signal_value > MaxAndroidInFlightSubmissions) {
+        work_semaphore.Wait(signal_value - MaxAndroidInFlightSubmissions);
+    }
+
 #if TRACY_GPU_ENABLED
     auto* profiler_ctx = instance.GetProfilerContext();
     if (profiler_ctx) {
@@ -465,7 +483,12 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
     auto submit_result = instance.GetGraphicsQueue().submit(submit_info, info.fence);
     ASSERT_MSG(submit_result != vk::Result::eErrorDeviceLost, "Device lost during submit");
 
-    work_semaphore.Refresh();
+    // On Android, completion is cached and advanced by the bounded wait
+    // above, explicit guest readback waits, or the deferred-ops poller (which
+    // already throttles Refresh calls). Never refresh unconditionally here.
+    if (!bounded_submit) {
+        work_semaphore.Refresh();
+    }
     AllocateWorkerCommandBuffers();
 
     // Apply pending operations

@@ -73,10 +73,21 @@ def derive(game, config, state_path, env):
     elif 'GOW3_UPSCALER' not in env:
         updates['GOW3_UPSCALER'] = 'none'
         updates['GOW3_UPSCALER_SOURCE'] = 'desktop-safe-default'
-    if 'GOW3_READBACK_LINEAR' not in env:
-        updates['GOW3_READBACK_LINEAR'] = '1'
+    # BACHATA core 025 was observed running GoW III CUSA01715 01.02 with
+    # readbacksMode=2 (Precise) and readbackLinearImages=false. Reproduce those
+    # effective defaults for this Android port without imposing them on
+    # desktop or overwriting an explicit per-session environment choice.
+    if android_port:
+        if 'GOW3_READBACKS' not in env:
+            updates['GOW3_READBACKS'] = '2'
+        if 'GOW3_READBACK_LINEAR' not in env:
+            updates['GOW3_READBACK_LINEAR'] = '0'
+    updates['GOW3_READBACK_MODE_SOURCE'] = (
+        'override' if 'GOW3_READBACKS' in env else
+        'android-gow3-precise-default' if android_port else 'core-default')
     updates['GOW3_READBACK_LINEAR_SOURCE'] = (
-        'override' if 'GOW3_READBACK_LINEAR' in env else 'android-safe-default')
+        'override' if 'GOW3_READBACK_LINEAR' in env else
+        'android-gow3-disabled-default' if android_port else 'core-default')
     identity_check = patch_profile_status(game)
     resolution = graphics['render_resolution']
     if android_port and resolution in graphics_options.DIRECT_RESOLUTIONS:
