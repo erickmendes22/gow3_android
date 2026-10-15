@@ -397,8 +397,12 @@ bool Rasterizer::DrawPipeWanted() {
     if (env && env[0]) {
         return env[0] == '1';
     }
-    // Stage B spins while draws flow. Measured ahead with 16 threads (+19%) and with 4 cores /
-    // 8 threads (taskset, Steam Deck-like: +18%).
+    // BACHATA 025's ordinary Vulkan draw path does not require the GoW3
+    // speculative draw pipeline. The port's draw-pipe speedup was measured
+    // on desktop cores, not a heterogeneous 8-core Android SoC. Prefer the
+    // deterministic direct path for Android; GOW3_DRAW_PIPE=1 (handled above)
+    // enables the existing path for matched-scene A/B measurement.
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) return false;
     return Gow3Threads::Available() >= 8;
 }
 
