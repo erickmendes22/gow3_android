@@ -57,11 +57,12 @@ final class SettingsDialog {
         {"cheat_item","Infinite blood vials and items","Using a blood vial, bullet or other item leaves its count as it was "
             +"(items moved to storage or given away stay too)","0"},
     };
-    private static final String[] RESOLUTION_VALUES={"native","480p","720p","800p","1440p","1800p",
-        "4K","1280x720","960x540","854x480","752x424","640x360","426x240"};
-    private static final String[] RESOLUTION_NAMES={"1080p (original)","480p (old)","720p (old)","800p (old)","1440p (old)",
-        "1800p (old)","4K (old)","1280x720 (direct)","960x540 (direct)",
-        "854x480 (direct)","752x424 (direct)","640x360 (direct)","426x240 (direct)"};
+    // One selector for all original and newly verified in-game resolutions.
+    // The PS4 original uses the "native" storage key but appears as 1080p.
+    private static final String[] RESOLUTION_VALUES={"240p","360p","424p","480p",
+        "540p","720p","800p","native","1440p","1800p","4K"};
+    private static final String[] RESOLUTION_NAMES={"240p","360p","424p","480p",
+        "540p","720p","800p","1080p","1440p","1800p","4K"};
     private static final String[] LSFG_VALUES={"0","2","3","4"};
     private static final String[] LSFG_NAMES={"Off","2× frames","3× frames","4× frames"};
     // flow scale 取值域照 run-gow3.sh 的白名单（0.25|0.5|0.75|1|1.0）：此前缺 0.25 这一档，这里
@@ -167,6 +168,18 @@ final class SettingsDialog {
         }
         return all ? "" : list.toString();
     }
+    private static String canonicalResolution(String value) {
+        switch (value) {
+            case "426x240": return "240p";
+            case "640x360": return "360p";
+            case "752x424": return "424p";
+            case "854x480": return "480p";
+            case "960x540": return "540p";
+            case "1280x720": return "720p";
+            case "1080p": return "native";
+            default: return value;
+        }
+    }
     private static int checkedIndex(RadioGroup g) {
         for (int i=0;i<g.getChildCount();++i) if (((RadioButton)g.getChildAt(i)).isChecked()) return i;
         return -1;
@@ -179,7 +192,7 @@ final class SettingsDialog {
 
         heading(box,"Render resolution (FSR disabled)");
         final RadioGroup resolutions=choices(box,RESOLUTION_NAMES,
-            indexOf(RESOLUTION_VALUES,get("render_resolution","720p"),2));
+            indexOf(RESOLUTION_VALUES,canonicalResolution(get("render_resolution","720p")),5));
         final TextView nativeNote=new TextView(activity);
         nativeNote.setText("All presets change the game's own resolution. No temporal FSR or upscaling.");
         nativeNote.setTextSize(13); nativeNote.setAlpha(0.7f); box.addView(nativeNote);
