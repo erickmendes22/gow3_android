@@ -447,8 +447,13 @@ bool TemporalUpscaler::EnsureResources(u32 w, u32 h, u32 ow, u32 oh, bool hdr) {
             PrintIssues("create info", issues);
             return false;
         }
-        if (ffxVkPortableUpscaleContextCreate(&device_info, &create_info, &context) !=
-            FFX_VK_PORTABLE_OK) {
+        const auto create_result = ffxVkPortableUpscaleContextCreate(&device_info, &create_info, &context);
+        if (create_result != FFX_VK_PORTABLE_OK) {
+            std::printf("GOW3_FSR_STATUS state=CONTEXT_FAILED code=%d input=%ux%u output=%ux%u hdr=%d half=%d subgroup=%d storage_without_format=%d\n",
+                        int(create_result), w, h, ow, oh, int(hdr),
+                        int(device_info.shaderFloat16Enabled),
+                        int(device_info.subgroupSizeControlEnabled),
+                        int(device_info.shaderStorageImageWriteWithoutFormatEnabled));
             std::printf("Upscaler: FSR 3 context creation failed\n");
             context = nullptr;
             return false;
@@ -1851,6 +1856,15 @@ void TemporalUpscaler::RunScaled() {
         ok = true;
         reset = false;
         dispatched_last_frame = true;
+        // Positive proof of an actual recorded FSR dispatch; setup/selection alone
+        // is not success. Keep one initial sample and periodic heartbeats.
+        static u64 successful_scaled_dispatches = 0;
+        ++successful_scaled_dispatches;
+        if (successful_scaled_dispatches == 1 || successful_scaled_dispatches % 600 == 0) {
+            std::printf("GOW3_FSR_STATUS state=DISPATCH_RECORDED count=%llu input=%ux%u output=%ux%u camera=%d depth=%d\n",
+                        static_cast<unsigned long long>(successful_scaled_dispatches),
+                        w, h, ow, oh, int(reprojection), int(bool(camera_motion.Depth())));
+        }
         ExtraSharpen(cmdbuf, vk::Image(ui_image), true, ow, oh);
     }
     barrier(vk::Image(ui_image), vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eGeneral, all,
