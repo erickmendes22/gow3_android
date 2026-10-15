@@ -8,11 +8,17 @@ ROOT = Path(__file__).resolve().parents[1]
 class AndroidFirstRunAndPerfTests(unittest.TestCase):
     def test_first_run_offers_both_sources_and_skips_configured_games(self):
         activity = (ROOT / "android-launcher/app/src/main/java/com/gow3/android/MainActivity.kt").read_text()
-        self.assertIn('if (savedInstanceState == null && !gameFolderManager.hasGameFolder())', activity)
+        self.assertIn('if (savedInstanceState == null || !hasStoragePermission())', activity)
+        self.assertIn('if (!gameFolderManager.hasGameFolder()) showFirstRunGameSource()', activity)
+        # First-run setup may only be offered after the original storage grant.
+        setup = activity.split('private fun ensureInitialStorage()', 1)[1].split('private fun showFirstRunGameSource()', 1)[0]
+        self.assertLess(setup.index('requestPermissions('), setup.index('showFirstRunGameSource()'))
+        self.assertIn('REQUEST_INITIAL_STORAGE)', setup)
+        self.assertIn('return', setup[:setup.index('showFirstRunGameSource()')])
         self.assertIn('showFirstRunGameSource()', activity)
-        self.assertIn('setPositiveButton("Instalar PKG")', activity)
+        self.assertIn('setPositiveButton(getString(R.string.pkg_install))', activity)
         self.assertIn('pkgInstallManager.pickBasePkg()', activity)
-        self.assertIn('setNegativeButton("Selecionar pasta")', activity)
+        self.assertIn('setNegativeButton(getString(R.string.setup_folder))', activity)
         self.assertIn('gameFolderManager.chooseGameFolder()', activity)
 
     def test_external_storage_permission_is_compatible_with_android_11(self):

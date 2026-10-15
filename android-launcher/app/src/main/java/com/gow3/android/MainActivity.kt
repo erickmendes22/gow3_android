@@ -1,7 +1,9 @@
 package com.gow3.android
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.app.AlertDialog
 import android.content.res.Configuration
 import android.os.Bundle
@@ -21,6 +23,9 @@ import com.gow3.android.ui.components.LauncherColors
 import com.gow3.android.ui.theme.Gow3LauncherTheme
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        private const val REQUEST_INITIAL_STORAGE = 1015
+    }
     private lateinit var gameFolderManager: GameFolderManager
     private lateinit var losslessDllManager: LosslessDllManager
     private lateinit var saveManager: SaveManager
@@ -61,7 +66,9 @@ class MainActivity : ComponentActivity() {
             Gow3LauncherTheme(dynamicColor = false) {
                 LauncherScreen(
                     onStartGame = {
-                        if (gameFolderManager.hasGameFolder()) {
+                        if (!hasStoragePermission()) {
+                            ensureInitialStorage()
+                        } else if (gameFolderManager.hasGameFolder()) {
                             startActivity(Intent(this, ro.cobrabm.fexdroid.GameActivity::class.java))
                         }
                     },
@@ -87,26 +94,37 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-        // First run (or a previously selected folder that no longer exists):
-        // present BOTH supported game sources, rather than opening the old
-        // folder-only picker or leaving the user with no setup dialog.
-        // Posting after setContent ensures the launcher window is attached.
-        if (savedInstanceState == null && !gameFolderManager.hasGameFolder()) {
+        // The original targetSdk 28 storage permission must come FIRST, before
+        // offering PKG installation or folder selection. A settings all-files
+        // grant must not replace this runtime permission flow.
+        if (savedInstanceState == null || !hasStoragePermission()) {
             window.decorView.post {
-                if (!isFinishing && !isDestroyed && !gameFolderManager.hasGameFolder()) {
-                    showFirstRunGameSource()
+                if (!isFinishing && !isDestroyed) {
+                    ensureInitialStorage()
                 }
             }
         }
     }
 
+    private fun hasStoragePermission(): Boolean =
+        checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
+            checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+
+    private fun ensureInitialStorage() {
+        if (!hasStoragePermission()) {
+            requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE), REQUEST_INITIAL_STORAGE)
+            return
+        }
+        if (!gameFolderManager.hasGameFolder()) showFirstRunGameSource()
+    }
+
     private fun showFirstRunGameSource() {
         AlertDialog.Builder(this)
-            .setTitle("Configurar God of War III")
-            .setMessage("Como deseja adicionar o jogo? Você pode instalar um PKG diretamente " +
-                "numa pasta escolhida ou selecionar uma pasta já extraída.")
-            .setPositiveButton("Instalar PKG") { _, _ -> pkgInstallManager.pickBasePkg() }
-            .setNegativeButton("Selecionar pasta") { _, _ -> gameFolderManager.chooseGameFolder() }
+            .setTitle(getString(R.string.setup_title))
+            .setMessage(getString(R.string.setup_message))
+            .setPositiveButton(getString(R.string.pkg_install)) { _, _ -> pkgInstallManager.pickBasePkg() }
+            .setNegativeButton(getString(R.string.setup_folder)) { _, _ -> gameFolderManager.chooseGameFolder() }
             .setCancelable(false)
             .show()
     }
@@ -114,7 +132,21 @@ class MainActivity : ComponentActivity() {
     @Deprecated("Legacy Activity Result API is required by this target SDK flow")
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_INITIAL_STORAGE) {
+            if (hasStoragePermission()) {
+                ensureInitialStorage()
+            } else {
+                AlertDialog.Builder(this)
+                    .setTitle(getString(R.string.storage_permission_title))
+                    .setMessage(getString(R.string.storage_permission_message))
+                    .setPositiveButton(getString(R.string.choose_again)) { _, _ -> ensureInitialStorage() }
+                    .setNegativeButton(getString(R.string.dialog_ok), null)
+                    .show()
+            }
+            return
+        }
         gameFolderManager.onPermissionResult(requestCode, grantResults)
+        pkgInstallManager.onPermissionResult(requestCode, grantResults)
     }
 
     @Deprecated("Legacy Activity Result API is required by this target SDK flow")

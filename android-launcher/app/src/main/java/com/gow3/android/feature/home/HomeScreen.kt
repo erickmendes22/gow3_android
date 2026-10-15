@@ -37,6 +37,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.gow3.android.R
 import com.gow3.android.data.Gow3Ini
+import com.gow3.android.feature.about.LanguageSetting
 import com.gow3.android.data.ImportResult
 import com.gow3.android.data.LosslessDllManager
 import com.gow3.android.data.RemoveResult
@@ -57,6 +58,7 @@ internal fun HomeScreen(
     pkgInstallBusy: Boolean,
     pkgInstallMessage: String?,
     pkgGeneration: Int,
+    onChangeLanguage: (String) -> Unit,
 ) {
     val context = LocalContext.current
     var iniValues by remember { mutableStateOf(loadIni(context)) }
@@ -107,12 +109,14 @@ internal fun HomeScreen(
         LaunchParameters(gameDir, updateDir, iniValues, ::save, onChooseGameFolder, onChooseUpdateFolder)
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            PkgAction("Instalar PKG", onInstallBasePkg, !pkgInstallBusy, Modifier.weight(1f))
-            PkgAction("Atualizar por PKG", onInstallUpdatePkg, !pkgInstallBusy, Modifier.weight(1f))
+            PkgAction(stringResource(R.string.pkg_install), onInstallBasePkg, !pkgInstallBusy, Modifier.weight(1f))
+            PkgAction(stringResource(R.string.pkg_update), onInstallUpdatePkg, !pkgInstallBusy, Modifier.weight(1f))
         }
         if (pkgInstallMessage != null) {
             Text(pkgInstallMessage, color = LauncherColors.textMuted, fontSize = 12.sp)
         }
+        Spacer(Modifier.height(16.dp))
+        LanguageSetting(onChangeLanguage)
         Spacer(Modifier.height(16.dp))
         FrameGenerationCard(
             state = dllState,

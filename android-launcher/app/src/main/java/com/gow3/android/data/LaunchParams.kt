@@ -35,6 +35,31 @@ internal data class LaunchOption(val value: String, val labelRes: Int)
 internal object LaunchParams {
     val all: List<LaunchParam> = listOf(
         LaunchParam(
+            key = "show_fps", labelRes = R.string.param_show_fps,
+            groupRes = R.string.param_group_fps,
+            options = listOf(LaunchOption("0", R.string.param_option_off),
+                LaunchOption("1", R.string.param_option_on)), defaultValue = "0",
+        ),
+        LaunchParam(
+            key = "overlay_corner", labelRes = R.string.param_fps_position,
+            groupRes = R.string.param_group_fps,
+            options = listOf(LaunchOption("0", R.string.fps_top_left),
+                LaunchOption("4", R.string.fps_top_center),
+                LaunchOption("1", R.string.fps_top_right)), defaultValue = "1",
+        ),
+        LaunchParam(
+            key = "overlay_scale", labelRes = R.string.param_fps_size,
+            groupRes = R.string.param_group_fps,
+            options = listOf(LaunchOption("50", R.string.fps_size_50),
+                LaunchOption("75", R.string.fps_size_75),
+                LaunchOption("100", R.string.fps_size_100),
+                LaunchOption("125", R.string.fps_size_125),
+                LaunchOption("150", R.string.fps_size_150),
+                LaunchOption("200", R.string.fps_size_200),
+                LaunchOption("250", R.string.fps_size_250),
+                LaunchOption("300", R.string.fps_size_300)), defaultValue = "100",
+        ),
+        LaunchParam(
             key = "render_resolution", labelRes = R.string.param_render_resolution,
             groupRes = R.string.param_group_display,
             options = listOf(

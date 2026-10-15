@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "gow3_overlay.h"
+#include "gow3_overlay_position.h"
 
 #include <algorithm>
 #include <atomic>
@@ -501,8 +502,8 @@ void OverlayTab() {
     ImGui::SeparatorText("Appearance");
     if (BeginRows("##appearance")) {
         SliderRow("Font size", s.overlay_scale, 50, 300, "%d%%", "Size of the overlay text.");
-        static const char* const corners[] = {"Top left", "Top right", "Bottom left", "Bottom right"};
-        ChoiceRow("Corner", s.overlay_corner, corners, nullptr, 4, "Where the overlay sits.");
+        static const char* const corners[] = {"Top left", "Top right", "Bottom left", "Bottom right", "Top center"};
+        ChoiceRow("Position", s.overlay_corner, corners, nullptr, 5, "Where the overlay sits.");
         SliderRow("Background opacity", s.overlay_opacity, 0, 100, "%d%%", "0% is no background.");
         static const char* const layouts[] = {"One line", "One item per line"};
         ChoiceRow("Layout", s.overlay_layout, layouts, nullptr, 2, "Items side by side or stacked.");
@@ -797,11 +798,10 @@ void FpsCounter() {
     }
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float pad = 12.0f * base_scale;
-    const int corner = s.overlay_corner;
-    const bool right = corner == 1 || corner == 3, bottom = corner >= 2;
-    ImGui::SetNextWindowPos(ImVec2(right ? viewport->WorkPos.x + viewport->WorkSize.x - pad : viewport->WorkPos.x + pad,
-                                   bottom ? viewport->WorkPos.y + viewport->WorkSize.y - pad : viewport->WorkPos.y + pad),
-                            ImGuiCond_Always, ImVec2(right ? 1.0f : 0.0f, bottom ? 1.0f : 0.0f));
+    const auto anchor = Gow3Overlay::Position(s.overlay_corner);
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + pad + (viewport->WorkSize.x - 2 * pad) * anchor.x,
+                                   viewport->WorkPos.y + pad + (viewport->WorkSize.y - 2 * pad) * anchor.y),
+                            ImGuiCond_Always, ImVec2(anchor.x, anchor.y));
     ImGui::SetNextWindowBgAlpha(s.overlay_opacity / 100.0f);
     ImGui::Begin("##fps", nullptr,
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |

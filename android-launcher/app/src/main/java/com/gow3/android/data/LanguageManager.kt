@@ -16,11 +16,12 @@ internal object LanguageManager {
     const val FOLLOW_SYSTEM = "system"
     const val ZH = "zh"
     const val EN = "en"
+    const val PT = "pt"
 
     /** 读取持久化的语言覆盖值；未设置时返回 [FOLLOW_SYSTEM]。 */
     fun read(context: Context): String =
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_LANGUAGE, FOLLOW_SYSTEM) ?: FOLLOW_SYSTEM
+        if (context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_LANGUAGE, EN) == PT) PT else EN
 
     /** 持久化语言覆盖值。 */
     fun set(context: Context, value: String) {
@@ -30,8 +31,7 @@ internal object LanguageManager {
 
     /** 解析当前生效的 Locale：`system` 跟随设备系统语言，其余为固定覆盖。 */
     fun resolve(context: Context): Locale = when (read(context)) {
-        ZH -> Locale("zh", "CN")
-        EN -> Locale.ENGLISH
-        else -> Locale.getDefault()
+        PT -> Locale("pt", "BR")
+        else -> Locale.ENGLISH
     }
 }

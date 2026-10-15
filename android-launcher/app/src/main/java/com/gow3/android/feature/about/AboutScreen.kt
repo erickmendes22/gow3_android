@@ -140,13 +140,12 @@ internal fun AboutScreen(
 
 /** 语言 / Language 设置：跟随系统 / 简体中文 / English，切换后由调用方持久化并重建。 */
 @Composable
-private fun LanguageSetting(onChange: (String) -> Unit) {
+internal fun LanguageSetting(onChange: (String) -> Unit) {
     val context = LocalContext.current
     val current = LanguageManager.read(context)
     val options = listOf(
-        R.string.language_follow_system to LanguageManager.FOLLOW_SYSTEM,
-        R.string.language_zh to LanguageManager.ZH,
         R.string.language_en to LanguageManager.EN,
+        R.string.language_pt to LanguageManager.PT,
     )
     Column(
         modifier = Modifier

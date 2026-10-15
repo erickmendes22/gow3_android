@@ -78,10 +78,11 @@ internal class GameFolderManager(private val activity: Activity) {
     }
 
     private fun chooseFolder(kind: Kind) {
-        // The native game runtime reads eboot.bin by its real filesystem path.
-        // On Android 11+ the legacy READ_EXTERNAL_STORAGE permission cannot
-        // grant this access. Use the same direct-path permission as PKG install.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        // This app targets API 28 and uses legacy storage even on newer phones.
+        // Keep the runtime permission dialog used by the working launcher.
+        // All-files settings are only needed if the app later targets scoped storage.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            activity.applicationInfo.targetSdkVersion >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
                 pendingFolderKind = kind
                 AlertDialog.Builder(activity)
