@@ -2,7 +2,7 @@
 
 ## What is supported by code and the available log
 
-This is a source-code investigation, **not** a claim of measured FPS gain on the Redmagic 10 Pro. The available `android-game(9).log` is from a previous revision (FSR and old 6-thread shader warm-up still enabled), and does not benchmark the newest APK or BACHATA under matched conditions.
+This is a source-code investigation, **not** a claim of measured FPS gain on the Redmagic 10 Pro. The available `android-game(9).log` is from a previous revision (the former temporal-rendering path and six-worker shader warm-up still enabled), and does not benchmark the newest APK or BACHATA under matched conditions.
 
 ### 1. Speculative GPU draw preparation ran when the Android draw pipeline was disabled
 
