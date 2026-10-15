@@ -223,6 +223,15 @@ internal class PkgInstallManager(
             .find(metadata)?.groupValues?.get(1)?.uppercase()
             ?: throw IOException("TITLE_ID ausente no cabeçalho PKG")
         if (!TITLE_PATTERN.matches(title)) throw IOException("TITLE_ID inválido")
+        if (!update && base != null && File(base, "eboot.bin").isFile &&
+            ParamSfoTitle.readTitleId(File(base, "sce_sys/param.sfo")) == title)
+            throw IOException("O jogo ${title} já está instalado em ${base.path}; " +
+                "não criei uma segunda cópia.")
+        if (update && selectedUpdate != null && !replacingUpdate &&
+            File(selectedUpdate, "eboot.bin").isFile &&
+            ParamSfoTitle.readTitleId(File(selectedUpdate, "sce_sys/param.sfo")) == title)
+            throw IOException("Já existe atualização para ${title} em ${selectedUpdate.path}. " +
+                "Selecione essa mesma pasta para substituí-la sem criar duplicações.")
         if (update) {
             if (base == null || !File(base, "eboot.bin").isFile)
                 throw IOException("Selecione ou instale o jogo base antes do update")
