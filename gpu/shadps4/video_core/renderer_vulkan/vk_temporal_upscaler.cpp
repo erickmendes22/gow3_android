@@ -1377,6 +1377,13 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
     if (!Scaled() || !color) {
         return;
     }
+    // CUSA01715 has no verified scene camera in this path. Redirecting a
+    // half-rendered 640x360 target into the 1280x720 host UI/display buffers
+    // corrupts the final frame. Leave guest UI, color and display untouched
+    // until temporal reprojection is actually available.
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && !camera_motion.Ready()) {
+        return;
+    }
     if (ui_phase) {
         // A UI movie can start without stencil and enable it for later text/masks.
         if (color == ui_color && depth && depth != ui_depth) {
@@ -1653,16 +1660,16 @@ void TemporalUpscaler::RunScaled() {
     if (depth.info.size.width != iw || depth.info.size.height != ih || w > ow || h > oh) {
         return;
     }
-    // A zero-motion texture is not camera motion. For CUSA01715, when the
-    // guest camera cannot be authenticated, preserve the scene via the spatial
-    // UI/background path instead of feeding false vectors into FSR history.
+    // No camera: no temporal data. Do not use RunUiOnly() here: that
+    // changes ui_phase and redirects the game's display-copy pass to a
+    // different-sized host target, corrupting the image. The original
+    // 640x360 guest frame remains valid and is presented normally.
     if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && !camera_motion.Ready()) {
         static bool warned = false;
         if (!warned) {
             warned = true;
-            std::printf("GOW3_FSR_STATUS state=MOTION_UNVERIFIED action=SPATIAL_ONLY\n");
+            std::printf("GOW3_FSR_STATUS state=MOTION_UNVERIFIED action=NATIVE_PRESENT\n");
         }
-        RunUiOnly(ldr_target, camera_motion.Depth());
         return;
     }
     if (!EnsureResources(w, h, ow, oh, false)) {

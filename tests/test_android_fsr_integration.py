@@ -105,7 +105,13 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn("void OnDisplayBoundary(VideoCore::ImageId color);", header)
         self.assertIn("const auto guest = scene_targets->GuestSize();", raster)
         self.assertNotIn("std::popcount(key.mrt_mask) >= 5 && db_desc.first", raster)
-        self.assertIn('state=MOTION_UNVERIFIED action=SPATIAL_ONLY', fsr)
+        self.assertIn('state=MOTION_UNVERIFIED action=NATIVE_PRESENT', fsr)
+        self.assertNotIn('state=MOTION_UNVERIFIED action=SPATIAL_ONLY', fsr)
+        # A missing camera must never mark UI compositing as complete or
+        # redirect the guest display buffer through RunUiOnly.
+        scaled = fsr.split('void TemporalUpscaler::RunScaled() {', 1)[1]
+        fallback = scaled.split('if (!EnsureResources(w, h, ow, oh, false))', 1)[0]
+        self.assertNotIn('RunUiOnly(', fallback.split('state=MOTION_UNVERIFIED', 1)[1])
         self.assertIn('camera_motion.RecordMotion(cmdbuf, depth_view, *motion_view, w, h)', fsr)
         self.assertIn("reprojection ? camera_motion.Near() : 0.1f", fsr)
         self.assertNotIn('if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) return;', camera)
@@ -116,6 +122,8 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn('GOW3_FSR_CAPS query=', fsr)
         self.assertIn('const VideoCore::ImageId scene = ldr_target;', fsr)
         self.assertIn('android && native_viewport && camera_motion.Depth()', fsr)
+        self.assertIn('if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && !camera_motion.Ready()) {', fsr)
+        self.assertIn('Leave guest UI, color and display untouched', fsr)
         self.assertNotIn("GOW3_CAMERA_BUFFER sample=", raster)
         self.assertNotIn("GOW3_FSR_TOPOLOGY", raster)
 
