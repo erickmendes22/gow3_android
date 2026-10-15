@@ -51,6 +51,13 @@ def derive(game, config, state_path, env):
     graphics, reverted = graphics_options.prepare(config, state_path)
     android_port = env.get('GOW3_ANDROID_PORT') == '1'
     ini = graphics_options.read_ini(config)
+    # Earlier Android builds wrote no frames_queued key and silently used one
+    # in-flight frame, forcing the CPU submission thread to wait for the GPU
+    # once each frame. Use two only when that key is absent; explicit 1/2/0
+    # choices remain untouched. The in-game setting still controls latency.
+    if android_port and 'frames_queued' not in ini:
+        graphics_options.write_keys(config, {'frames_queued': '2'})
+        ini = graphics_options.read_ini(config)
     if android_port and ini.get('upscaler') != 'off':
         graphics_options.write_keys(config, {'upscaler': 'off', 'preset': '0',
                                              'fsr1': '0', 'rcas': '0'})
