@@ -387,13 +387,13 @@ def android_native_resolution_writes(xml, image, segments, sha, render_res, patc
         address = offset + EBOOT_BASE
         expected_address = CUSA01715_0102_SITES[i]
         if address != expected_address:
-            raise ValueError(f'FSR site {i}: got {address:#x}, expected {expected_address:#x}')
+            raise ValueError(f'Resolution operand {i}: got {address:#x}, expected {expected_address:#x}')
         field = CUSA01715_0102_FIELDS[i]
         original = (1920 if field == 'width' else 1080).to_bytes(len(patched), 'little')
         if image[offset:offset + len(patched)] != original:
-            raise ValueError(f'FSR site {i}: unexpected original instruction operand at {address:#x}')
+            raise ValueError(f'Resolution operand {i}: unexpected original instruction operand at {address:#x}')
         if patched != (1280 if field == 'width' else 720).to_bytes(len(patched), 'little'):
-            raise ValueError(f'FSR site {i}: 720p patch template mismatch at {address:#x}')
+            raise ValueError(f'Resolution operand {i}: 720p patch template mismatch at {address:#x}')
         overrides[offset] = (width if field == 'width' else height).to_bytes(len(patched), 'little')
     return overrides, {'render': f'{width}x{height}', 'output': f'{width}x{height}',
                        'verified_eboot_sha256': sha,
@@ -435,7 +435,7 @@ def main():
     native_info = None
     if native_input:
         # If the 720p patch signature fails, DO NOT report that the new input
-        # resolution was installed or allow FSR to run on mismatched buffers.
+        # resolution was installed with incompatible operands.
         if 'Resolution Patch - 720p' in skipped:
             raise ValueError('cannot apply direct resolution: 720p template skipped')
         overrides, native_info = android_native_resolution_writes(
