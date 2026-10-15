@@ -57,8 +57,11 @@ final class SettingsDialog {
         {"cheat_item","Infinite blood vials and items","Using a blood vial, bullet or other item leaves its count as it was "
             +"(items moved to storage or given away stay too)","0"},
     };
-    private static final String[] UPSCALER_VALUES={"off","fsr3"};
-    private static final String[] UPSCALER_NAMES={"Off (render at 1280×720)","FSR 3.1"};
+    private static final String[] RESOLUTION_VALUES={"native","480p","720p","800p","1440p","1800p",
+        "4K","1280x720","960x540","854x480","752x424","640x360","426x240"};
+    private static final String[] RESOLUTION_NAMES={"1080p (original)","480p (old)","720p (old)","800p (old)","1440p (old)",
+        "1800p (old)","4K (old)","1280x720 (direct)","960x540 (direct)",
+        "854x480 (direct)","752x424 (direct)","640x360 (direct)","426x240 (direct)"};
     private static final String[] LSFG_VALUES={"0","2","3","4"};
     private static final String[] LSFG_NAMES={"Off","2× frames","3× frames","4× frames"};
     // flow scale 取值域照 run-gow3.sh 的白名单（0.25|0.5|0.75|1|1.0）：此前缺 0.25 这一档，这里
@@ -174,29 +177,12 @@ final class SettingsDialog {
         LinearLayout box=new LinearLayout(activity); box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(24),dp(4),dp(24),dp(8));
 
-        // 升采样入口只提供 off / fsr3。运行时的 UPSCALERS 还有 fsr4、fsr411、taa、dlss
-        // （gow3_settings.cpp 的 UpscalerName，见 my-docs/gow3/LAUNCHER.md §3.2），此处刻意不给：
-        // FSR 4 / 4.1.1 在 Adreno 740 上约 470ms 一帧且黑屏（run-gow3.sh 实测）；taa 需要 native
-        // guest 目标的实时路径、dlss 需要 gow3_dlss.dll/nvngx_dlss.dll，都是桌面 N 卡路径，在本
-        // 移植上不成立。要加新升采样器前，先确认它在这套 Vulkan/Turnip 上真能出画面。
-        heading(box,"FSR 3.1 (output fixed at 1280×720)");
-        final RadioGroup upscalers=choices(box,UPSCALER_NAMES,indexOf(UPSCALER_VALUES,get("upscaler","fsr3"),1));
-        heading(box,"FSR input quality (output fixed at 1280×720)");
-        final RadioGroup presets=choices(box,PRESETS,indexOf(PRESET_VALUES,get("preset","3"),2));
-        // FSR 3.1 frame generation (frame_generation=1) is not wired: shadps4 has no
-        // GOW3_FRAME_GEN consumer and no FSR 3.1 frame-gen patch on this tree, so the
-        // option would have been a no-op. LSFG is the only frame-generation path here;
-        // tune its multiplier / flow scale / performance mode from the in-game drawer.
-        final TextView presetNote=new TextView(activity); presetNote.setTextSize(13); presetNote.setAlpha(0.7f);
-        box.addView(presetNote);
-        RadioGroup.OnCheckedChangeListener upscaling=(g,id) -> {
-            int upscaler=checkedIndex(upscalers);
-            boolean on=upscaler!=0;
-            for (int i=0;i<presets.getChildCount();++i) presets.getChildAt(i).setEnabled(on);
-            presetNote.setText(on ? "Lower is faster; the upscaler fills the screen." : "Without upscaling the game renders at 1280×720.");
-        };
-        upscalers.setOnCheckedChangeListener(upscaling); upscaling.onCheckedChanged(upscalers,0);
-
+        heading(box,"Render resolution (FSR disabled)");
+        final RadioGroup resolutions=choices(box,RESOLUTION_NAMES,
+            indexOf(RESOLUTION_VALUES,get("render_resolution","720p"),2));
+        final TextView nativeNote=new TextView(activity);
+        nativeNote.setText("All presets change the game's own resolution. No temporal FSR or upscaling.");
+        nativeNote.setTextSize(13); nativeNote.setAlpha(0.7f); box.addView(nativeNote);
         heading(box,"Image");
         final Switch sharpen=toggle(box,"Sharpening","1".equals(get("sharpen","0")));
         final TextView sharpLabel=new TextView(activity); sharpLabel.setTextSize(14); box.addView(sharpLabel);
@@ -268,11 +254,10 @@ final class SettingsDialog {
             .setNegativeButton("Cancel",null)
             .setPositiveButton("Apply & restart",(d,w) -> {
                 Map<String,String> changed=new LinkedHashMap<>();
-                changed.put("upscaler",UPSCALER_VALUES[Math.max(0,checkedIndex(upscalers))]);
+                changed.put("upscaler","off");
                 changed.put("fps_limit",FPS_VALUES[Math.max(0,checkedIndex(fpsLimit))]);
-                changed.put("preset",PRESET_VALUES[Math.max(0,checkedIndex(presets))]);
-                changed.put("output_res","1280x720");
-                changed.put("render_resolution","720p");
+                changed.put("preset","0");
+                changed.put("render_resolution",RESOLUTION_VALUES[Math.max(0,checkedIndex(resolutions))]);
                 changed.put("disable_dynamic_shadows",disableShadows.isChecked() ? "1" : "0");
                 changed.put("effect_dynamic_shadows",disableShadows.isChecked() ? "0" : "1");
                 changed.put("sharpen",sharpen.isChecked() ? "1" : "0");
