@@ -235,13 +235,17 @@ PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/content_profile.py" "$
 # GOW3_DEVICE_MEM_MB lets launch_env.py gate the patches by the device's RAM (insufficient-memory-budget).
 mem_kb=$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || true)
 [ -n "$mem_kb" ] && [ "$mem_kb" -gt 0 ] && export GOW3_DEVICE_MEM_MB=${GOW3_DEVICE_MEM_MB:-$((mem_kb/1024))}
-# Android always presents a 720p PS4 target; preset controls FSR input quality.
-export GOW3_ANDROID_FSR_FIXED_OUTPUT=1
+# Select native guest resolution patches, without any FSR or temporal path.
+export GOW3_ANDROID_PORT=1
+unset GOW3_ANDROID_FSR_FIXED_OUTPUT GOW3_RENDER_RES GOW3_PATCH_INPUT_RES
+export GOW3_UPSCALER=none
+export GOW3_FSR1=0
+export GOW3_RCAS=0
 eval "$(PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/launch_env.py" --game "$game" --config "$GOW3_CONFIG" --state "$out/graphics_state.json" --shell)"
 # Report what will actually be patched into the verified CUSA01715 eboot, not
 # merely the preset selected by the UI. scripts/patches.py checks the signature
 # and original bytes again before writing patches.bin.
-echo "GOW3_FSR_STARTUP: status=${GOW3_FSR_INPUT_STATUS:-unknown} input=${GOW3_RENDER_RES:-native} patch=${GOW3_PATCH_INPUT_RES:-none} output=${GOW3_OUTPUT_RES:-unspecified}"
+echo "GOW3_NATIVE_RESOLUTION: status=${GOW3_RESOLUTION_STATUS:-unknown} patch=${GOW3_PATCH_INPUT_RES:-standard} fsr=disabled"
 # The retail pool is 5056 MiB; the resolution/texture patches ask for more (7104+ for the default
 # set). On a phone RAM is the binding constraint: lower the patch set / resolution if the app is
 # killed. See docs/ANDROID_PORT.md.
