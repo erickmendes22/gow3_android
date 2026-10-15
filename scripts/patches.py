@@ -451,7 +451,7 @@ def main():
             raise ValueError(f'direct resolution overrides missing from patch stream: {sorted(unmatched)}')
         writes=remapped
         print(f"Patches: verified CUSA01715 DIRECT render {native_info['render']} "
-              f"without FSR ({len(overrides)} operand writes)")
+              f"({len(overrides)} operand writes)")
     for name,reason in skipped.items():
         print(f'Patches: {name} skipped ({reason} in this eboot.bin)')
     if a.patches_dir and sha==REFERENCE_SHA256:
