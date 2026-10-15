@@ -420,8 +420,14 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
     // Readback demand paths retain their own mandatory waits; no guest memory
     // becomes visible until its matching timeline tick is complete.
     constexpr u64 MaxAndroidInFlightSubmissions = 8;
-    const bool android_port = std::getenv("GOW3_ANDROID_PORT") != nullptr;
-    if (android_port && signal_value > MaxAndroidInFlightSubmissions) {
+    // Cache the policy once: this is the hot path for thousands of submissions.
+    // GOW3_VK_POLL_EACH_SUBMIT=1 re-enables the old path for device A/B testing.
+    static const bool bounded_submit = [] {
+        const char* opt_out = std::getenv("GOW3_VK_POLL_EACH_SUBMIT");
+        return std::getenv("GOW3_ANDROID_PORT") != nullptr &&
+               !(opt_out && opt_out[0] == '1');
+    }();
+    if (bounded_submit && signal_value > MaxAndroidInFlightSubmissions) {
         work_semaphore.Wait(signal_value - MaxAndroidInFlightSubmissions);
     }
 
@@ -480,7 +486,7 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
     // On Android, completion is cached and advanced by the bounded wait
     // above, explicit guest readback waits, or the deferred-ops poller (which
     // already throttles Refresh calls). Never refresh unconditionally here.
-    if (!android_port) {
+    if (!bounded_submit) {
         work_semaphore.Refresh();
     }
     AllocateWorkerCommandBuffers();
