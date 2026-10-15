@@ -38,19 +38,17 @@ internal object LaunchParams {
             key = "render_resolution", labelRes = R.string.param_render_resolution,
             groupRes = R.string.param_group_display,
             options = listOf(
-                LaunchOption("native", R.string.param_resolution_original),
+                LaunchOption("240p", R.string.param_resolution_240),
+                LaunchOption("360p", R.string.param_resolution_360),
+                LaunchOption("424p", R.string.param_resolution_424),
                 LaunchOption("480p", R.string.param_resolution_480),
+                LaunchOption("540p", R.string.param_resolution_540),
                 LaunchOption("720p", R.string.param_resolution_720),
                 LaunchOption("800p", R.string.param_resolution_800),
+                LaunchOption("native", R.string.param_resolution_original),
                 LaunchOption("1440p", R.string.param_resolution_1440),
                 LaunchOption("1800p", R.string.param_resolution_1800),
                 LaunchOption("4K", R.string.param_resolution_4k),
-                LaunchOption("1280x720", R.string.param_resolution_1280),
-                LaunchOption("960x540", R.string.param_resolution_960),
-                LaunchOption("854x480", R.string.param_resolution_854),
-                LaunchOption("752x424", R.string.param_resolution_752),
-                LaunchOption("640x360", R.string.param_resolution_640),
-                LaunchOption("426x240", R.string.param_resolution_426),
             ),
             defaultValue = "720p",
             descriptionRes = R.string.param_render_resolution_desc,
@@ -139,7 +137,20 @@ internal object LaunchParams {
     /** 参数的当前原始值；缺失或为空时返回其默认值。 */
     fun valueOf(ini: Map<String, String>, param: LaunchParam): String {
         val v = ini[param.key]?.trim()
-        return if (v.isNullOrEmpty()) param.defaultValue else v
+        if (v.isNullOrEmpty()) return param.defaultValue
+        if (param.key != "render_resolution") return v
+        // Existing installations may contain pixel-name duplicates. Show the
+        // single canonical option without waiting for a game launch to migrate.
+        return when (v) {
+            "1280x720" -> "720p"
+            "854x480" -> "480p"
+            "960x540" -> "540p"
+            "752x424" -> "424p"
+            "640x360" -> "360p"
+            "426x240" -> "240p"
+            "1080p" -> "native"
+            else -> v
+        }
     }
 
     /** 当前值对应的选项；未知值返回 null（由 UI 层回退到原始值）。 */
