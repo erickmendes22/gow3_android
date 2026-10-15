@@ -1323,6 +1323,27 @@ void TemporalUpscaler::OnColorTarget(VideoCore::ImageId color) {
     }
 }
 
+void TemporalUpscaler::OnDisplayBoundary(VideoCore::ImageId color) {
+    // In CUSA01715 the 640x360 frame is complete before the display copy.
+    // GoW3 lacks Bloodborne's five-MRT scene and known HUD shader hashes.
+    if (!std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") || !scaled_session ||
+        !Active() || !color || done_this_frame || ui_phase ||
+        !camera_motion.Depth() || render_width >= target_width ||
+        render_height >= target_height)
+        return;
+    const auto& image = texture_cache.GetImage(color);
+    const auto& depth = texture_cache.GetImage(camera_motion.Depth());
+    if ((image.info.pixel_format != vk::Format::eR8G8B8A8Unorm &&
+         image.info.pixel_format != vk::Format::eR8G8B8A8Srgb) ||
+        image.info.size.width != render_width ||
+        image.info.size.height != render_height ||
+        image.info.size.width != depth.info.size.width ||
+        image.info.size.height != depth.info.size.height)
+        return;
+    ldr_target = color;
+    RunScaled();
+}
+
 void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
                               VideoCore::ImageId depth, bool native_viewport) {
     if (!Scaled() && vs_hash == ui_trigger_vs) done_this_frame = true;
@@ -1659,13 +1680,27 @@ void TemporalUpscaler::RunScaled() {
     // The previous frame's display pass read it: all commands before.
     barrier(vk::Image(ui_image), vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eUndefined,
             all, vk::AccessFlagBits2::eNone, vk::ImageLayout::eGeneral, all, rw);
+    // GoW3 camera offsets are unverified: do not reproject arbitrary
+    // vertex data as motion. A zero-motion temporal dispatch is possible,
+    // although moving views will require real GoW3 motion vectors later.
+    const bool reprojection = camera_motion.Ready();
+    const auto motion_stage = reprojection ? vk::PipelineStageFlagBits2::eComputeShader
+                                           : vk::PipelineStageFlagBits2::eTransfer;
+    const auto motion_write = reprojection ? vk::AccessFlagBits2::eShaderWrite
+                                           : vk::AccessFlagBits2::eTransferWrite;
     barrier(vk::Image(motion_image), vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eUndefined,
             all, vk::AccessFlagBits2::eNone, vk::ImageLayout::eGeneral,
-            vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderWrite);
-    camera_motion.RecordMotion(cmdbuf, depth_view, *motion_view, w, h);
+            motion_stage, motion_write);
+    if (reprojection) {
+        camera_motion.RecordMotion(cmdbuf, depth_view, *motion_view, w, h);
+    } else {
+        const vk::ClearColorValue zero{std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}};
+        const vk::ImageSubresourceRange range{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+        cmdbuf.clearColorImage(vk::Image(motion_image), vk::ImageLayout::eGeneral, zero, range);
+    }
     barrier(vk::Image(motion_image), vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eGeneral,
-            vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderWrite,
-            vk::ImageLayout::eGeneral, all, vk::AccessFlagBits2::eShaderRead);
+            motion_stage, motion_write, vk::ImageLayout::eGeneral, all,
+            vk::AccessFlagBits2::eShaderRead);
 
     const auto now = std::chrono::steady_clock::now();
     float frame_ms = std::chrono::duration<float, std::milli>(now - last_frame).count();
@@ -1788,9 +1823,9 @@ void TemporalUpscaler::RunScaled() {
     info.outputSize = {ow, oh};
     info.frameTimeMilliseconds = frame_ms;
     info.preExposure = 1.0f;
-    info.cameraNear = camera_motion.Near();
+    info.cameraNear = reprojection ? camera_motion.Near() : 0.1f;
     info.cameraFar = 3000.0f;
-    info.cameraVerticalFovRadians = camera_motion.VerticalFov();
+    info.cameraVerticalFovRadians = reprojection ? camera_motion.VerticalFov() : 1.0471976f;
     info.viewSpaceToMeters = 1.0f;
     info.sharpness = std::min(settings.sharpness.load(), 1.0f);
     info.enableSharpening = settings.sharpen ? VK_TRUE : VK_FALSE;

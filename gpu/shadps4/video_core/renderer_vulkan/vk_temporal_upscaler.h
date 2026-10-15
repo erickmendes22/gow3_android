@@ -94,6 +94,8 @@ public:
     /// A pass's first color target: the last render-size RGBA8 target before the UI is the
     /// game's finished frame.
     void OnColorTarget(VideoCore::ImageId color);
+    /// Final image boundary of CUSA01715's one/two MRT forward renderer.
+    void OnDisplayBoundary(VideoCore::ImageId color);
 
     struct Target {
         vk::ImageView view;

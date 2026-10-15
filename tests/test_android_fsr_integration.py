@@ -77,15 +77,21 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn('depth != camera_motion.Depth()', source)
         self.assertIn('GOW3_CAMERA_CONSTANTS block=', camera)
 
-    def test_fsr_diagnostics_sample_actual_gameplay_frames(self):
+    def test_android_fsr_forward_renderer_composites_at_display_boundary(self):
         camera = (ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_camera_motion.cpp").read_text()
         fsr = (ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp").read_text()
+        header = (ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.h").read_text()
         raster = (ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp").read_text()
-        self.assertIn("frame_number == 600", camera)
-        self.assertIn("frame_number == 3600", camera)
-        self.assertIn("index == 8192", fsr)
-        self.assertIn("GOW3_CAMERA_BUFFER sample=", raster)
-        self.assertIn("GOW3_FSR_TOPOLOGY", raster)
+        self.assertIn("upscaler->OnDisplayBoundary(cb_descs[0].first)", raster)
+        self.assertIn("void TemporalUpscaler::OnDisplayBoundary(", fsr)
+        self.assertIn("void OnDisplayBoundary(VideoCore::ImageId color);", header)
+        self.assertIn("const auto guest = scene_targets->GuestSize();", raster)
+        self.assertNotIn("std::popcount(key.mrt_mask) >= 5 && db_desc.first", raster)
+        self.assertIn("cmdbuf.clearColorImage(vk::Image(motion_image)", fsr)
+        self.assertIn("reprojection ? camera_motion.Near() : 0.1f", fsr)
+        self.assertIn('if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) return;', camera)
+        self.assertNotIn("GOW3_CAMERA_BUFFER sample=", raster)
+        self.assertNotIn("GOW3_FSR_TOPOLOGY", raster)
 
     def test_shadow_toggle_semantics(self):
         from launch_env import disable_shadows_requested
