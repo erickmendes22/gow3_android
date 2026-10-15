@@ -2093,8 +2093,14 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                                      reinterpret_cast<const void*>(ring->address), ring->size);
             }
             if (!desc.IsSpecial()) {
-                if (ring->size == 864 && gbuffer_draw &&
-                    memory->IsValidGpuMapping(ring->address, 0)) {
+                // CUSA01715 uses a forward renderer: gbuffer_draw is never
+                // true.  Inspect camera candidates from its scene vertex
+                // constants too; OnConstants still validates the signature.
+                const bool android_scene_camera =
+                    std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") &&
+                    camera_motion->Depth() && stage.sw_stage == Shader::SwStage::Vertex;
+                if (ring->size == 864 && (gbuffer_draw || android_scene_camera) &&
+                    memory->IsValidGpuMapping(ring->address, 864)) {
                     camera_motion->OnConstants(reinterpret_cast<const float*>(ring->address));
                 }
                 push_data.AddOffset(binding.buffer, 0);
@@ -2154,8 +2160,11 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
         } else {
             const auto vsharp =
                 prepared ? prepared->buffer_sharps[buffer_index] : desc.GetSharp(stage);
-            if (vsharp.GetSize() == 864 && gbuffer_draw &&
-                memory->IsValidGpuMapping(vsharp.base_address, 0)) {
+            const bool android_scene_camera =
+                std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") &&
+                camera_motion->Depth() && stage.sw_stage == Shader::SwStage::Vertex;
+            if (vsharp.GetSize() == 864 && (gbuffer_draw || android_scene_camera) &&
+                memory->IsValidGpuMapping(vsharp.base_address, 864)) {
                 camera_motion->OnConstants(reinterpret_cast<const float*>(vsharp.base_address));
             }
             // Object motion research: the vertex shader buffers of G-buffer draws.

@@ -454,6 +454,18 @@ bool TemporalUpscaler::EnsureResources(u32 w, u32 h, u32 ow, u32 oh, bool hdr) {
                         int(device_info.shaderFloat16Enabled),
                         int(device_info.subgroupSizeControlEnabled),
                         int(device_info.shaderStorageImageWriteWithoutFormatEnabled));
+            // The backend returns UNSUPPORTED both for missing shader features
+            // and for builds with the FSR3 implementation disabled.  Show the
+            // actual device contract rather than assigning blame to Turnip.
+            FfxVkPortableDeviceCapabilities caps{};
+            caps.structSize = sizeof(caps);
+            const auto caps_result = ffxVkPortableQueryDeviceCapabilities(
+                device_info.physicalDevice, &caps);
+            std::printf("GOW3_FSR_CAPS query=%d fsr3=%d compute=%d subgroup=%d formats=%d storage_no_format=%d\n",
+                        int(caps_result), int(caps.fsr3ComputePrerequisites),
+                        int(caps.hasComputeQueue), int(caps.subgroupOperations),
+                        int(caps.requiredFsr3StorageFormats),
+                        int(device_info.shaderStorageImageWriteWithoutFormatEnabled));
             std::printf("Upscaler: FSR 3 context creation failed\n");
             context = nullptr;
             return false;
@@ -1340,7 +1352,13 @@ void TemporalUpscaler::OnDisplayBoundary(VideoCore::ImageId color) {
         !camera_motion.Depth() || render_width >= target_width ||
         render_height >= target_height)
         return;
-    const auto& image = texture_cache.GetImage(color);
+    // The draw that starts the display-copy pass binds the DISPLAY image, not
+    // the completed game scene.  OnColorTarget cached the last 640x360 LDR
+    // render target before that pass.  Never feed the display copy to FSR.
+    const VideoCore::ImageId scene = ldr_target;
+    if (!scene || FrameCapture::IsDisplayBuffer(texture_cache.GetImage(scene).info.guest_address))
+        return;
+    const auto& image = texture_cache.GetImage(scene);
     const auto& depth = texture_cache.GetImage(camera_motion.Depth());
     if ((image.info.pixel_format != vk::Format::eR8G8B8A8Unorm &&
          image.info.pixel_format != vk::Format::eR8G8B8A8Srgb) ||
@@ -1349,7 +1367,6 @@ void TemporalUpscaler::OnDisplayBoundary(VideoCore::ImageId color) {
         image.info.size.width != depth.info.size.width ||
         image.info.size.height != depth.info.size.height)
         return;
-    ldr_target = color;
     RunScaled();
 }
 
@@ -1375,8 +1392,11 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
     // drawn over the CURRENT LDR scene color with valid camera/depth. Generic
     // fullscreen postprocess passes reusing scene depth must not trigger FSR.
     const bool android = std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") != nullptr;
+    // Camera motion can be unavailable on GoW III's forward renderer.  Depth
+    // and the verified scene target suffice for a temporal dispatch with
+    // zero-motion fallback; do not mislabel it camera-reprojected FSR.
     const bool android_hud_transition =
-        android && native_viewport && camera_motion.Ready() &&
+        android && native_viewport && camera_motion.Depth() &&
         ldr_target == color && depth && depth != camera_motion.Depth();
     // The hashes 0x34e8a281 etc. were identified in Bloodborne, not in
     // the supplied CUSA01715 executable. Do not use them to trigger GoW3
@@ -1403,7 +1423,8 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
         RenderTarget(image.info.size.width, image.info.size.height) &&
         !FrameCapture::IsDisplayBuffer(image.info.guest_address);
     const bool motion_ready = camera_motion.Ready();
-    const bool scene_ready = motion_ready && ldr_target == color;
+    const bool scene_ready = (android ? bool(camera_motion.Depth()) : motion_ready) &&
+                             ldr_target == color;
     // Only the first few relevant transitions, not per-frame log spam.
     if (movie) {
         static unsigned trace = 0;

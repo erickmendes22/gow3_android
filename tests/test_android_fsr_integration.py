@@ -111,6 +111,9 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn('GOW3_CAMERA_CONSTANTS block=', camera)
         self.assertIn('GOW3_FSR_STATUS state=CONTEXT_FAILED', fsr)
         self.assertIn('GOW3_FSR_STATUS state=DISPATCH_RECORDED', fsr)
+        self.assertIn('GOW3_FSR_CAPS query=', fsr)
+        self.assertIn('const VideoCore::ImageId scene = ldr_target;', fsr)
+        self.assertIn('android && native_viewport && camera_motion.Depth()', fsr)
         self.assertNotIn("GOW3_CAMERA_BUFFER sample=", raster)
         self.assertNotIn("GOW3_FSR_TOPOLOGY", raster)
 
