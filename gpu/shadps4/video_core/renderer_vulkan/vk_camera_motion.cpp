@@ -221,12 +221,25 @@ void CameraMotion::RecordMotion(vk::CommandBuffer cmdbuf, vk::ImageView depth_vi
 }
 
 void CameraMotion::OnConstants(const float* data, size_t float_count) {
+    // Keep the old validated Bloodborne layout for the desktop/non-GoW3 path.
+    // The CUSA01715 path below deliberately does not inherit those offsets.
+    if (!std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) {
+        if (!data || float_count < 192 || frame_has_camera) return;
+        if (data[0] != 3000.0f || data[4] < 64.0f || data[5] < 64.0f ||
+            std::abs(data[1] * data[0] - 1.0f) > 1e-3f) return;
+        std::memcpy(current.view.data(), data + 8, 12 * sizeof(float));
+        std::memcpy(current.inv_view.data(), data + 180, 12 * sizeof(float));
+        current.proj = {data[52], data[57], data[62], data[63]};
+        current.valid = current.proj[0] != 0.0f && current.proj[1] != 0.0f;
+        render_size = {u32(data[4]), u32(data[5])};
+        frame_has_camera = current.valid;
+        return;
+    }
     // GoW III CUSA01715 does not use Bloodborne's far=3000, offset+8/+180
     // 864-byte signature. Inspect matrices actually bound by scene shaders.
     // Only algebraically inverse rigid transforms and valid perspective
     // projections are accepted; never synthesize a valid camera from zeros.
-    if (!std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") ||
-        !depth_id || !data || float_count < 16 || float_count > 1024)
+    if (!depth_id || !data || float_count < 16 || float_count > 1024)
         return;
     if (frame_has_camera && frame_pose_votes >= 3) return;
     if (++frame_scanned_buffers > 96) return; // bound work on mobile CPUs
