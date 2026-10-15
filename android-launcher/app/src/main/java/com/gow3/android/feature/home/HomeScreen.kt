@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,12 +52,17 @@ internal fun HomeScreen(
     onGetFromSteam: ((Boolean, String) -> Unit) -> Unit,
     onChooseGameFolder: () -> Unit,
     onChooseUpdateFolder: () -> Unit,
+    onInstallBasePkg: () -> Unit,
+    onInstallUpdatePkg: () -> Unit,
+    pkgInstallBusy: Boolean,
+    pkgInstallMessage: String?,
+    pkgGeneration: Int,
 ) {
     val context = LocalContext.current
     var iniValues by remember { mutableStateOf(loadIni(context)) }
     var dllState by remember { mutableStateOf(losslessDlls.resolve()) }
-    var gameDir by remember { mutableStateOf(currentGameDir(context)) }
-    var updateDir by remember { mutableStateOf(currentUpdateDir(context)) }
+    var gameDir by remember(pkgGeneration) { mutableStateOf(currentGameDir(context)) }
+    var updateDir by remember(pkgGeneration) { mutableStateOf(currentUpdateDir(context)) }
     var notice by remember { mutableStateOf<String?>(null) }
 
     fun refreshDll() {
@@ -99,6 +105,14 @@ internal fun HomeScreen(
         LaunchButton(onStartGame)
         Spacer(Modifier.height(20.dp))
         LaunchParameters(gameDir, updateDir, iniValues, ::save, onChooseGameFolder, onChooseUpdateFolder)
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            PkgAction("Instalar PKG", onInstallBasePkg, !pkgInstallBusy, Modifier.weight(1f))
+            PkgAction("Atualizar por PKG", onInstallUpdatePkg, !pkgInstallBusy, Modifier.weight(1f))
+        }
+        if (pkgInstallMessage != null) {
+            Text(pkgInstallMessage, color = LauncherColors.textMuted, fontSize = 12.sp)
+        }
         Spacer(Modifier.height(16.dp))
         FrameGenerationCard(
             state = dllState,
@@ -140,6 +154,22 @@ internal fun HomeScreen(
         )
         Spacer(Modifier.height(24.dp))
     }
+}
+
+@Composable
+private fun PkgAction(label: String, action: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier) {
+    Text(
+        text = label,
+        color = if (enabled) LauncherColors.textPrimary else LauncherColors.textMuted,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(LauncherColors.navSurface)
+            .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.55f)), RoundedCornerShape(10.dp))
+            .clickable(enabled = enabled, onClick = action)
+            .padding(horizontal = 10.dp, vertical = 15.dp),
+    )
 }
 
 /** launcher 的 gow3.ini 路径，即游戏、run-gow3.sh 和 GameActivity 读取的同一个文件。 */

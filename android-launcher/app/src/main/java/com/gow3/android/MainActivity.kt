@@ -12,6 +12,9 @@ import com.gow3.android.data.LanguageManager
 import com.gow3.android.data.LogManager
 import com.gow3.android.data.LosslessDllManager
 import com.gow3.android.data.SaveManager
+import com.gow3.android.data.PkgInstallManager
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import com.gow3.android.ui.LauncherScreen
 import com.gow3.android.ui.components.LauncherColors
 import com.gow3.android.ui.theme.Gow3LauncherTheme
@@ -21,6 +24,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var losslessDllManager: LosslessDllManager
     private lateinit var saveManager: SaveManager
     private lateinit var logManager: LogManager
+    private lateinit var pkgInstallManager: PkgInstallManager
+    private val pkgBusy = mutableStateOf(false)
+    private val pkgMessage = mutableStateOf<String?>(null)
+    private val pkgGeneration = mutableIntStateOf(0)
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(applyLanguage(newBase))
@@ -44,6 +51,11 @@ class MainActivity : ComponentActivity() {
         losslessDllManager = LosslessDllManager(this)
         saveManager = SaveManager(this)
         logManager = LogManager(this)
+        pkgInstallManager = PkgInstallManager(this) { busy, message ->
+            pkgBusy.value = busy
+            pkgMessage.value = message
+            if (!busy) pkgGeneration.intValue += 1
+        }
         setContent {
             Gow3LauncherTheme(dynamicColor = false) {
                 LauncherScreen(
@@ -60,6 +72,11 @@ class MainActivity : ComponentActivity() {
                     },
                     onChooseGameFolder = { gameFolderManager.chooseGameFolder() },
                     onChooseUpdateFolder = { gameFolderManager.chooseUpdateFolder() },
+                    onInstallBasePkg = { pkgInstallManager.pickBasePkg() },
+                    onInstallUpdatePkg = { pkgInstallManager.pickUpdatePkg() },
+                    pkgInstallBusy = pkgBusy.value,
+                    pkgInstallMessage = pkgMessage.value,
+                    pkgGeneration = pkgGeneration.intValue,
                     saves = saveManager,
                     logs = logManager,
                     onChangeLanguage = { value ->
@@ -69,7 +86,7 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-        gameFolderManager.ensureGameFolder()
+        // Do not force the directory picker before the user can install a PKG.
     }
 
     @Deprecated("Legacy Activity Result API is required by this target SDK flow")
@@ -84,6 +101,7 @@ class MainActivity : ComponentActivity() {
         if (saveManager.onActivityResult(requestCode, resultCode, data)) return
         if (logManager.onActivityResult(requestCode, resultCode, data)) return
         if (losslessDllManager.onPickerResult(requestCode, resultCode, data)) return
+        if (pkgInstallManager.onPickerResult(requestCode, resultCode, data)) return
         gameFolderManager.onFolderResult(requestCode, resultCode, data)
     }
 }

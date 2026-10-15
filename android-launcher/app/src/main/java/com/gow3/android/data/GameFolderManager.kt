@@ -42,7 +42,9 @@ internal class GameFolderManager(private val activity: Activity) {
     private fun prefs() = activity.getSharedPreferences("gow3", Activity.MODE_PRIVATE)
 
     fun hasGameFolder(): Boolean {
-        if (activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) return false
+        // App-installed PKGs are stored under externalFilesDir and do not need the
+        // legacy READ_EXTERNAL_STORAGE permission. SAF-selected folders retain
+        // their own permission checks when the picker is opened.
         val path = prefs().getString("game_dir", null) ?: return false
         return isGame(File(path))
     }
