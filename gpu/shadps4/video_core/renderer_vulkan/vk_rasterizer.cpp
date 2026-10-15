@@ -2098,6 +2098,7 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                 // constants too; OnConstants still validates the signature.
                 const bool android_scene_camera =
                     std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") &&
+                    upscaler && upscaler->Enabled() &&
                     camera_motion->Depth() && stage.sw_stage == Shader::SwStage::Vertex;
                 if (ring->size >= 64 && ring->size <= 4096 &&
                     (gbuffer_draw || android_scene_camera) &&
@@ -2164,6 +2165,7 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                 prepared ? prepared->buffer_sharps[buffer_index] : desc.GetSharp(stage);
             const bool android_scene_camera =
                 std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") &&
+                    upscaler && upscaler->Enabled() &&
                 camera_motion->Depth() && stage.sw_stage == Shader::SwStage::Vertex;
             if (vsharp.GetSize() >= 64 && vsharp.GetSize() <= 4096 &&
                 (gbuffer_draw || android_scene_camera) && vsharp.base_address &&
