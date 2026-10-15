@@ -15,6 +15,7 @@ import java.io.FileInputStream
 import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import ro.cobrabm.fexdroid.RuntimeInstaller
 
 /**
  * Direct, zero-copy PKG installation.
@@ -189,7 +190,23 @@ internal class PkgInstallManager(
             .create()
         dialog.show()
         worker.execute {
-            val result = runCatching { install(choice.pkg, destination, choice.update) }
+            val result = runCatching {
+                // PKG setup is available before GameActivity has ever run.
+                // Install/validate the signed runtime first, on this worker.
+                RuntimeInstaller.ensure(activity, activity.filesDir) { _ ->
+                    activity.runOnUiThread {
+                        val preparing = localized("Preparing game runtime…", "Preparando runtime do jogo…")
+                        dialog.setMessage(preparing)
+                        onState(true, preparing)
+                    }
+                }
+                activity.runOnUiThread {
+                    val extracting = localized("Extracting PKG directly into the selected folder…", "Extraindo PKG diretamente na pasta selecionada…")
+                    dialog.setMessage(extracting)
+                    onState(true, extracting)
+                }
+                install(choice.pkg, destination, choice.update)
+            }
             activity.runOnUiThread {
                 installing.set(false)
                 dialog.dismiss()

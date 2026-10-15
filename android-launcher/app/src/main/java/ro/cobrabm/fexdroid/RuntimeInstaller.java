@@ -14,7 +14,7 @@ import java.security.MessageDigest;
 import java.util.function.Consumer;
 
 /** Installs the signed APK's Linux runtime transactionally in this app's private data directory. */
-final class RuntimeInstaller {
+public final class RuntimeInstaller {
     private static final String LOADER = "rootfs/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1";
 
     private static void deleteTree(File root) throws Exception {
@@ -95,6 +95,32 @@ final class RuntimeInstaller {
         if (!source.renameTo(target)) throw new IllegalStateException("Cannot stage old " + label);
     }
 
+    private static void preserveUserData(File files, File stage) throws Exception {
+        // Home can save settings/import saves before the first game launch.
+        // Runtime upgrades replace gow3port, so carry user-owned data into the
+        // validated stage before promotion; the old copy remains for rollback.
+        for (String relative : new String[]{"gow3port/gow3.ini", "gow3port/user", "gow3port/Lossless.dll"}) {
+            java.nio.file.Path source = new File(files, relative).toPath();
+            java.nio.file.Path target = new File(stage, relative).toPath();
+            if (!Files.exists(source, java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
+            Files.walkFileTree(source, new SimpleFileVisitor<java.nio.file.Path>() {
+                @Override public FileVisitResult preVisitDirectory(java.nio.file.Path dir, BasicFileAttributes attrs)
+                        throws java.io.IOException {
+                    Files.createDirectories(target.resolve(source.relativize(dir)));
+                    return FileVisitResult.CONTINUE;
+                }
+                @Override public FileVisitResult visitFile(java.nio.file.Path file, BasicFileAttributes attrs)
+                        throws java.io.IOException {
+                    java.nio.file.Path destination = target.resolve(source.relativize(file));
+                    Files.createDirectories(destination.getParent());
+                    Files.copy(file, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                            java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+    }
+
     private static void promote(File files, File stage, String expected) throws Exception {
         File previous = new File(files, ".runtime-previous");
         deleteTree(previous);
@@ -145,7 +171,7 @@ final class RuntimeInstaller {
         }
     }
 
-    static boolean ensure(Context context, File files, Consumer<String> status) throws Exception {
+    public static synchronized boolean ensure(Context context, File files, Consumer<String> status) throws Exception {
         String expected;
         try (InputStream in = context.getAssets().open("runtime.sha256")) {
             expected = new String(readAll(in), StandardCharsets.US_ASCII).trim();
@@ -186,6 +212,7 @@ final class RuntimeInstaller {
                 throw new IllegalStateException("Runtime extraction failed: " +
                         new String(log, 0, Math.min(log.length, 2048), StandardCharsets.UTF_8));
             validateRuntime(stage);
+            preserveUserData(files, stage);
             promote(files, stage, expected);
             return true;
         } finally {
