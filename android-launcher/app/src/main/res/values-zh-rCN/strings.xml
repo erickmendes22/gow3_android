@@ -35,7 +35,6 @@
     <string name="dialog_ok">确定</string>
 
     <!-- 启动参数：参数名 -->
-    <string name="param_upscaler">超分</string>
     <string name="param_resolution">分辨率</string>
     <string name="param_fps_limit">帧率上限</string>
     <string name="param_engine_fps">引擎帧率</string>
@@ -47,7 +46,6 @@
 
     <!-- 启动参数：选项名 -->
     <string name="param_option_off_720p">关闭（以 1280×720 渲染）</string>
-    <string name="param_option_fsr31">FSR 3.1</string>
     <string name="param_option_native">原生</string>
     <string name="param_option_480p">480p</string>
     <string name="param_option_720p">720p</string>
@@ -67,7 +65,6 @@
     <string name="param_option_frames_2">2</string>
 
     <!-- 启动参数：说明 -->
-    <string name="param_desc_upscaler">以较低的内部分辨率渲染游戏，再用 FSR 3.1 把画面放大到你的屏幕，在保持清晰画面的同时获得更高性能。关闭时以固定 1280×720 渲染。</string>
     <string name="param_desc_engine_fps">游戏引擎自身更新游戏世界的速度，与显示无关。60 是游戏原生速度；更高数值让动作更流畅，但更耗电。</string>
     <string name="param_desc_vsync">将游戏帧与屏幕刷新率同步，避免画面撕裂。除非出现撕裂或卡顿，否则保持开启。</string>
     <string name="param_desc_frames_queued">游戏在屏幕上显示之前预先准备多少帧。数值越低越能降低输入延迟；数值越高在较弱的硬件上可能更流畅。</string>
