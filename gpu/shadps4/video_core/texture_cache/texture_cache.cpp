@@ -160,7 +160,29 @@ void TextureCache::CancelReadbacks(VAddr address, u64 size) {
 // before) left the GPU mostly idle in God of War III's gameplay, at about 2 FPS.
 void TextureCache::ProcessDownloadImages() {
     if (deferred_readbacks) {
-        // Upload workers must finish reading RAM before these pages become inaccessible.
+        // The BACHATA ARM64 download path only synchronizes when a GPU->CPU
+        // transfer is actually required. This port used to drain ALL host
+        // upload/copy workers every time ProcessDownloadImages() ran, even if
+        // there was no image to download. On a CPU-limited Android device that
+        // needlessly serializes FEX writes and Vulkan submission.
+        //
+        // Peek under its own lock, then release it BEFORE readback_mutex:
+        // the non-empty path below takes readback_mutex before download_images_mutex.
+        // Retiring previously queued GPU copies is independent of host uploads.
+        bool has_new_downloads = false;
+        {
+            std::scoped_lock download_lock{download_images_mutex};
+            has_new_downloads = !download_images.empty();
+        }
+        if (!has_new_downloads) {
+            if (has_pending_readbacks.load(std::memory_order_acquire)) {
+                std::scoped_lock readback_lock{readback_mutex};
+                RetireReadbacks();
+            }
+            return;
+        }
+        // New page watchers must only be installed after all host workers
+        // have stopped reading the affected guest RAM: keep this wait.
         scheduler.WaitHostCopies();
         std::scoped_lock readback_lock{readback_mutex};
         RetireReadbacks();
