@@ -272,23 +272,45 @@ internal class PkgInstallManager(
      */
     private fun localDocumentFile(uri: Uri, directory: Boolean): File? {
         return try {
-            if (uri.authority != "com.android.externalstorage.documents") return null
-            val id = if (directory) DocumentsContract.getTreeDocumentId(uri)
-                else DocumentsContract.getDocumentId(uri)
-            val colon = id.indexOf(':')
-            if (colon <= 0) return null
-            val volume = id.substring(0, colon)
-            val rel = id.substring(colon + 1)
-            val root = if (volume.equals("primary", ignoreCase = true)) {
-                Environment.getExternalStorageDirectory()
+            val authority = uri.authority
+            val result = if (authority == "com.android.externalstorage.documents") {
+                val id = if (directory) DocumentsContract.getTreeDocumentId(uri)
+                    else DocumentsContract.getDocumentId(uri)
+                val colon = id.indexOf(':')
+                if (colon <= 0) return null
+                val volume = id.substring(0, colon)
+                val relative = id.substring(colon + 1)
+                val root = if (volume.equals("primary", ignoreCase = true)) {
+                    Environment.getExternalStorageDirectory()
+                } else {
+                    if (!Regex("[A-Za-z0-9_-]{4,24}").matches(volume)) return null
+                    File("/storage", volume)
+                }
+                val output = File(root, relative).canonicalFile
+                if (!isNested(output, root.canonicalFile)) return null
+                output
             } else {
-                if (!Regex("[A-Za-z0-9_-]{4,24}").matches(volume)) return null
-                File("/storage", volume)
+                // Downloads/media may return their own document providers for
+                // local PKGs. Resolve the real path only when the provider
+                // exposes it; never stream/copy a remote file to a temp PKG.
+                if (directory) return null
+                val id = runCatching { DocumentsContract.getDocumentId(uri) }.getOrNull()
+                val raw = if (id?.startsWith("raw:") == true) id.removePrefix("raw:")
+                    else activity.contentResolver.query(uri,
+                        arrayOf(android.provider.MediaStore.MediaColumns.DATA),
+                        null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst() && !cursor.isNull(0))
+                            cursor.getString(0) else null
+                    }
+                if (raw.isNullOrBlank()) return null
+                File(raw).canonicalFile
             }
-            val output = File(root, rel).canonicalFile
-            // Do not let a crafted document ID escape its storage volume.
-            if (!isNested(output, root.canonicalFile)) return null
-            output
+            // Reject arbitrary providers that point at app-private paths or
+            // any path outside mounted external storage volumes.
+            val primary = Environment.getExternalStorageDirectory().canonicalFile
+            val storage = File("/storage").canonicalFile
+            if (!isNested(result, primary) && !isNested(result, storage)) return null
+            result
         } catch (_: Exception) {
             null
         }
