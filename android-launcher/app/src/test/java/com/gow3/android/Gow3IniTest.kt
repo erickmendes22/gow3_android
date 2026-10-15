@@ -91,4 +91,25 @@ class Gow3IniTest {
         assertTrue(ok)
         assertEquals("upscaler=fsr3\n", file.readText())
     }
+    @Test
+    fun `write fills packaged defaults without resetting choices`() {
+        val dir = tempDir()
+        File(dir, "gow3.default.ini").writeText(
+            "render_resolution=720p\nengine_fps=120\nframes_queued=2\n")
+        val file = File(dir, "gow3.ini")
+        file.writeText("# user settings\nengine_fps=240\ncustom_key=keep\n")
+        assertTrue(Gow3Ini.write(file, mapOf("show_fps" to "1")))
+        val values = Gow3Ini.read(file)
+        assertEquals("720p", values["render_resolution"])
+        assertEquals("240", values["engine_fps"])
+        assertEquals("2", values["frames_queued"])
+        assertEquals("keep", values["custom_key"])
+        val first = file.readText()
+        assertTrue(first.startsWith("# user settings\n"))
+        assertTrue(Gow3Ini.write(file, mapOf("show_fps" to "1")))
+        assertEquals(first, file.readText())
+        assertTrue(Gow3Ini.write(file, mapOf("render_resolution" to "480p")))
+        assertEquals("480p", Gow3Ini.read(file)["render_resolution"])
+    }
+
 }

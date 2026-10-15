@@ -121,6 +121,41 @@ public final class RuntimeInstaller {
         }
     }
 
+    /** Fill only missing keys; never reset user settings during a runtime upgrade. */
+    private static void completeConfig(File root) throws Exception {
+        File defaults = path(root, "gow3port/gow3.default.ini");
+        File config = path(root, "gow3port/gow3.ini");
+        if (!defaults.isFile()) throw new IllegalStateException("Runtime archive is incomplete: default settings");
+        String original = config.isFile()
+                ? new String(Files.readAllBytes(config.toPath()), StandardCharsets.UTF_8) : "";
+        java.util.Set<String> keys = new java.util.HashSet<>();
+        for (String line : original.split("\\r?\\n")) {
+            String trimmed = line.trim();
+            int equals = trimmed.indexOf('=');
+            if (!trimmed.startsWith("#") && equals > 0)
+                keys.add(trimmed.substring(0, equals).trim());
+        }
+        StringBuilder merged = new StringBuilder(original);
+        for (String line : Files.readAllLines(defaults.toPath(), StandardCharsets.UTF_8)) {
+            String trimmed = line.trim();
+            int equals = trimmed.indexOf('=');
+            if (trimmed.startsWith("#") || equals <= 0) continue;
+            if (keys.add(trimmed.substring(0, equals).trim())) {
+                if (merged.length() > 0 && merged.charAt(merged.length() - 1) != '\n') merged.append('\n');
+                merged.append(line).append('\n');
+            }
+        }
+        if (merged.toString().equals(original)) return;
+        File temporary = new File(config.getPath() + ".defaults.tmp");
+        try {
+            Files.write(temporary.toPath(), merged.toString().getBytes(StandardCharsets.UTF_8));
+            Files.move(temporary.toPath(), config.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(temporary.toPath());
+        }
+    }
+
     private static void promote(File files, File stage, String expected) throws Exception {
         File previous = new File(files, ".runtime-previous");
         deleteTree(previous);
@@ -176,7 +211,7 @@ public final class RuntimeInstaller {
         try (InputStream in = context.getAssets().open("runtime.sha256")) {
             expected = new String(readAll(in), StandardCharsets.US_ASCII).trim();
         } catch (java.io.FileNotFoundException missing) {
-            try { validateRuntime(files); return false; }
+            try { validateRuntime(files); completeConfig(files); return false; }
             catch (Exception incomplete) {
                 throw new IllegalStateException("This APK does not contain a complete runtime", missing);
             }
@@ -184,7 +219,7 @@ public final class RuntimeInstaller {
         if (!expected.matches("[0-9a-f]{64}")) throw new IllegalStateException("Invalid runtime digest");
         File marker = new File(files, ".runtime.sha256");
         if (marker.isFile() && expected.equals(new String(Files.readAllBytes(marker.toPath()), StandardCharsets.US_ASCII).trim())) {
-            try { validateRuntime(files); return false; }
+            try { validateRuntime(files); completeConfig(files); return false; }
             catch (Exception ignored) { /* stale marker: reinstall from the signed asset */ }
         }
 
@@ -213,6 +248,7 @@ public final class RuntimeInstaller {
                         new String(log, 0, Math.min(log.length, 2048), StandardCharsets.UTF_8));
             validateRuntime(stage);
             preserveUserData(files, stage);
+            completeConfig(stage);
             promote(files, stage, expected);
             return true;
         } finally {

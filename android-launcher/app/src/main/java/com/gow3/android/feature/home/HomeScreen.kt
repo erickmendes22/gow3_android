@@ -179,7 +179,10 @@ private fun PkgAction(label: String, action: () -> Unit, enabled: Boolean, modif
 /** launcher 的 gow3.ini 路径，即游戏、run-gow3.sh 和 GameActivity 读取的同一个文件。 */
 private fun gow3IniFile(context: Context): File = File(context.filesDir, "gow3port/gow3.ini")
 
-private fun loadIni(context: Context): Map<String, String> = Gow3Ini.read(gow3IniFile(context))
+private fun loadIni(context: Context): Map<String, String> {
+    val config = gow3IniFile(context)
+    return Gow3Ini.read(java.io.File(config.parentFile, "gow3.default.ini")) + Gow3Ini.read(config)
+}
 
 private fun currentGameDir(context: Context): String? =
     context.getSharedPreferences("gow3", Context.MODE_PRIVATE).getString("game_dir", null)

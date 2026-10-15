@@ -39,7 +39,12 @@ internal object Gow3Ini {
         } catch (_: Exception) {
             emptyList()
         }
-        val pending = LinkedHashMap(updates)
+        // Home may save a single option before runtime installation. Once the
+        // packaged defaults exist, seed missing keys on every write as well.
+        val existing = read(path)
+        val pending = LinkedHashMap(read(File(path.parentFile, "gow3.default.ini"))
+            .filterKeys { it !in existing })
+        pending.putAll(updates)
         val out = mutableListOf<String>()
         for (line in lines) {
             val eq = line.indexOf('=')
