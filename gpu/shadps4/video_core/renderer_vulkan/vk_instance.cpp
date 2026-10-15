@@ -489,12 +489,18 @@ bool Instance::CreateDevice() {
             .hostQueryReset = vk12_features.hostQueryReset,
             .timelineSemaphore = vk12_features.timelineSemaphore,
             .bufferDeviceAddress = vk12_features.bufferDeviceAddress,
+            // Match Bloodborne Android's known-working FSR3 logical-device
+            // feature chain. VulkanMemoryModel is not implicitly enabled by
+            // advertising Vulkan 1.2 on the physical device.
+            .vulkanMemoryModel = vk12_features.vulkanMemoryModel,
+            .vulkanMemoryModelDeviceScope = vk12_features.vulkanMemoryModelDeviceScope,
             .shaderOutputLayer = vk12_features.shaderOutputLayer,
         },
         vk::PhysicalDeviceVulkan13Features{
             .robustImageAccess = vk13_features.robustImageAccess,
             .shaderDemoteToHelperInvocation = vk13_features.shaderDemoteToHelperInvocation,
             .subgroupSizeControl = vk13_features.subgroupSizeControl,
+            .computeFullSubgroups = vk13_features.computeFullSubgroups,
             .synchronization2 = vk13_features.synchronization2,
             .dynamicRendering = vk13_features.dynamicRendering,
             .shaderIntegerDotProduct = vk13_features.shaderIntegerDotProduct,

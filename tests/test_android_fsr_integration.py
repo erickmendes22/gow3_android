@@ -27,6 +27,24 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn('const int output = std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")', (
             ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp").read_text())
 
+    def test_android_fsr_device_matches_bloodborne_enabled_features(self):
+        # Compare to ducvd89/Bloodborne-Android android-0.5.2, same
+        # FSR-Vulkan submodule c64f093404125e960813f95f1996c14780f0dd69.
+        root = ROOT / "gpu/shadps4/video_core/renderer_vulkan"
+        instance = (root / "vk_instance.cpp").read_text()
+        upscaler = (root / "vk_temporal_upscaler.cpp").read_text()
+        for feature in (
+            ".vulkanMemoryModel = vk12_features.vulkanMemoryModel",
+            ".vulkanMemoryModelDeviceScope = vk12_features.vulkanMemoryModelDeviceScope",
+            ".computeFullSubgroups = vk13_features.computeFullSubgroups",
+        ):
+            with self.subTest(feature=feature):
+                self.assertIn(feature, instance)
+        self.assertIn("instance.IsStorageImageWriteWithoutFormatEnabled() ? VK_TRUE : VK_FALSE",
+                      upscaler)
+        self.assertNotIn("device_info.shaderStorageImageWriteWithoutFormatEnabled = VK_TRUE",
+                         upscaler)
+
     def test_arm64_fmt_dynamic_dependency_is_not_required(self):
         cmake = (ROOT / "gpu/CMakeLists.txt").read_text()
         build = (ROOT / "tools/android/build/build_arm64.sh").read_text()

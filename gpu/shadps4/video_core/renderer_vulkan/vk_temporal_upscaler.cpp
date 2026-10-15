@@ -427,7 +427,11 @@ bool TemporalUpscaler::EnsureResources(u32 w, u32 h, u32 ow, u32 oh, bool hdr) {
     device_info.shaderFloat16Enabled = instance.IsShaderFloat16Enabled();
     device_info.subgroupSizeControlEnabled = instance.IsSubgroupSizeControlEnabled();
     device_info.synchronization2Enabled = VK_TRUE;
-    device_info.shaderStorageImageWriteWithoutFormatEnabled = VK_TRUE;
+    // This describes an ENABLED logical-device feature. Do not claim VK_TRUE
+    // unconditionally: that would make the portable FSR backend try shaders
+    // whose feature was not enabled when VkDevice was created.
+    device_info.shaderStorageImageWriteWithoutFormatEnabled =
+        instance.IsStorageImageWriteWithoutFormatEnabled() ? VK_TRUE : VK_FALSE;
 
     FfxVkPortableUpscaleCreateInfo create_info{};
     create_info.structSize = sizeof(create_info);
