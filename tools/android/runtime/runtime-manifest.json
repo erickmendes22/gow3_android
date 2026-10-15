@@ -10,8 +10,14 @@
   "port_root": "gow3port",
   "port_arch_root": "gow3port/arm64",
   "home_root": "home",
-  "top_level_roots": ["rootfs", "gow3port", "home"],
-  "required_directories": ["home/gow3port"],
+  "top_level_roots": [
+    "rootfs",
+    "gow3port",
+    "home"
+  ],
+  "required_directories": [
+    "home/gow3port"
+  ],
   "loader": "rootfs/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
   "loader_strategy": "explicit-loader-when-PT_INTERP-slot-cannot-fit",
   "entrypoints": [
@@ -20,28 +26,56 @@
       "owner": "java",
       "kind": "arm64-elf",
       "launch_via_loader": true,
-      "args": ["--dir", "rootfs/tmp/.fxshm"]
+      "args": [
+        "--dir",
+        "rootfs/tmp/.fxshm"
+      ]
     },
     {
       "path": "rootfs/usr/bin/Xvfb",
       "owner": "java",
       "kind": "arm64-elf",
       "launch_via_loader": true,
-      "args": [":0", "-screen", "0", "1280x720x24", "-shmem", "-ac", "-nolisten", "tcp", "-pn"]
+      "args": [
+        ":0",
+        "-screen",
+        "0",
+        "1280x720x24",
+        "-shmem",
+        "-ac",
+        "-nolisten",
+        "tcp",
+        "-pn"
+      ]
     },
     {
       "path": "rootfs/usr/bin/python3.13",
       "owner": "run-gow3.sh",
       "kind": "arm64-elf",
       "launch_via_loader": true,
-      "args": ["gow3port/scripts/prepare.py"]
+      "args": [
+        "gow3port/scripts/prepare.py"
+      ]
+    },
+    {
+      "path": "gow3port/arm64/bin/orbis-pkg-util",
+      "owner": "PkgInstallManager",
+      "kind": "arm64-elf",
+      "launch_via_loader": true,
+      "args": [
+        "info",
+        "extract"
+      ]
     },
     {
       "path": "gow3port/arm64/bin/gow3-probe",
       "owner": "run-gow3.sh",
       "kind": "arm64-elf",
       "launch_via_loader": true,
-      "args": ["--vulkan-only", "--cpu-only"]
+      "args": [
+        "--vulkan-only",
+        "--cpu-only"
+      ]
     },
     {
       "path": "gow3port/arm64/bin/kgsl-chip-id",
@@ -62,39 +96,135 @@
       "owner": "java",
       "kind": "shell",
       "launch_via_loader": false,
-      "args": ["game", "cpu", "check", "vulkan"]
+      "args": [
+        "game",
+        "cpu",
+        "check",
+        "vulkan"
+      ]
     }
   ],
   "required_paths": [
-    {"path": "rootfs/usr/bin/Xvfb", "type": "executable"},
-    {"path": "rootfs/usr/bin/sh", "type": "executable"},
-    {"path": "rootfs/usr/libexec/fxshmd", "type": "executable"},
-    {"path": "rootfs/usr/bin/FEX", "type": "executable"},
-    {"path": "rootfs/usr/bin/python3.13", "type": "executable"},
-    {"path": "rootfs/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1", "type": "loader"},
-    {"path": "gow3port/arm64/bin/gow3-probe", "type": "executable"},
-    {"path": "gow3port/arm64/bin/kgsl-chip-id", "type": "executable"},
-    {"path": "gow3port/arm64/lib/libgow3cpu.so", "type": "shared-library"},
-    {"path": "gow3port/arm64/lib/libgow3gpu.so", "type": "shared-library"},
-    {"path": "gow3port/arm64/lsfg/liblsfg-vk.so", "type": "shared-library"},
-    {"path": "gow3port/arm64/lsfg/VkLayer_LS_frame_generation.json", "type": "data"},
-    {"path": "gow3port/run-gow3.sh", "type": "executable"},
-    {"path": "gow3port/scripts/launch_env.py", "type": "data"},
-    {"path": "gow3port/scripts/patches.py", "type": "data"},
-    {"path": "gow3port/scripts/content_profile.py", "type": "data"},
-    {"path": "gow3port/scripts/game_identity.py", "type": "data"},
-    {"path": "gow3port/scripts/game_update.py", "type": "data"},
-    {"path": "gow3port/scripts/texture_diagnostics.py", "type": "data"},
-    {"path": "gow3port/scripts/graphics_options.py", "type": "data"},
-    {"path": "gow3port/scripts/link_libc.py", "type": "data"},
-    {"path": "gow3port/scripts/link_modules.py", "type": "data"},
-    {"path": "gow3port/scripts/mods.py", "type": "data"},
-    {"path": "gow3port/scripts/prepare.py", "type": "data"},
-    {"path": "gow3port/scripts/prepare_game.py", "type": "data"},
-    {"path": "gow3port/scripts/save_backup.py", "type": "data"},
-    {"path": "gow3port/patches/God_of_War_III_Remastered.xml", "type": "data"},
-    {"path": "gow3port/gow3-fex-compatible.json", "type": "data"},
-    {"path": "gow3port/gow3.default.ini", "type": "data"}
+    {
+      "path": "rootfs/usr/bin/Xvfb",
+      "type": "executable"
+    },
+    {
+      "path": "rootfs/usr/bin/sh",
+      "type": "executable"
+    },
+    {
+      "path": "rootfs/usr/libexec/fxshmd",
+      "type": "executable"
+    },
+    {
+      "path": "rootfs/usr/bin/FEX",
+      "type": "executable"
+    },
+    {
+      "path": "rootfs/usr/bin/python3.13",
+      "type": "executable"
+    },
+    {
+      "path": "rootfs/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
+      "type": "loader"
+    },
+    {
+      "path": "gow3port/arm64/bin/gow3-probe",
+      "type": "executable"
+    },
+    {
+      "path": "gow3port/arm64/bin/kgsl-chip-id",
+      "type": "executable"
+    },
+    {
+      "path": "gow3port/arm64/lib/libgow3cpu.so",
+      "type": "shared-library"
+    },
+    {
+      "path": "gow3port/arm64/lib/libgow3gpu.so",
+      "type": "shared-library"
+    },
+    {
+      "path": "gow3port/arm64/lsfg/liblsfg-vk.so",
+      "type": "shared-library"
+    },
+    {
+      "path": "gow3port/arm64/lsfg/VkLayer_LS_frame_generation.json",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/run-gow3.sh",
+      "type": "executable"
+    },
+    {
+      "path": "gow3port/scripts/launch_env.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/patches.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/content_profile.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/game_identity.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/game_update.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/texture_diagnostics.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/graphics_options.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/link_libc.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/link_modules.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/mods.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/prepare.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/prepare_game.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/scripts/save_backup.py",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/patches/God_of_War_III_Remastered.xml",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/gow3-fex-compatible.json",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/gow3.default.ini",
+      "type": "data"
+    },
+    {
+      "path": "gow3port/arm64/bin/orbis-pkg-util",
+      "type": "executable"
+    }
   ],
   "environment": {
     "FXD_FILES": "{files_dir}",
