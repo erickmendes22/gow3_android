@@ -6,6 +6,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <vector>
 
 #include "common/types.h"
@@ -69,8 +70,9 @@ public:
     void RecordMotion(vk::CommandBuffer cmdbuf, vk::ImageView depth_view, vk::ImageView motion_view,
                       u32 width, u32 height);
 
-    /// A bound constant buffer of 864 bytes: checks the scene constant signature.
-    void OnConstants(const float* data);
+    /// Scan bound scene vertex constants for algebraically validated camera matrices.
+    /// Float count comes from the actual guest buffer, never assumed to be 864 bytes.
+    void OnConstants(const float* data, size_t float_count);
 
     /// The G-buffer pass (5+ color targets): its depth is the scene depth.
     void OnGBufferPass(VideoCore::ImageId depth);
@@ -102,6 +104,11 @@ private:
     ObjectMotion* object_motion = nullptr;
     Camera current, previous;
     bool frame_has_camera = false;
+    bool have_pose = false, have_projection = false;
+    std::array<float, 12> frame_view{}, frame_inverse{};
+    std::array<float, 4> frame_projection{};
+    u32 frame_pose_votes = 0, frame_scanned_buffers = 0;
+    bool reported_camera = false;
     std::array<float, 2> jitter{}, previous_jitter{};
     std::array<u32, 2> render_size{};
     VideoCore::ImageId depth_id{};
