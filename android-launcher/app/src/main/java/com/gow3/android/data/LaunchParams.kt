@@ -35,26 +35,25 @@ internal data class LaunchOption(val value: String, val labelRes: Int)
 internal object LaunchParams {
     val all: List<LaunchParam> = listOf(
         LaunchParam(
-            key = "upscaler", labelRes = R.string.param_upscaler, groupRes = R.string.param_group_display,
+            key = "render_resolution", labelRes = R.string.param_render_resolution,
+            groupRes = R.string.param_group_display,
             options = listOf(
-                LaunchOption("off", R.string.param_option_off_720p),
-                LaunchOption("fsr3", R.string.param_option_fsr31),
+                LaunchOption("native", R.string.param_resolution_original),
+                LaunchOption("480p", R.string.param_resolution_480),
+                LaunchOption("720p", R.string.param_resolution_720),
+                LaunchOption("800p", R.string.param_resolution_800),
+                LaunchOption("1440p", R.string.param_resolution_1440),
+                LaunchOption("1800p", R.string.param_resolution_1800),
+                LaunchOption("4K", R.string.param_resolution_4k),
+                LaunchOption("1280x720", R.string.param_resolution_1280),
+                LaunchOption("960x540", R.string.param_resolution_960),
+                LaunchOption("854x480", R.string.param_resolution_854),
+                LaunchOption("752x424", R.string.param_resolution_752),
+                LaunchOption("640x360", R.string.param_resolution_640),
+                LaunchOption("426x240", R.string.param_resolution_426),
             ),
-            defaultValue = "fsr3",
-            descriptionRes = R.string.param_desc_upscaler,
-        ),
-        // PS4 game output and Vulkan FSR output are fixed at 1280x720 on Android.
-        // This controls only the temporal FSR input quality (NOT the output size).
-        LaunchParam(
-            key = "preset", labelRes = R.string.param_fsr_input, groupRes = R.string.param_group_display,
-            options = listOf(
-                LaunchOption("0", R.string.param_option_native),
-                LaunchOption("1", R.string.param_option_quality),
-                LaunchOption("3", R.string.param_option_performance),
-                LaunchOption("4", R.string.param_option_ultra_performance),
-            ),
-            defaultValue = "3",
-            descriptionRes = R.string.param_desc_fsr_input,
+            defaultValue = "720p",
+            descriptionRes = R.string.param_render_resolution_desc,
         ),
         LaunchParam(
             key = "disable_dynamic_shadows", labelRes = R.string.param_shadows,
