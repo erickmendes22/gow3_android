@@ -67,6 +67,10 @@ def main():
     (stage / 'lib').mkdir()
     shutil.copy2(OUT / 'gow3-probe', stage / 'bin/gow3-probe')
     shutil.copy2(OUT / 'kgsl-chip-id', stage / 'bin/kgsl-chip-id')
+    pkg_tool = OUT / 'orbis-pkg-util'
+    if not pkg_tool.is_file():
+        raise SystemExit('Missing PS4 package extractor: out/arm64/orbis-pkg-util')
+    shutil.copy2(pkg_tool, stage / 'bin/orbis-pkg-util')
     # The game patches the settings screen chooses from (run-gow3.sh), compiled here.  Some
     # regional eboots are not yet address-validated; stage an empty directory for those so the
     # native runtime can still be tested unpatched.
@@ -81,7 +85,8 @@ def main():
         shutil.copytree(ROOT / 'fsr4_shaders', stage / 'fsr4_shaders')
     for name, source in sorted(ship.items()):
         shutil.copy2(source.resolve(), stage / 'lib' / name)
-    for path in [stage / 'bin/gow3-probe', stage / 'bin/kgsl-chip-id', *(stage / 'lib').iterdir()]:
+    for path in [stage / 'bin/gow3-probe', stage / 'bin/kgsl-chip-id',
+                 stage / 'bin/orbis-pkg-util', *(stage / 'lib').iterdir()]:
         subprocess.run(['llvm-strip', '--strip-debug', str(path)], check=True)
         if path.parent.name == 'lib':
             subprocess.run(['patchelf', '--set-rpath', '$ORIGIN', str(path)], check=True)

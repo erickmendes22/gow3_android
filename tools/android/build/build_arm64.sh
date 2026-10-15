@@ -86,7 +86,7 @@ unset PKG_CONFIG_SYSROOT_DIR PKG_CONFIG_LIBDIR
 # Banners/elapsed time print on every run; the rolling "[N/M]" line only shows on a TTY
 # (no-op when output is piped, so CI logs stay clean).
 step=0
-total=4
+total=5
 _t0=0
 
 begin() { step=$((step + 1)); _t0=$(date +%s); printf '\n==> [%d/%d] %s\n' "$step" "$total" "$*"; }
@@ -183,7 +183,7 @@ if llvm-readelf --dyn-syms --wide "$out/gpu/libgow3gpu.so" | grep -Eq 'UND.*_ZN3
 fi
 end_stage "libgow3gpu.so"
 
-# ---- 3/4 gow3-probe (the loader) --------------------------------------------
+# ---- 3/5 gow3-probe (the loader) --------------------------------------------
 cc=(clang --target=aarch64-linux-gnu --sysroot="$sysroot" -fuse-ld=lld)
 export PKG_CONFIG_SYSROOT_DIR=$sysroot
 export PKG_CONFIG_LIBDIR=$sysroot/usr/lib/aarch64-linux-gnu/pkgconfig:$sysroot/usr/share/pkgconfig
@@ -209,7 +209,7 @@ archiver=${GOW3_AR:-$(command -v llvm-ar || true)}
 "$archiver" rcs "$out/libatrac9.a" "$out"/atrac9/*.o
 end_stage "libatrac9.a"
 
-# ---- 4/4 gow3-probe (the loader) --------------------------------------------
+# ---- 4/5 gow3-probe (the loader) --------------------------------------------
 begin "gow3-probe (loader)"
 # src/runtime*.c includes runtime_cpu.c (a stub on ARM64: libgow3cpu.so implements guest_cpu.h).
 "${cc[@]}" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -no-pie "${includes[@]}" -I. -Isrc \
@@ -219,5 +219,31 @@ begin "gow3-probe (loader)"
     "${libraries[@]}" -o "$out/gow3-probe"
 end_stage "gow3-probe"
 
+# ---- 5/5 PS4 PKG extractor (game-free ARM64 binary) --------------------------
+# Pure Rust Orbis PKG/PFS implementation; pinned to a reviewed public revision.
+# The user supplies any game/update packages through Android SAF, not at build time.
+begin "orbis-pkg-util (aarch64)"
+pkg_revision=13f1294a87a53d54f82feec56acbfd03f50667a9
+pkg_src="$root/.local-deps/android/orbis-pkg"
+command -v cargo >/dev/null || { echo 'PKG installer requires Rust cargo' >&2; exit 1; }
+command -v rustup >/dev/null || { echo 'PKG installer requires rustup' >&2; exit 1; }
+if [[ ! -d "$pkg_src/.git" ]]; then
+    git clone --no-checkout https://github.com/videobitva/orbis.git "$pkg_src"
+fi
+git -C "$pkg_src" fetch --depth=1 origin "$pkg_revision"
+git -C "$pkg_src" checkout --detach --force "$pkg_revision"
+rustup target add aarch64-unknown-linux-gnu
+export GOW3_ARM64_SYSROOT="$sysroot"
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER="$root/tools/android/build/aarch64-cargo-linker.sh"
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-Clink-arg=-fuse-ld=lld"
+(
+    cd "$pkg_src"
+    cargo build --locked --release --target aarch64-unknown-linux-gnu \
+        --target-dir "$out/orbis-cargo" -p orbis-pkg-util
+)
+install -m 0755 "$out/orbis-cargo/aarch64-unknown-linux-gnu/release/orbis-pkg-util" "$out/orbis-pkg-util"
+llvm-readelf -h "$out/orbis-pkg-util" | grep -q 'Machine:.*AArch64'
+end_stage "orbis-pkg-util"
+
 printf '\nAll ARM64 artifacts built:\n'
-ls -lh "$out/fex/libgow3cpu.so" "$out/gpu/libgow3gpu.so" "$out/gow3-probe"
+ls -lh "$out/fex/libgow3cpu.so" "$out/gpu/libgow3gpu.so" "$out/gow3-probe" "$out/orbis-pkg-util"

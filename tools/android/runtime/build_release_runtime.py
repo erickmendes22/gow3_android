@@ -222,6 +222,8 @@ def main():
         missing.append('migrated rootfs: usr/lib/aarch64-linux-gnu/libvulkan_freedreno.so')
     if not (NATIVE / 'bin/gow3-probe').is_file():
         missing.append('ARM64 bundle: bin/gow3-probe (run build_arm64_bundle.py)')
+    if not (NATIVE / 'bin/orbis-pkg-util').is_file():
+        missing.append('ARM64 bundle: bin/orbis-pkg-util (PKG import requires a native extractor)')
     if not (NATIVE / 'lib/libgow3cpu.so').is_file():
         missing.append('ARM64 bundle: lib/libgow3cpu.so (run build_arm64_bundle.py)')
     missing.extend('main Turnip: ' + name for name in TURNIP_FILES.values()
