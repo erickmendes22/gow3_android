@@ -27,7 +27,7 @@ class AndroidDisplayTests(unittest.TestCase):
     def test_runtime_messages_do_not_mention_retired_feature(self):
         launch = (ROOT / "tools/android/device/run-gow3.sh").read_text()
         self.assertNotIn("fsr=disabled", launch)
-        self.assertNotIn("upscaler=\${GOW3_UPSCALER", launch)
+        self.assertNotIn("upscaler=${GOW3_UPSCALER", launch)
         self.assertIn('export GOW3_UPSCALER=none', launch)
         patches = (ROOT / "scripts/patches.py").read_text()
         self.assertNotIn("without FSR", patches)
