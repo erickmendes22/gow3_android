@@ -10,7 +10,10 @@ never did, the next start goes back to the last confirmed values.
 import json
 from pathlib import Path
 
-RESOLUTIONS = ('native', '480p', '720p', '800p', '1440p', '1800p', '4K')
+RESOLUTIONS = ('native', '480p', '720p', '800p', '1440p', '1800p', '4K',
+               '1280x720', '960x540', '854x480', '752x424', '640x360', '426x240')
+DIRECT_RESOLUTIONS = frozenset(('1280x720', '960x540', '854x480',
+                                '752x424', '640x360', '426x240'))
 ENGINE_FPS = (60, 120, 240)
 DEFAULTS = {'render_resolution': 'native', 'engine_fps': '120', 'deferred_readback': '1',
             'stale_readback': '1', 'async_shaders': '1'}
@@ -93,7 +96,8 @@ def patch_names(names, options, texture_fix_available=True):
     names = [n for n in names if not n.startswith(RESOLUTION_PREFIX) and not n.startswith(FPS_PREFIX)]
     resolution = options['render_resolution']
     if resolution != 'native':
-        names = [n for n in names if n != TEXTURE_FIX] + [f'{RESOLUTION_PREFIX} - {resolution}']
+        patch_resolution = '720p' if resolution in DIRECT_RESOLUTIONS else resolution
+        names = [n for n in names if n != TEXTURE_FIX] + [f'{RESOLUTION_PREFIX} - {patch_resolution}']
     elif texture_fix_available and TEXTURE_FIX not in names:
         names.insert(0, TEXTURE_FIX)
     if options['engine_fps'] != '60':
