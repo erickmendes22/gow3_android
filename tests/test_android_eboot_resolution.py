@@ -94,7 +94,7 @@ class Cusa01715ResolutionTests(unittest.TestCase):
             with self.subTest(render=render), tempfile.TemporaryDirectory() as t:
                 folder = Path(t)
                 config = folder / "gow3.ini"
-                config.write_text(f"upscaler=fsr3\\nrender_resolution={render}\\n")
+                config.write_text(f"upscaler=fsr3\nrender_resolution={render}\n")
                 with patch.object(patches, "patch_profile_status", return_value=verified):
                     plan = launch_env.derive(folder, config, folder / "state.json",
                                              {"GOW3_ANDROID_PORT": "1"})
