@@ -2,6 +2,7 @@ package com.gow3.android
 
 import android.content.Context
 import android.content.Intent
+import android.app.AlertDialog
 import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -86,7 +87,28 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-        // Do not force the directory picker before the user can install a PKG.
+        // First run (or a previously selected folder that no longer exists):
+        // present BOTH supported game sources, rather than opening the old
+        // folder-only picker or leaving the user with no setup dialog.
+        // Posting after setContent ensures the launcher window is attached.
+        if (savedInstanceState == null && !gameFolderManager.hasGameFolder()) {
+            window.decorView.post {
+                if (!isFinishing && !isDestroyed && !gameFolderManager.hasGameFolder()) {
+                    showFirstRunGameSource()
+                }
+            }
+        }
+    }
+
+    private fun showFirstRunGameSource() {
+        AlertDialog.Builder(this)
+            .setTitle("Configurar God of War III")
+            .setMessage("Como deseja adicionar o jogo? Você pode instalar um PKG diretamente " +
+                "numa pasta escolhida ou selecionar uma pasta já extraída.")
+            .setPositiveButton("Instalar PKG") { _, _ -> pkgInstallManager.pickBasePkg() }
+            .setNegativeButton("Selecionar pasta") { _, _ -> gameFolderManager.chooseGameFolder() }
+            .setCancelable(false)
+            .show()
     }
 
     @Deprecated("Legacy Activity Result API is required by this target SDK flow")
