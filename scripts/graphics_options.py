@@ -10,10 +10,26 @@ never did, the next start goes back to the last confirmed values.
 import json
 from pathlib import Path
 
-RESOLUTIONS = ('native', '480p', '720p', '800p', '1440p', '1800p', '4K',
-               '1280x720', '960x540', '854x480', '752x424', '640x360', '426x240')
-DIRECT_RESOLUTIONS = frozenset(('1280x720', '960x540', '854x480',
-                                '752x424', '640x360', '426x240'))
+# One menu entry per physical resolution; retain the original/old game patches
+# and expose the genuinely new, byte-verified CUSA01715 resolutions.
+RESOLUTIONS = ('240p', '360p', '424p', '480p', '540p', '720p', '800p',
+               'native', '1440p', '1800p', '4K')
+DIRECT_PIXEL_RESOLUTIONS = {
+    '240p': '426x240',
+    '360p': '640x360',
+    '424p': '752x424',
+    '540p': '960x540',
+}
+DIRECT_RESOLUTIONS = frozenset(DIRECT_PIXEL_RESOLUTIONS)
+# Old versions exposed the same 480p and 720p twice under raw pixel names.
+# Migrate those configurations while preserving the unchanged legacy patches.
+LEGACY_RESOLUTION_ALIASES = {
+    '426x240': '240p', '640x360': '360p', '752x424': '424p',
+    '854x480': '480p', '960x540': '540p', '1280x720': '720p',
+    '1080p': 'native',
+}
+def canonical_resolution(value):
+    return LEGACY_RESOLUTION_ALIASES.get(value, value)
 ENGINE_FPS = (60, 120, 240)
 DEFAULTS = {'render_resolution': 'native', 'engine_fps': '120', 'deferred_readback': '1',
             'stale_readback': '1', 'async_shaders': '1'}
@@ -57,6 +73,7 @@ def write_keys(path, updates):
 def startup_options(ini):
     """The startup options, normalized; unknown values fall back to the defaults."""
     options = {key: ini.get(key, value) for key, value in DEFAULTS.items()}
+    options['render_resolution'] = canonical_resolution(options['render_resolution'])
     if options['render_resolution'] not in RESOLUTIONS:
         options['render_resolution'] = 'native'
     if options['engine_fps'] not in {str(f) for f in ENGINE_FPS}:
