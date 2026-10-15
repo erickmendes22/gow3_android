@@ -199,8 +199,16 @@ internal class PkgInstallManager(
         if (pkg.canonicalFile == dest.canonicalFile || pkg.canonicalFile.parentFile == dest.canonicalFile)
             throw IOException("Escolha outra pasta: o PKG não pode ficar dentro do destino")
         val selectedUpdate = preferences.getString("update_dir", null)?.let(::File)
-        val replacingUpdate = update && selectedUpdate?.canonicalFile == dest.canonicalFile
-        if (dest.listFiles()?.isNotEmpty() != false && !replacingUpdate)
+        // Existing update: demand the SAME destination. Otherwise another
+        // full update folder would be created and consume storage twice.
+        if (update && selectedUpdate?.exists() == true &&
+            selectedUpdate.canonicalFile != dest.canonicalFile)
+            throw IOException("O update já está instalado. Escolha a MESMA pasta do update para não duplicar arquivos.")
+        val existingEntries = dest.listFiles()
+            ?: throw IOException("Não foi possível listar a pasta escolhida")
+        val replacingUpdate = update && selectedUpdate?.canonicalFile == dest.canonicalFile &&
+            existingEntries.isNotEmpty()
+        if (existingEntries.isNotEmpty() && !replacingUpdate)
             throw IOException("Escolha uma pasta vazia: não criaremos outra cópia nem sobrescreveremos arquivos de terceiros")
         // Do not install an update over the game: our existing runtime overlays
         // the two directories and should never copy the patch into the base.
