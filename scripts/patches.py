@@ -357,7 +357,7 @@ CUSA01715_0102_FIELDS = ('width', 'height', 'width', 'height',
                           'height', 'width', 'width', 'height')
 
 
-def android_fsr_input_writes(xml, image, segments, sha, render_res, patch_names):
+def android_native_resolution_writes(xml, image, segments, sha, render_res, patch_names):
     """Return exact-byte-verified CUSA01715 startup-resize overrides for this ELF.
 
     Applies ONLY to the supplied 01.02 executable, and never silently treats
@@ -368,16 +368,16 @@ def android_fsr_input_writes(xml, image, segments, sha, render_res, patch_names)
     if not render_res:
         return {}, None
     if sha != CUSA01715_0102_ANDROID_SHA:
-        raise ValueError('FSR startup resolution requires verified CUSA01715 01.02 eboot.bin')
+        raise ValueError('Direct resolution requires verified CUSA01715 01.02 eboot.bin')
     if 'Resolution Patch - 720p' not in patch_names:
-        raise ValueError('FSR startup input patch requires the 720p resolution profile')
+        raise ValueError('Direct resolution requires verified 720p patch template')
     match = re.fullmatch(r'([0-9]{2,4})x([0-9]{2,4})', render_res)
     if not match:
-        raise ValueError(f'invalid FSR input resolution {render_res!r}')
+        raise ValueError(f'invalid direct resolution {render_res!r}')
     width, height = map(int, match.groups())
-    if (width, height) not in ((1280, 720), (854, 480), (752, 424),
+    if (width, height) not in ((1280, 720), (960, 540), (854, 480), (752, 424),
                               (640, 360), (426, 240)):
-        raise ValueError(f'unsupported verified Android FSR input preset: {render_res}')
+        raise ValueError(f'unsupported verified direct resolution: {render_res}')
     template = compile_patches(xml, ['Resolution Patch - 720p'], '01.02',
                                segments, image)
     if len(template) != 9:
@@ -395,7 +395,7 @@ def android_fsr_input_writes(xml, image, segments, sha, render_res, patch_names)
         if patched != (1280 if field == 'width' else 720).to_bytes(len(patched), 'little'):
             raise ValueError(f'FSR site {i}: 720p patch template mismatch at {address:#x}')
         overrides[offset] = (width if field == 'width' else height).to_bytes(len(patched), 'little')
-    return overrides, {'render': f'{width}x{height}', 'output': '1280x720',
+    return overrides, {'render': f'{width}x{height}', 'output': f'{width}x{height}',
                        'verified_eboot_sha256': sha,
                        'verified_sites': [hex(site) for site in CUSA01715_0102_SITES]}
 
@@ -431,15 +431,15 @@ def main():
     skipped={}
     image=eboot_image(elf)
     writes=compile_patches(xml,names,None,segments,image,skipped)
-    fsr_input = os.environ.get('GOW3_PATCH_INPUT_RES', '')
-    fsr_info = None
-    if fsr_input:
+    native_input = os.environ.get('GOW3_PATCH_INPUT_RES', '')
+    native_info = None
+    if native_input:
         # If the 720p patch signature fails, DO NOT report that the new input
         # resolution was installed or allow FSR to run on mismatched buffers.
         if 'Resolution Patch - 720p' in skipped:
-            raise ValueError('cannot apply FSR input: the 720p base patch was skipped')
-        overrides, fsr_info = android_fsr_input_writes(
-            xml,image,segments,sha,fsr_input,names)
+            raise ValueError('cannot apply direct resolution: 720p template skipped')
+        overrides, native_info = android_native_resolution_writes(
+            xml,image,segments,sha,native_input,names)
         unmatched = set(overrides)
         remapped = []
         for offset,data in writes:
@@ -448,10 +448,10 @@ def main():
                 unmatched.discard(offset)
             remapped.append((offset,data))
         if unmatched:
-            raise ValueError(f'FSR input overrides missing from patch stream: {sorted(unmatched)}')
+            raise ValueError(f'direct resolution overrides missing from patch stream: {sorted(unmatched)}')
         writes=remapped
-        print(f"Patches: verified CUSA01715 FSR scene input {fsr_info['render']} -> "
-              f"output {fsr_info['output']} ({len(overrides)} operand writes)")
+        print(f"Patches: verified CUSA01715 DIRECT render {native_info['render']} "
+              f"without FSR ({len(overrides)} operand writes)")
     for name,reason in skipped.items():
         print(f'Patches: {name} skipped ({reason} in this eboot.bin)')
     if a.patches_dir and sha==REFERENCE_SHA256:
@@ -462,7 +462,7 @@ def main():
     write_patches(a.out,writes)
     applied=[n for n in names if n not in skipped]
     (a.out/'patch_status.json').write_text(json.dumps({'sha256':sha,'applied':applied,
-        'skipped':skipped,'android_fsr':fsr_info}))
+        'skipped':skipped,'android_native_resolution':native_info}))
     print(f'Patches: {title}; {len(writes)} writes from {applied or "none"}')
 
 if __name__=='__main__':
