@@ -26,7 +26,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /** Graphics settings for the Thor, kept in gow3.ini (run-gow3.sh reads them at start: scene
- *  size, upscaler, the game's effect patches). Other lines and comments of the file are kept. */
+ *  size, game resolution, the game's effect patches). Other lines and comments of the file are kept. */
 final class SettingsDialog {
     /** Scene sizes of the presets at the Thor's 1280x720 output (run-gow3.sh). */
     private static final String[] PRESETS={"Native (1280×720)","Quality (854×480)",
@@ -41,7 +41,7 @@ final class SettingsDialog {
         {"effect_dynamic_shadows","Shadows from dynamic lights","1"},
         {"effect_ssr","Screen-space reflections (not in the original)","0"},
     };
-    // FSR 4 (INT8) is not offered: ~470 ms a frame and a black scene on the Adreno 740 (run-gow3.sh).
+    // Legacy temporal reconstruction controls are not exposed on Android.
     /** Game settings: the game patches run-gow3.sh applies at start (patch-parts), as upstream's
      *  System menu pages and launcher offer them: {key, title, note, default}. */
     private static final String[][] GAME_PATCHES={
@@ -190,11 +190,11 @@ final class SettingsDialog {
         LinearLayout box=new LinearLayout(activity); box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(24),dp(4),dp(24),dp(8));
 
-        heading(box,"Render resolution (FSR disabled)");
+        heading(box,"Render resolution");
         final RadioGroup resolutions=choices(box,RESOLUTION_NAMES,
             indexOf(RESOLUTION_VALUES,canonicalResolution(get("render_resolution","720p")),5));
         final TextView nativeNote=new TextView(activity);
-        nativeNote.setText("All presets change the game's own resolution. No temporal FSR or upscaling.");
+        nativeNote.setText("Choose the game rendering resolution. Changes apply after restart.");
         nativeNote.setTextSize(13); nativeNote.setAlpha(0.7f); box.addView(nativeNote);
         heading(box,"Image");
         final Switch sharpen=toggle(box,"Sharpening","1".equals(get("sharpen","0")));
@@ -377,8 +377,7 @@ final class SettingsDialog {
      *  (run-gow3.sh wrote lsfg-vk.toml), changes go to that file and apply at once (lsfg-vk watches
      *  it; off is multiplier 1). Turning it on when the layer was not loaded restarts the game.
      *  flow scale 已按 run-gow3.sh 的白名单补齐 0.25 档（见 LSFG_FLOW_VALUES）。这是本移植唯一的
-     *  帧生成路径：FSR 3.1 帧生成（frame_generation=1）没有接通，shadps4 无 GOW3_FRAME_GEN 消费者，
-     *  所以这里不要再加一个"FSR 帧生成"开关。 */
+     *  帧生成仅通过 Lossless Scaling 实现，不提供其他帧生成开关。 */
     void showLossless(java.util.function.BooleanSupplier gameRunning,Runnable onLiveApplied) {
         load();
         final File live=new File(file.getParentFile(),"lsfg-vk.toml");
@@ -391,7 +390,7 @@ final class SettingsDialog {
         final Switch lsfgPerformance=toggle(box,"Performance mode","1".equals(get("lsfg_performance","0")));
         TextView lsfgNote=new TextView(activity); lsfgNote.setTextSize(13); lsfgNote.setAlpha(0.7f);
         lsfgNote.setText("Needs Lossless.dll from your own Lossless Scaling (Steam) next to the game "
-            +"folder. Works with any upscaler and replaces FSR 3.1 frame generation. "
+            +"folder. Uses the final game image and requires no game resolution changes. "
             +"It sees only finished frames, so fast motion and the HUD show more artifacts. Lower flow "
             +"scale and performance mode are faster. Changes apply while you play; only turning it on "
             +"after starting without it restarts the game.");
