@@ -172,8 +172,8 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             config = Path(tmp) / "gow3.ini"
             state = Path(tmp) / "graphics_state.json"
-            config.write_text("upscaler=fsr3\\npreset=3\\nrender_resolution=640x360\\n"
-                              "effect_dynamic_shadows=0\\n")
+            config.write_text("upscaler=fsr3\npreset=3\nrender_resolution=640x360\n"
+                              "effect_dynamic_shadows=0\n")
             env = {"GOW3_ANDROID_PORT": "1"}
             with patch.object(patches, "patch_profile_status", return_value=identity(verified)), \
                     patch.object(patches, "game_profile", return_value=profile):
