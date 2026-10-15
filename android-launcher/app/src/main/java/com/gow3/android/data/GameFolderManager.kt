@@ -9,6 +9,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Environment
+import android.os.Build
+import android.provider.Settings
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -25,6 +27,7 @@ internal class GameFolderManager(private val activity: Activity) {
         const val REQUEST_GAME_FOLDER = 1001
         const val REQUEST_UPDATE_FOLDER = 1007
         const val REQUEST_STORAGE = 1002
+        const val REQUEST_ALL_FILES_FOLDER = 1013
         private val SERIALS = arrayOf("CUSA01740", "CUSA00900", "CUSA00207", "CUSA00208", "CUSA00299",
             "CUSA01363", "CUSA03179", "CUSA03014", "CUSA03023")
     }
@@ -75,9 +78,41 @@ internal class GameFolderManager(private val activity: Activity) {
     }
 
     private fun chooseFolder(kind: Kind) {
-        if (activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+        // The native game runtime reads eboot.bin by its real filesystem path.
+        // On Android 11+ the legacy READ_EXTERNAL_STORAGE permission cannot
+        // grant this access. Use the same direct-path permission as PKG install.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                pendingFolderKind = kind
+                AlertDialog.Builder(activity)
+                    .setTitle("Acesso à pasta do jogo")
+                    .setMessage("Para executar o jogo de uma pasta escolhida, " +
+                        "autorize o acesso aos arquivos deste aplicativo. " +
+                        "O jogo não será copiado.")
+                    .setPositiveButton("Permitir") { _, _ ->
+                        try {
+                            activity.startActivityForResult(
+                                Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                    Uri.parse("package:${activity.packageName}")),
+                                REQUEST_ALL_FILES_FOLDER)
+                        } catch (e: Exception) {
+                            pendingFolderKind = null
+                            AlertDialog.Builder(activity)
+                                .setMessage("Não foi possível abrir a permissão: ${e.message}")
+                                .setPositiveButton("OK", null).show()
+                        }
+                    }
+                    .setNegativeButton("Cancelar") { _, _ -> pendingFolderKind = null }
+                    .show()
+            } else {
+                showFolderDialog(kind)
+            }
+        } else if (activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED) {
             pendingFolderKind = kind
-            activity.requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE), REQUEST_STORAGE)
+            activity.requestPermissions(
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE), REQUEST_STORAGE)
         } else {
             showFolderDialog(kind)
         }
@@ -100,13 +135,28 @@ internal class GameFolderManager(private val activity: Activity) {
     }
 
     fun onFolderResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQUEST_ALL_FILES_FOLDER) {
+            val pending = pendingFolderKind
+            pendingFolderKind = null
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                Environment.isExternalStorageManager()) {
+                showFolderDialog(pending ?: Kind.GAME)
+            } else {
+                AlertDialog.Builder(activity)
+                    .setMessage("Acesso aos arquivos não autorizado. " +
+                        "Você ainda pode instalar um PKG ou escolher a pasta depois.")
+                    .setPositiveButton("OK", null).show()
+            }
+            return
+        }
         val kind = when (requestCode) {
             REQUEST_GAME_FOLDER -> Kind.GAME
             REQUEST_UPDATE_FOLDER -> Kind.UPDATE
             else -> return
         }
         if (resultCode != Activity.RESULT_OK || data?.data == null) {
-            if (kind == Kind.GAME) ensureGameFolder()
+            // Cancelling folder selection must not reopen the picker forever:
+            // the Home page still offers direct PKG installation.
             return
         }
         var dir = folderOf(data.data!!)
