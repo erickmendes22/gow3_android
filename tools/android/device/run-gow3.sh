@@ -246,6 +246,7 @@ eval "$(PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/launch_env.py"
 # merely the preset selected by the UI. scripts/patches.py checks the signature
 # and original bytes again before writing patches.bin.
 echo "GOW3_NATIVE_RESOLUTION: status=${GOW3_RESOLUTION_STATUS:-unknown} patch=${GOW3_PATCH_INPUT_RES:-standard}"
+echo "Game language: system_param=${GOW3_LANGUAGE:-1} (1=English, 17=Portuguese-Brazil)"
 # The retail pool is 5056 MiB; the resolution/texture patches ask for more (7104+ for the default
 # set). On a phone RAM is the binding constraint: lower the patch set / resolution if the app is
 # killed. See docs/ANDROID_PORT.md.

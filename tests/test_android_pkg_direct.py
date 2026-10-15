@@ -28,13 +28,16 @@ class AndroidPkgDirectTests(unittest.TestCase):
         self.assertNotIn("stage.renameTo(", source)
         self.assertIn("dest.listFiles()", source)
 
-    def test_no_duplicate_updates_or_base_overwrite(self):
+    def test_updates_use_selected_base_and_validate_title_before_extraction(self):
         source = PKG.read_text()
         self.assertIn("replacingUpdate", source)
         self.assertIn('arguments.add("--force")', source)
         self.assertIn('"update_dir"', source)
         self.assertIn('"game_dir"', source)
-        self.assertIn('previousTitle != title', source)
+        self.assertIn('baseTitle != title', source)
+        self.assertIn('selectedDestination = Uri.fromFile(base)', source)
+        self.assertIn('if (update) edit.remove("update_dir")', source)
+        self.assertLess(source.index('if (baseTitle != title)'), source.index('execute(loader, helper, arguments, dest)'))
         self.assertIn('dest.canonicalFile', source)
 
     def test_direct_filesystem_permission_and_launcher(self):

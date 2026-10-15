@@ -20,7 +20,8 @@ import ro.cobrabm.fexdroid.RuntimeInstaller
 /**
  * Direct, zero-copy PKG installation.
  *
- * Select an existing local PKG, then choose the EXACT empty destination folder.
+ * Base game: select a PKG and an empty destination folder. Updates: select a
+ * PKG and install directly into the already selected game folder after title validation.
  * orbis-pkg-util opens the original local file and creates the unpacked files
  * inside that folder. The PKG is never duplicated; there is no staging folder
  * and the output is never copied between folders.
@@ -29,8 +30,8 @@ import ro.cobrabm.fexdroid.RuntimeInstaller
  * path for both the PKG and destination. A remote SAF/cloud provider cannot
  * work with its seek/mmap I/O; reject it instead of making an implicit copy.
  *
- * GoW3's existing game_update.py overlays the independent update folder on the
- * independent base folder. No updated files are duplicated into the base.
+ * Legacy separately selected update folders remain usable through the launcher;
+ * installing an update PKG now merges it into the selected game instead.
  */
 internal class PkgInstallManager(
     private val activity: Activity,
@@ -66,6 +67,13 @@ internal class PkgInstallManager(
                 Toast.LENGTH_SHORT).show()
             return
         }
+        if (update) {
+            val base = preferences.getString("game_dir", null)?.let(::File)
+            if (base == null || !File(base, "eboot.bin").isFile) {
+                error(localized("Select or install the base game before the update", "Selecione ou instale o jogo base antes do update"))
+                return
+            }
+        }
         // targetSdk 28 uses the legacy read/write permission dialog, including
         // on Android 11+. SAF selection alone does not authorize native path I/O.
         if (activity.applicationInfo.targetSdkVersion < 30 &&
@@ -100,6 +108,18 @@ internal class PkgInstallManager(
                 if (result != Activity.RESULT_OK || data?.data == null) return true
                 val update = request == REQUEST_UPDATE_PKG
                 selected = Selection(data.data!!, update)
+                if (update) {
+                    val base = preferences.getString("game_dir", null)?.let(::File)
+                    if (base == null || !File(base, "eboot.bin").isFile) {
+                        clearSelection()
+                        error(localized("Select or install the base game before the update", "Selecione ou instale o jogo base antes do update"))
+                        return true
+                    }
+                    // Internal URI only: updates use the selected game folder.
+                    selectedDestination = Uri.fromFile(base)
+                    startSelectedInstall()
+                    return true
+                }
                 try {
                     activity.startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or
@@ -134,7 +154,7 @@ internal class PkgInstallManager(
                     AlertDialog.Builder(activity)
                         .setTitle(localized("Direct installation permission", "Permissão para instalação direta"))
                         .setMessage(localized("To extract the PKG directly into the selected folder, ", "Para extrair o PKG diretamente na pasta escolhida, ") +
-                            localized("without extra copies, the extractor needs direct access to ", "sem criar cópias, o extrator precisa acessar os arquivos ") +
+                            localized("the extractor needs direct access to ", "o extrator precisa acessar os arquivos ") +
                             localized("local files. Allow access to ", "locais pelo caminho de armazenamento. Autorize o acesso a ") +
                             localized("all files to continue.", "todos os arquivos para continuar."))
                         .setPositiveButton(localized("Allow", "Permitir")) { _, _ ->
@@ -158,7 +178,7 @@ internal class PkgInstallManager(
             REQUEST_ALL_FILES_ACCESS -> {
                 if (needsAllFilesAccess()) {
                     clearSelection()
-                    error(localized("Storage permission denied: direct installation cancelled; no copies created", "Sem permissão de armazenamento: instalação direta cancelada, sem cópias"))
+                    error(localized("Storage permission denied: installation cancelled", "Permissão de armazenamento negada: instalação cancelada"))
                 } else {
                     startSelectedInstall()
                 }
@@ -185,7 +205,7 @@ internal class PkgInstallManager(
         onState(true, localized("Extracting PKG directly into the selected folder…", "Extraindo PKG diretamente na pasta selecionada…"))
         val dialog = AlertDialog.Builder(activity)
             .setTitle(if (choice.update) localized("Installing update PKG", "Instalando atualização PKG") else localized("Installing game PKG", "Instalando jogo PKG"))
-            .setMessage(localized("Extraction uses the selected folder without an extra copy of the PKG.", "A extração usa a pasta escolhida, sem cópia adicional do PKG."))
+            .setMessage(localized("Extraction uses the selected folder.", "A extração usa a pasta escolhida."))
             .setCancelable(false)
             .create()
         dialog.show()
@@ -242,24 +262,17 @@ internal class PkgInstallManager(
             throw IOException(localized("Original PKG unavailable: ${pkg.path}", "PKG original indisponível: ${pkg.path}"))
         if (!dest.isDirectory || !dest.canWrite())
             throw IOException(localized("No write access to the selected folder: ${dest.path}", "Sem permissão de escrita na pasta escolhida: ${dest.path}"))
-        if (pkg.canonicalFile == dest.canonicalFile || pkg.canonicalFile.parentFile == dest.canonicalFile)
+        if (!update && (pkg.canonicalFile == dest.canonicalFile || pkg.canonicalFile.parentFile == dest.canonicalFile))
             throw IOException(localized("Choose another folder: the PKG cannot be inside the destination", "Escolha outra pasta: o PKG não pode ficar dentro do destino"))
-        val selectedUpdate = preferences.getString("update_dir", null)?.let(::File)
-        // Existing update: demand the SAME destination. Otherwise another
-        // full update folder would be created and consume storage twice.
-        if (update && selectedUpdate?.exists() == true &&
-            selectedUpdate.canonicalFile != dest.canonicalFile)
-            throw IOException(localized("The update is already installed. Choose the SAME update folder to avoid duplicate files.", "O update já está instalado. Escolha a MESMA pasta do update para não duplicar arquivos."))
         val existingEntries = dest.listFiles()
             ?: throw IOException(localized("Could not list the selected folder", "Não foi possível listar a pasta escolhida"))
-        val replacingUpdate = update && selectedUpdate?.canonicalFile == dest.canonicalFile &&
-            existingEntries.isNotEmpty()
-        if (existingEntries.isNotEmpty() && !replacingUpdate)
-            throw IOException(localized("Choose an empty folder to avoid duplicate copies or overwriting unrelated files", "Escolha uma pasta vazia: não criaremos outra cópia nem sobrescreveremos arquivos de terceiros"))
-        // Do not install an update over the game: our existing runtime overlays
-        // the two directories and should never copy the patch into the base.
         val base = preferences.getString("game_dir", null)?.let(::File)
-        if (base != null && (base.canonicalFile == dest.canonicalFile ||
+        val replacingUpdate = update && base?.canonicalFile == dest.canonicalFile
+        if (update && !replacingUpdate)
+            throw IOException(localized("The update destination must be the selected game folder", "O destino da atualização deve ser a pasta do jogo selecionado"))
+        if (existingEntries.isNotEmpty() && !update)
+            throw IOException(localized("Choose an empty folder for the base game", "Escolha uma pasta vazia para o jogo base"))
+        if (!update && base != null && (base.canonicalFile == dest.canonicalFile ||
                 isNested(dest.canonicalFile, base.canonicalFile)))
             throw IOException(localized("Do not extract an update inside the base game folder", "Não extraia uma atualização dentro da pasta do jogo base"))
         val updateDir = preferences.getString("update_dir", null)?.let(::File)
@@ -280,12 +293,7 @@ internal class PkgInstallManager(
         if (!update && base != null && File(base, "eboot.bin").isFile &&
             ParamSfoTitle.readTitleId(File(base, "sce_sys/param.sfo")) == title)
             throw IOException(localized("Game ${title} is already installed in ${base.path}; ", "O jogo ${title} já está instalado em ${base.path}; ") +
-                localized("no second copy was created.", "não criei uma segunda cópia."))
-        if (update && selectedUpdate != null && !replacingUpdate &&
-            File(selectedUpdate, "eboot.bin").isFile &&
-            ParamSfoTitle.readTitleId(File(selectedUpdate, "sce_sys/param.sfo")) == title)
-            throw IOException(localized("An update for ${title} already exists in ${selectedUpdate.path}. ", "Já existe atualização para ${title} em ${selectedUpdate.path}. ") +
-                localized("Select that same folder to replace it without duplicate copies.", "Selecione essa mesma pasta para substituí-la sem criar duplicações."))
+                localized("select that game folder.", "selecione essa pasta do jogo."))
         if (update) {
             if (base == null || !File(base, "eboot.bin").isFile)
                 throw IOException(localized("Select or install the base game before the update", "Selecione ou instale o jogo base antes do update"))
@@ -293,17 +301,10 @@ internal class PkgInstallManager(
                 ?: throw IOException(localized("Base game TITLE_ID unavailable", "TITLE_ID do jogo base indisponível"))
             if (baseTitle != title)
                 throw IOException(localized("Update ${title} does not match game ${baseTitle}", "Atualização ${title} não corresponde ao jogo ${baseTitle}"))
-            if (replacingUpdate) {
-                val previousTitle = ParamSfoTitle.readTitleId(File(dest, "sce_sys/param.sfo"))
-                    ?: throw IOException(localized("The previous update has no valid TITLE_ID", "O update anterior não tem TITLE_ID válido"))
-                if (previousTitle != title)
-                    throw IOException(localized("The destination contains an update for another game", "O destino contém um update de outro jogo"))
-            }
         }
 
-        // Native extractor writes directly to the selected directory; an
-        // already selected update path is overwritten in-place with --force,
-        // rather than producing a duplicate folder. No temporary game/PKG copy.
+        // After title validation, update files replace their counterparts in
+        // the selected game folder. The base files absent from the PKG remain.
         try {
             val arguments = mutableListOf("extract", pkg.canonicalPath,
                 "--output", dest.canonicalPath, "--quiet")
@@ -321,12 +322,15 @@ internal class PkgInstallManager(
                 dest.listFiles()?.forEach { created -> created.deleteRecursively() }
             throw failure
         }
-        val key = if (update) "update_dir" else "game_dir"
-        if (!preferences.edit().putString(key, dest.canonicalPath).commit())
+        val edit = preferences.edit().putString("game_dir", dest.canonicalPath)
+        // The game now contains the update. Do not overlay an older separate
+        // update on top of it on the next launch; keep those files untouched.
+        if (update) edit.remove("update_dir")
+        if (!edit.commit())
             throw IOException(localized("Content extracted, but the folder could not be selected", "Conteúdo extraído, mas não foi possível selecionar a pasta"))
         return if (update)
-            localized("Update ${title} installed directly into ${dest.path} without duplicating the game.", "Update ${title} instalado diretamente em ${dest.path}, sem duplicar o jogo.")
-        else localized("Game ${title} installed directly into ${dest.path} without extra copies.", "Jogo ${title} instalado diretamente em ${dest.path}, sem cópias adicionais.")
+            localized("Update ${title} installed directly into ${dest.path}.", "Update ${title} instalado diretamente em ${dest.path}.")
+        else localized("Game ${title} installed directly into ${dest.path}.", "Jogo ${title} instalado diretamente em ${dest.path}.")
     }
 
     private fun isNested(dir: File, ancestor: File): Boolean {
@@ -346,6 +350,12 @@ internal class PkgInstallManager(
      */
     private fun localDocumentFile(uri: Uri, directory: Boolean): File? {
         return try {
+            if (directory && uri.scheme == "file") {
+                // Only the internally generated selected-game destination uses file://.
+                val selectedGame = preferences.getString("game_dir", null)?.let(::File)?.canonicalFile
+                val candidate = uri.path?.let(::File)?.canonicalFile
+                return if (candidate != null && candidate == selectedGame) candidate else null
+            }
             val authority = uri.authority
             val result = if (authority == "com.android.externalstorage.documents") {
                 val id = if (directory) DocumentsContract.getTreeDocumentId(uri)

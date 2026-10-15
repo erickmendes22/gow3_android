@@ -94,7 +94,7 @@ public final class GameActivity extends Activity {
 
     private int dp(float n) { return Math.round(n*getResources().getDisplayMetrics().density); }
     private TextView text(String value, int size, int color) {
-        TextView t=new TextView(this); t.setText(value); t.setTextSize(size); t.setTextColor(color); return t;
+        TextView t=new TextView(this); t.setText(UiText.get(this, value)); t.setTextSize(size); t.setTextColor(color); return t;
     }
     private FrameLayout.LayoutParams frame(int width,int height,int gravity) {
         return new FrameLayout.LayoutParams(width,height,gravity);
@@ -195,8 +195,8 @@ public final class GameActivity extends Activity {
         });
          */
         menuItem("ic_refresh","Restart game","Unsaved progress is lost",() -> new AlertDialog.Builder(this)
-            .setTitle("Restart God of War III?").setMessage("Any unsaved progress will be lost.")
-            .setNegativeButton("Cancel",null).setPositiveButton("Restart",(dialog,which) -> restartGame()).show());
+            .setTitle(UiText.get(this, "Restart God of War III?")).setMessage(UiText.get(this, "Any unsaved progress will be lost."))
+            .setNegativeButton(UiText.get(this, "Cancel"),null).setPositiveButton(UiText.get(this, "Restart"),(dialog,which) -> restartGame()).show());
 
         section("Graphics");
         // Graphics 入口只保留运行时真正消费的那几项：upscaler / preset / sharpen / sharpness /
@@ -237,8 +237,8 @@ public final class GameActivity extends Activity {
         });
 
         menuItem("ic_exit","Quit game",null,() -> new AlertDialog.Builder(this)
-            .setTitle("Quit God of War III?").setMessage("Any unsaved progress will be lost.")
-            .setNegativeButton("Cancel",null).setPositiveButton("Quit",(dialog,which) -> finish()).show());
+            .setTitle(UiText.get(this, "Quit God of War III?")).setMessage(UiText.get(this, "Any unsaved progress will be lost."))
+            .setNegativeButton(UiText.get(this, "Cancel"),null).setPositiveButton(UiText.get(this, "Quit"),(dialog,which) -> finish()).show());
 
         // The version, pinned under the scrolling menu.
         String version="";
@@ -252,7 +252,7 @@ public final class GameActivity extends Activity {
     }
 
     private void restartGame() {
-        closeDrawer(); status.setText("Restarting God of War III…"); status.setVisibility(View.VISIBLE);
+        closeDrawer(); status.setText(UiText.get(this, "Restarting God of War III…")); status.setVisibility(View.VISIBLE);
         worker.execute(() -> { stopGame(); startGame(); });
     }
 
@@ -299,7 +299,7 @@ public final class GameActivity extends Activity {
     }
     private static void setDetail(LinearLayout row,String value) {
         TextView detail=row==null ? null : (TextView)row.findViewWithTag("detail");
-        if (detail!=null) detail.setText(value);
+        if (detail!=null) detail.setText(UiText.get(detail.getContext(), value));
     }
     /** 抽屉里的一行不可用时：不可点击、不可获焦（手柄/键盘导航会跳过它），并整体变灰。
      *  action 存在 row 的 tag 里，监听器保持挂着——setClickable(false) 会让点击不再分发，
@@ -465,6 +465,7 @@ public final class GameActivity extends Activity {
         env.put("LD_LIBRARY_PATH",BASE+"/arm64/lib:"+ROOT+"/usr/lib/aarch64-linux-gnu:"+ROOT+"/usr/lib");
         // Its libc emulates SysV shared memory through fxshmd (started below).
         env.put("FXD_SHM_SOCKET",ROOT+"/tmp/.fxshm/sock");
+        env.put("GOW3_LANGUAGE", UiText.gameLanguage(this));
         if (gameDir!=null) env.put("GOW3_GAME_DIR",gameDir);
         if (updateDir!=null) env.put("GOW3_PATCH_DIR",updateDir);
         if (target.endsWith("/Xvfb")) env.put("LD_PRELOAD",ROOT+"/usr/lib/fexdroid/libfxpath.so");
@@ -473,7 +474,7 @@ public final class GameActivity extends Activity {
     }
     private void startX(SurfaceHolder holder) {
         try {
-            boolean installed=RuntimeInstaller.ensure(this, new File(FILES), message -> main.post(() -> status.setText(message)));
+            boolean installed=RuntimeInstaller.ensure(this, new File(FILES), message -> main.post(() -> status.setText(UiText.get(this, message))));
             android.util.Log.i("God of War III","runtime installed="+installed);
             if (audio!=null) audio.start();
             if (audio==null || !audio.awaitReady(5000))
@@ -548,18 +549,18 @@ public final class GameActivity extends Activity {
                 android.Manifest.permission.WRITE_EXTERNAL_STORAGE},REQUEST_STORAGE);
             return;
         }
-        status.setText(change ? "Choose the God of War III game folder." :
-            "Choose your God of War III game folder (e.g. CUSA01740, the folder with eboot.bin).");
+        status.setText(UiText.get(this, change ? "Choose the God of War III game folder." :
+            "Choose your God of War III game folder (e.g. CUSA01740, the folder with eboot.bin)."));
         status.setVisibility(View.VISIBLE);
-        new AlertDialog.Builder(this).setTitle("God of War III game folder")
-            .setMessage("Select the extracted game folder (e.g. CUSA01740 or CUSA00900, which contains eboot.bin) or the folder "
-                +"that holds it, in your phone's storage."+(gameDir!=null ? "\n\nCurrent: "+gameDir : ""))
-            .setPositiveButton("Choose folder",(d,w) -> {
+        new AlertDialog.Builder(this).setTitle(UiText.get(this, "God of War III game folder"))
+            .setMessage(UiText.get(this, "Select the extracted game folder (e.g. CUSA01740 or CUSA00900, which contains eboot.bin) or the folder "
+                +"that holds it, in your phone's storage."+(gameDir!=null ? "\n\nCurrent: "+gameDir : "")))
+            .setPositiveButton(UiText.get(this, "Choose folder"),(d,w) -> {
                 Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
                 try { startActivityForResult(pick,REQUEST_FOLDER); }
                 catch (Exception ex) { error("No folder picker: "+ex); }
             })
-            .setNegativeButton(change ? "Cancel" : "Quit",(d,w) -> { if (!change) finish(); })
+            .setNegativeButton(UiText.get(this, change ? "Cancel" : "Quit"),(d,w) -> { if (!change) finish(); })
             .setCancelable(change).show();
     }
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results) {
@@ -577,15 +578,15 @@ public final class GameActivity extends Activity {
         if (dir!=null && !isGame(dir))
             for (String serial : SERIALS) if (isGame(new File(dir,serial))) { dir=new File(dir,serial); break; }
         if (!isGame(dir)) {
-            new AlertDialog.Builder(this).setTitle("Not a God of War III folder")
-                .setMessage((dir==null ? "That location" : dir.getPath())+" has no eboot.bin.")
-                .setPositiveButton("Choose again",(d,w) -> askGameFolder(gameDir!=null)).show();
+            new AlertDialog.Builder(this).setTitle(UiText.get(this, "Not a God of War III folder"))
+                .setMessage(UiText.get(this, (dir==null ? "That location" : dir.getPath())+" has no eboot.bin."))
+                .setPositiveButton(UiText.get(this, "Choose again"),(d,w) -> askGameFolder(gameDir!=null)).show();
             return;
         }
         boolean changed=gameDir!=null && !gameDir.equals(dir.getPath());
         gameDir=dir.getPath();
         getSharedPreferences("gow3",MODE_PRIVATE).edit().putString("game_dir",gameDir).apply();
-        status.setText("Starting God of War III…");
+        status.setText(UiText.get(this, "Starting God of War III…"));
         if (changed && game!=null) restartGame(); else startPending();
     }
     /** A storage folder of the picker (tree document "primary:Path" or "XXXX-XXXX:Path") as a path. */
@@ -641,10 +642,10 @@ public final class GameActivity extends Activity {
         field.setFilters(new InputFilter[]{new InputFilter.LengthFilter(max)});
         field.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         FrameLayout box=new FrameLayout(this); box.setPadding(dp(20),dp(8),dp(20),0); box.addView(field);
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(title.isEmpty() ? "Enter text" : title)
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(UiText.get(this, title.isEmpty() ? "Enter text" : title))
             .setView(box)
-            .setPositiveButton("OK",(d,w) -> answerIme(true,field.getText().toString()))
-            .setNegativeButton("Cancel",(d,w) -> answerIme(false,""))
+            .setPositiveButton(UiText.get(this, "OK"),(d,w) -> answerIme(true,field.getText().toString()))
+            .setNegativeButton(UiText.get(this, "Cancel"),(d,w) -> answerIme(false,""))
             .setOnCancelListener(d -> answerIme(false,"")).create();
         field.setOnEditorActionListener((v,action,event) -> {
             if (action!=EditorInfo.IME_ACTION_DONE) return false;
@@ -753,7 +754,7 @@ public final class GameActivity extends Activity {
     private void error(String message) {
         hadError=true;
         android.util.Log.e("God of War III",message);
-        main.post(() -> { if (!destroyed) { status.setText(message); status.setVisibility(View.VISIBLE); } });
+        main.post(() -> { if (!destroyed) { status.setText(UiText.get(this, message)); status.setVisibility(View.VISIBLE); } });
     }
     private void stopGame() {
         Process p=game; game=null;

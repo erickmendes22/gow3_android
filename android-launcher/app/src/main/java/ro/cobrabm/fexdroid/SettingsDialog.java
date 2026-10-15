@@ -124,18 +124,18 @@ final class SettingsDialog {
     }
 
     private TextView heading(LinearLayout box,String title) {
-        TextView t=new TextView(activity); t.setText(title); t.setTextSize(15);
+        TextView t=new TextView(activity); t.setText(UiText.get(activity, title)); t.setTextSize(15);
         t.setTypeface(Typeface.DEFAULT,Typeface.BOLD); t.setPadding(0,dp(14),0,dp(4));
         box.addView(t); return t;
     }
     private Switch toggle(LinearLayout box,String title,boolean on) {
-        Switch s=new Switch(activity); s.setText(title); s.setChecked(on); s.setTextSize(15);
+        Switch s=new Switch(activity); s.setText(UiText.get(activity, title)); s.setChecked(on); s.setTextSize(15);
         s.setPadding(0,dp(6),0,dp(6)); box.addView(s); return s;
     }
     private RadioGroup choices(LinearLayout box,String[] names,int selected) {
         RadioGroup g=new RadioGroup(activity);
         for (int i=0;i<names.length;++i) {
-            RadioButton b=new RadioButton(activity); b.setId(View.generateViewId()); b.setText(names[i]); b.setTextSize(15);
+            RadioButton b=new RadioButton(activity); b.setId(View.generateViewId()); b.setText(UiText.get(activity, names[i])); b.setTextSize(15);
             g.addView(b); if (i==selected) g.check(b.getId());
         }
         box.addView(g); return g;
@@ -194,7 +194,7 @@ final class SettingsDialog {
         final RadioGroup resolutions=choices(box,RESOLUTION_NAMES,
             indexOf(RESOLUTION_VALUES,canonicalResolution(get("render_resolution","720p")),5));
         final TextView nativeNote=new TextView(activity);
-        nativeNote.setText("Choose the game rendering resolution. Changes apply after restart.");
+        nativeNote.setText(UiText.get(activity, "Choose the game rendering resolution. Changes apply after restart."));
         nativeNote.setTextSize(13); nativeNote.setAlpha(0.7f); box.addView(nativeNote);
         heading(box,"Image");
         final Switch sharpen=toggle(box,"Sharpening","1".equals(get("sharpen","0")));
@@ -204,7 +204,7 @@ final class SettingsDialog {
         try { initial=Float.parseFloat(get("sharpness","0.5")); } catch (NumberFormatException ignored) {}
         sharpness.setProgress(Math.round(Math.max(0,Math.min(1,initial))*100));
         SeekBar.OnSeekBarChangeListener sharpText=new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar s,int p,boolean user) { sharpLabel.setText("Sharpness: "+p+"%"); }
+            @Override public void onProgressChanged(SeekBar s,int p,boolean user) { sharpLabel.setText(UiText.get(activity, "Sharpness: "+p+"%")); }
             @Override public void onStartTrackingTouch(SeekBar s) {}
             @Override public void onStopTrackingTouch(SeekBar s) {}
         };
@@ -227,7 +227,7 @@ final class SettingsDialog {
         heading(box,"FPS limit");
         final RadioGroup fpsLimit=choices(box,FPS_NAMES,indexOf(FPS_VALUES,get("fps_limit","30"),0));
         TextView fpsNote=new TextView(activity); fpsNote.setTextSize(13); fpsNote.setAlpha(0.7f);
-        fpsNote.setText("Above 30 uses the community frame-rate patch (game timing follows the real frame time).");
+        fpsNote.setText(UiText.get(activity, "Above 30 uses the community frame-rate patch (game timing follows the real frame time)."));
         box.addView(fpsNote);
 
         /* 以下三段已注释掉：写入 gow3.ini 的键在本仓库的 fexdroid 启动链路里没有消费方，勾选后
@@ -263,9 +263,9 @@ final class SettingsDialog {
          */
 
         ScrollView scroll=new ScrollView(activity); scroll.addView(box);
-        new AlertDialog.Builder(activity).setTitle("Graphics settings").setView(scroll)
-            .setNegativeButton("Cancel",null)
-            .setPositiveButton("Apply & restart",(d,w) -> {
+        new AlertDialog.Builder(activity).setTitle(UiText.get(activity, "Graphics settings")).setView(scroll)
+            .setNegativeButton(UiText.get(activity, "Cancel"),null)
+            .setPositiveButton(UiText.get(activity, "Apply & restart"),(d,w) -> {
                 Map<String,String> changed=new LinkedHashMap<>();
                 changed.put("upscaler","off");
                 changed.put("fps_limit",FPS_VALUES[Math.max(0,checkedIndex(fpsLimit))]);
@@ -287,7 +287,7 @@ final class SettingsDialog {
         for (Map.Entry<String,String> e:changed.entrySet()) if (!e.getValue().equals(values.get(e.getKey()))) same=false;
         if (same) return;
         if (save(changed)) restart.run();
-        else new AlertDialog.Builder(activity).setMessage("The settings could not be saved.").setPositiveButton("OK",null).show();
+        else new AlertDialog.Builder(activity).setMessage(UiText.get(activity, "The settings could not be saved.")).setPositiveButton(UiText.get(activity, "OK"),null).show();
     }
 
     /* showGame() 已注释掉（入口也随之在 GameActivity 里隐藏）：这四个 ini 键
@@ -304,17 +304,17 @@ final class SettingsDialog {
         for (int i=0;i<GAME_PATCHES.length;++i) {
             toggles[i]=toggle(box,GAME_PATCHES[i][1],"1".equals(get(GAME_PATCHES[i][0],GAME_PATCHES[i][3])));
             TextView note=new TextView(activity); note.setTextSize(12); note.setAlpha(0.65f);
-            note.setText(GAME_PATCHES[i][2]); note.setPadding(0,0,0,dp(6));
+            note.setText(UiText.get(activity, GAME_PATCHES[i][2])); note.setPadding(0,0,0,dp(6));
             box.addView(note);
         }
         TextView restartNote=new TextView(activity); restartNote.setTextSize(13); restartNote.setAlpha(0.7f);
-        restartNote.setText("These are patches to the game: Apply restarts it (unsaved progress is lost).");
+        restartNote.setText(UiText.get(activity, "These are patches to the game: Apply restarts it (unsaved progress is lost)."));
         restartNote.setPadding(0,dp(8),0,0);
         box.addView(restartNote);
         ScrollView scroll=new ScrollView(activity); scroll.addView(box);
-        new AlertDialog.Builder(activity).setTitle("Game settings").setView(scroll)
-            .setNegativeButton("Cancel",null)
-            .setPositiveButton("Apply",(d,w) -> {
+        new AlertDialog.Builder(activity).setTitle(UiText.get(activity, "Game settings")).setView(scroll)
+            .setNegativeButton(UiText.get(activity, "Cancel"),null)
+            .setPositiveButton(UiText.get(activity, "Apply"),(d,w) -> {
                 Map<String,String> changed=new LinkedHashMap<>();
                 for (int i=0;i<GAME_PATCHES.length;++i) changed.put(GAME_PATCHES[i][0],toggles[i].isChecked() ? "1" : "0");
                 apply(changed);
@@ -342,17 +342,17 @@ final class SettingsDialog {
         for (int i=0;i<CHEATS.length;++i) {
             toggles[i]=toggle(box,CHEATS[i][1],"1".equals(get(CHEATS[i][0],CHEATS[i][3])));
             TextView note=new TextView(activity); note.setTextSize(12); note.setAlpha(0.65f);
-            note.setText(CHEATS[i][2]); note.setPadding(0,0,0,dp(6));
+            note.setText(UiText.get(activity, CHEATS[i][2])); note.setPadding(0,0,0,dp(6));
             box.addView(note);
         }
         TextView restartNote=new TextView(activity); restartNote.setTextSize(13); restartNote.setAlpha(0.7f);
-        restartNote.setText("For God of War III 1.09 offline play. They switch at once, while you play.");
+        restartNote.setText(UiText.get(activity, "For God of War III 1.09 offline play. They switch at once, while you play."));
         restartNote.setPadding(0,dp(8),0,0);
         box.addView(restartNote);
         ScrollView scroll=new ScrollView(activity); scroll.addView(box);
-        new AlertDialog.Builder(activity).setTitle("Cheats").setView(scroll)
-            .setNegativeButton("Cancel",null)
-            .setPositiveButton("Apply",(d,w) -> {
+        new AlertDialog.Builder(activity).setTitle(UiText.get(activity, "Cheats")).setView(scroll)
+            .setNegativeButton(UiText.get(activity, "Cancel"),null)
+            .setPositiveButton(UiText.get(activity, "Apply"),(d,w) -> {
                 Map<String,String> changed=new LinkedHashMap<>();
                 for (int i=0;i<CHEATS.length;++i) changed.put(CHEATS[i][0],toggles[i].isChecked() ? "1" : "0");
                 // The running game follows cheats.state (probe.c reads it): no restart.
@@ -389,11 +389,11 @@ final class SettingsDialog {
         final RadioGroup lsfgFlow=choices(box,LSFG_FLOW_NAMES,indexOf(LSFG_FLOW_VALUES,get("lsfg_flow_scale","1.0"),0));
         final Switch lsfgPerformance=toggle(box,"Performance mode","1".equals(get("lsfg_performance","0")));
         TextView lsfgNote=new TextView(activity); lsfgNote.setTextSize(13); lsfgNote.setAlpha(0.7f);
-        lsfgNote.setText("Needs Lossless.dll from your own Lossless Scaling (Steam) next to the game "
+        lsfgNote.setText(UiText.get(activity, "Needs Lossless.dll from your own Lossless Scaling (Steam) next to the game "
             +"folder. Uses the final game image and requires no game resolution changes. "
             +"It sees only finished frames, so fast motion and the HUD show more artifacts. Lower flow "
             +"scale and performance mode are faster. Changes apply while you play; only turning it on "
-            +"after starting without it restarts the game.");
+            +"after starting without it restarts the game."));
         box.addView(lsfgNote);
         RadioGroup.OnCheckedChangeListener lossless=(g,id) -> {
             boolean on=checkedIndex(lsfg)>0;
@@ -403,9 +403,9 @@ final class SettingsDialog {
         lsfg.setOnCheckedChangeListener(lossless); lossless.onCheckedChanged(lsfg,0);
 
         ScrollView scroll=new ScrollView(activity); scroll.addView(box);
-        new AlertDialog.Builder(activity).setTitle("Lossless Scaling frame generation").setView(scroll)
-            .setNegativeButton("Cancel",null)
-            .setPositiveButton("Apply",(d,w) -> {
+        new AlertDialog.Builder(activity).setTitle(UiText.get(activity, "Lossless Scaling frame generation")).setView(scroll)
+            .setNegativeButton(UiText.get(activity, "Cancel"),null)
+            .setPositiveButton(UiText.get(activity, "Apply"),(d,w) -> {
                 Map<String,String> changed=new LinkedHashMap<>();
                 String multiplier=LSFG_VALUES[Math.max(0,checkedIndex(lsfg))];
                 changed.put("lsfg_multiplier",multiplier);
@@ -414,15 +414,15 @@ final class SettingsDialog {
                 if (gameRunning.getAsBoolean() && live.isFile()) {
                     boolean ok=save(changed) && writeLsfgProfile(live,"0".equals(multiplier) ? "1" : multiplier,
                         changed.get("lsfg_flow_scale"),lsfgPerformance.isChecked());
-                    android.widget.Toast.makeText(activity,ok ? "Lossless Scaling: applied"
-                        : "Lossless Scaling: could not apply",android.widget.Toast.LENGTH_SHORT).show();
+                    android.widget.Toast.makeText(activity,UiText.get(activity, ok ? "Lossless Scaling: applied"
+                        : "Lossless Scaling: could not apply"),android.widget.Toast.LENGTH_SHORT).show();
                     // layer 已按新倍率热更新 toml；这里同步重选设备显示模式，否则层参数和刷新率会
                     // 分叉（4.3 复评）。
                     if (ok && onLiveApplied!=null) onLiveApplied.run();
                 } else if (!"0".equals(multiplier) && gameRunning.getAsBoolean()) {
                     apply(changed); // the layer loads at start only
                 } else if (!save(changed)) {
-                    new AlertDialog.Builder(activity).setMessage("The settings could not be saved.").setPositiveButton("OK",null).show();
+                    new AlertDialog.Builder(activity).setMessage(UiText.get(activity, "The settings could not be saved.")).setPositiveButton(UiText.get(activity, "OK"),null).show();
                 }
             }).show();
     }
