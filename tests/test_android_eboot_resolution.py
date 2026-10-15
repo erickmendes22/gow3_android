@@ -128,6 +128,23 @@ class Cusa01715ResolutionTests(unittest.TestCase):
                 self.assertEqual(canonical_resolution(old), canonical)
                 self.assertEqual(startup_options({"render_resolution": old})["render_resolution"], canonical)
         self.assertEqual(len(RESOLUTIONS), len(set(RESOLUTIONS)))
+        verified = {"title_id": "CUSA01715", "app_version": "01.02",
+                    "eboot_sha256": HASH, "eboot_matches": True, "reason": "validated"}
+        for old, canonical in aliases.items():
+            with self.subTest(legacy_config=old), tempfile.TemporaryDirectory() as t:
+                folder = Path(t)
+                config = folder / "gow3.ini"
+                config.write_text(f"render_resolution={old}\n")
+                with patch.object(patches, "patch_profile_status", return_value=verified):
+                    plan = launch_env.derive(folder, config, folder / "state.json",
+                                             {"GOW3_ANDROID_PORT": "1"})
+                self.assertIn(f"render_resolution={canonical}\n", config.read_text())
+                if canonical in ("480p", "720p"):
+                    self.assertNotIn("GOW3_PATCH_INPUT_RES", plan["updates"])
+                    self.assertIn(f"Resolution Patch - {canonical}", plan["patch_names"])
+                else:
+                    self.assertIn("GOW3_PATCH_INPUT_RES", plan["updates"])
+
 
 
 if __name__ == "__main__":
