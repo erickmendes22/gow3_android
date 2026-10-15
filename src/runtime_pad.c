@@ -274,8 +274,16 @@ static void read_inject(void) {
     static int last_stick[4] = {-2,-2,-2,-2};
     if (injected.buttons != last_buttons ||
         memcmp(injected.stick, last_stick, sizeof(last_stick)) != 0) {
-        printf("Runtime: pad file: buttons 0x%x sticks %d %d %d %d\n",injected.buttons,
-               injected.stick[0],injected.stick[1],injected.stick[2],injected.stick[3]);
+        // The Android input bridge updates this file on nearly every touch
+        // event. Its launcher already sets GOW3_PAD_QUIET=1: honor it instead
+        // of synchronously printing during gameplay. Input updates are never
+        // skipped; only the diagnostic output is suppressed.
+        const char *quiet = getenv("GOW3_PAD_QUIET");
+        if (!quiet || strcmp(quiet, "1") != 0) {
+            printf("Runtime: pad file: buttons 0x%x sticks %d %d %d %d\n",
+                   injected.buttons, injected.stick[0], injected.stick[1],
+                   injected.stick[2], injected.stick[3]);
+        }
         last_buttons = injected.buttons;
         memcpy(last_stick, injected.stick, sizeof(last_stick));
     }
