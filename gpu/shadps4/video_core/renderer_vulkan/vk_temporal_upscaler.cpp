@@ -1652,6 +1652,18 @@ void TemporalUpscaler::RunScaled() {
     if (depth.info.size.width != iw || depth.info.size.height != ih || w > ow || h > oh) {
         return;
     }
+    // A zero-motion texture is not camera motion. For CUSA01715, when the
+    // guest camera cannot be authenticated, preserve the scene via the spatial
+    // UI/background path instead of feeding false vectors into FSR history.
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && !camera_motion.Ready()) {
+        static bool warned = false;
+        if (!warned) {
+            warned = true;
+            std::printf("GOW3_FSR_STATUS state=MOTION_UNVERIFIED action=SPATIAL_ONLY\n");
+        }
+        RunUiOnly(ldr_target, camera_motion.Depth());
+        return;
+    }
     if (!EnsureResources(w, h, ow, oh, false)) {
         failed = true;
         return;
@@ -1710,9 +1722,8 @@ void TemporalUpscaler::RunScaled() {
     // The previous frame's display pass read it: all commands before.
     barrier(vk::Image(ui_image), vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eUndefined,
             all, vk::AccessFlagBits2::eNone, vk::ImageLayout::eGeneral, all, rw);
-    // GoW3 camera offsets are unverified: do not reproject arbitrary
-    // vertex data as motion. A zero-motion temporal dispatch is possible,
-    // although moving views will require real GoW3 motion vectors later.
+    // CUSA01715: RunScaled is rejected above without validated motion.
+    // Never label a zero-filled motion texture as working temporal FSR.
     const bool reprojection = camera_motion.Ready();
     const auto motion_stage = reprojection ? vk::PipelineStageFlagBits2::eComputeShader
                                            : vk::PipelineStageFlagBits2::eTransfer;
