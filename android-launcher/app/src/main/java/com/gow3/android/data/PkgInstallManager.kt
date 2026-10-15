@@ -233,14 +233,20 @@ internal class PkgInstallManager(
 
         // Native extractor writes DIRECTLY to dest; no stage directory, no
         // second game copy and no second PKG copy. Destination is empty.
-        execute(loader, helper, listOf("extract", pkg.canonicalPath, "--output",
-            dest.canonicalPath, "--quiet"), dest)
-
-        val extractedTitle = ParamSfoTitle.readTitleId(File(dest, "sce_sys/param.sfo"))
-            ?: throw IOException("Extração incompleta: param.sfo ausente/inválido. " +
-                "Arquivos incompletos ficaram na pasta escolhida; nenhum foi copiado.")
-        if (extractedTitle != title || !File(dest, "eboot.bin").isFile)
-            throw IOException("Conteúdo extraído não corresponde ao PKG ou está incompleto")
+        try {
+            execute(loader, helper, listOf("extract", pkg.canonicalPath, "--output",
+                dest.canonicalPath, "--quiet"), dest)
+            val extractedTitle = ParamSfoTitle.readTitleId(File(dest, "sce_sys/param.sfo"))
+                ?: throw IOException("Extração incompleta: sce_sys/param.sfo inválido")
+            if (extractedTitle != title || !File(dest, "eboot.bin").isFile)
+                throw IOException("Conteúdo extraído não corresponde ao PKG ou está incompleto")
+        } catch (failure: Exception) {
+            // The chosen directory was verified EMPTY before extraction. Remove
+            // only content that this failed attempt could have created, leaving
+            // the user's chosen directory itself intact. No second game copy.
+            dest.listFiles()?.forEach { created -> created.deleteRecursively() }
+            throw failure
+        }
         val key = if (update) "update_dir" else "game_dir"
         if (!preferences.edit().putString(key, dest.canonicalPath).commit())
             throw IOException("Conteúdo extraído, mas não foi possível selecionar a pasta")
