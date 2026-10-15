@@ -37,7 +37,7 @@
     <!-- 启动参数：参数名 -->
     <string name="param_resolution">Resolution</string>
     <string name="param_render_resolution">Render resolution</string>
-    <string name="param_render_resolution_desc">Changes the game's rendering resolution. Takes effect on the next launch.</string>
+    <string name="param_render_resolution_desc">Sets the rendering resolution. Takes effect on the next launch.</string>
     <string name="param_resolution_original">1080p</string>
     <string name="param_resolution_480">480p</string>
     <string name="param_resolution_720">720p</string>
