@@ -62,7 +62,7 @@ def derive(game, config, state_path, env):
         updates['GOW3_FSR1'] = '0'
         updates['GOW3_RCAS'] = '0'
         updates['GOW3_UPSCALER_SOURCE'] = 'disabled-android'
-        updates['GOW3_RESOLUTION_STATUS'] = 'native-game-patch-no-fsr'
+        updates['GOW3_RESOLUTION_STATUS'] = 'native-game-patch'
     elif 'GOW3_UPSCALER' not in env:
         updates['GOW3_UPSCALER'] = 'none'
         updates['GOW3_UPSCALER_SOURCE'] = 'desktop-safe-default'
