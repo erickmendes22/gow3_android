@@ -32,5 +32,33 @@ class AndroidPerfBudgetTests(unittest.TestCase):
         self.assertIn('Gow3Settings::Get().frames_queued.load()', presenter)
         self.assertIn('draw_scheduler.Wait(tick)', presenter)
 
+    def test_existing_config_only_migrates_missing_queue_setting(self):
+        import sys
+        import tempfile
+        from unittest.mock import patch
+        sys.path.insert(0, str(ROOT / 'scripts'))
+        import launch_env
+        import patches
+
+        profile = ({'CUSA01715'}, ROOT / 'patches/God_of_War_III_Remastered.xml',
+                   '01.02', 'God of War III')
+        status = {'title_id': 'CUSA01715', 'app_version': '01.02',
+                  'eboot_sha256': patches.CUSA01715_0102_ANDROID_SHA,
+                  'eboot_matches': True, 'reason': 'validated'}
+        for configured in (None, '1', '2', '0'):
+            with self.subTest(configured=configured), tempfile.TemporaryDirectory() as tmp:
+                folder = Path(tmp)
+                config = folder / 'gow3.ini'
+                setting = f'frames_queued={configured}\n' if configured is not None else ''
+                config.write_text('render_resolution=720p\n' + setting)
+                with patch.object(patches, 'patch_profile_status', return_value=status), \
+                        patch.object(patches, 'game_profile', return_value=profile):
+                    launch_env.derive(folder, config, folder / 'state.json',
+                                      {'GOW3_ANDROID_PORT': '1'})
+                config_text = config.read_text()
+                expected = '2' if configured is None else configured
+                self.assertIn(f'frames_queued={expected}\n', config_text)
+                self.assertEqual(config_text.count('frames_queued='), 1)
+
 if __name__ == '__main__':
     unittest.main()
