@@ -19,9 +19,9 @@ inline constexpr std::array<const char*, DisplayModeCount> DisplayModeNames = {
 inline constexpr std::array<int, 5> FpsLimits = {30, 60, 120, 240, 0};
 
 /// Game patch suffixes ("Resolution Patch - <name>"); "native" is no resolution patch.
-inline constexpr std::array<std::string_view, 13> Resolutions = {
-    "native", "480p", "720p", "800p", "1440p", "1800p", "4K",
-    "1280x720", "960x540", "854x480", "752x424", "640x360", "426x240"};
+inline constexpr std::array<std::string_view, 11> Resolutions = {
+    "240p", "360p", "424p", "480p", "540p", "720p",
+    "800p", "native", "1440p", "1800p", "4K"};
 /// Engine frame rate ceilings: 60 is the game's own, 120 and 240 are frame rate patches.
 inline constexpr std::array<int, 3> EngineFps = {60, 120, 240};
 
@@ -42,7 +42,16 @@ inline int ParseFpsLimit(int value) {
 }
 /// Index into Resolutions; unknown text is native.
 inline int ParseResolution(std::string_view text) {
-    return IndexOf(Resolutions, text, 0);
+    // Accept values written by older APKs, but never expose them as separate
+    // resolution options. 480p/720p still use their original game patches.
+    if (text == "426x240") text = "240p";
+    else if (text == "640x360") text = "360p";
+    else if (text == "752x424") text = "424p";
+    else if (text == "854x480") text = "480p";
+    else if (text == "960x540") text = "540p";
+    else if (text == "1280x720") text = "720p";
+    else if (text == "1080p") text = "native";
+    return IndexOf(Resolutions, text, 7);
 }
 /// A listed ceiling, else 120 (the default patch).
 inline int ParseEngineFps(int value) {
