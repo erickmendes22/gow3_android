@@ -93,7 +93,7 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         camera = (root / "vk_camera_motion.cpp").read_text()
         self.assertIn('android ? android_hud_transition', source)
         self.assertIn('depth != camera_motion.Depth()', source)
-        self.assertIn('GOW3_CAMERA_CONSTANTS block=', camera)
+        self.assertIn('GOW3_CAMERA_VERIFIED pair=1 projection=1', camera)
 
     def test_android_fsr_forward_renderer_composites_at_display_boundary(self):
         camera = (ROOT / "gpu/shadps4/video_core/renderer_vulkan/vk_camera_motion.cpp").read_text()
@@ -105,10 +105,11 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn("void OnDisplayBoundary(VideoCore::ImageId color);", header)
         self.assertIn("const auto guest = scene_targets->GuestSize();", raster)
         self.assertNotIn("std::popcount(key.mrt_mask) >= 5 && db_desc.first", raster)
-        self.assertIn("cmdbuf.clearColorImage(vk::Image(motion_image)", fsr)
+        self.assertIn('state=MOTION_UNVERIFIED action=SPATIAL_ONLY', fsr)
+        self.assertIn('camera_motion.RecordMotion(cmdbuf, depth_view, *motion_view, w, h)', fsr)
         self.assertIn("reprojection ? camera_motion.Near() : 0.1f", fsr)
         self.assertNotIn('if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) return;', camera)
-        self.assertIn('GOW3_CAMERA_CONSTANTS block=', camera)
+        self.assertIn('GOW3_CAMERA_VERIFIED pair=1 projection=1', camera)
         self.assertIn('GOW3_FSR_STATUS state=CONTEXT_FAILED', fsr)
         self.assertIn('GOW3_FSR_STATUS state=DISPATCH_RECORDED', fsr)
         self.assertIn('GOW3_FSR_CAPS query=', fsr)
@@ -116,6 +117,18 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn('android && native_viewport && camera_motion.Depth()', fsr)
         self.assertNotIn("GOW3_CAMERA_BUFFER sample=", raster)
         self.assertNotIn("GOW3_FSR_TOPOLOGY", raster)
+
+    def test_camera_layout_is_scanned_not_bloodborne_hardcoded(self):
+        base = ROOT / "gpu/shadps4/video_core/renderer_vulkan"
+        camera = (base / "vk_camera_motion.cpp").read_text()
+        raster = (base / "vk_rasterizer.cpp").read_text()
+        detector = (base / "gow3_camera_layout.h").read_text()
+        self.assertIn('Gow3CameraLayout::FindPose(data, float_count)', camera)
+        self.assertIn('Gow3CameraLayout::FindProjection(data, float_count)', camera)
+        self.assertIn('frame_pose_votes >= 2', camera)
+        self.assertIn('camera_motion->OnConstants(reinterpret_cast<const float*>(ring->address),', raster)
+        self.assertIn('ring->size >= 64', raster)
+        self.assertIn('InversePair(a, b) && InversePair(b, a)', detector)
 
     def test_shadow_toggle_semantics(self):
         from launch_env import disable_shadows_requested
