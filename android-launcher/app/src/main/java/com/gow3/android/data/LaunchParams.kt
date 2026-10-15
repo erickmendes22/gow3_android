@@ -22,7 +22,7 @@ internal data class LaunchOption(val value: String, val labelRes: Int)
 
 /**
  * launcher 编辑的启动参数，由 Android 运行时消费的 gow3.ini 键支撑。
- * 默认值与取值域遵循 `SettingsDialog.java` 的常量（UPSCALER_VALUES/FPS_VALUES …）
+ * 默认值与取值域遵循 `SettingsDialog.java` 的常量（RESOLUTION_VALUES/FPS_VALUES …）
  * 以及 `gpu/shim/gow3_graphics.h` / `gpu/shim/gow3_settings.cpp` 中的运行时解析器；
  * 当两者不一致时（fps_limit：Java 前端提供 40/45，但 `ParseFpsLimit` 把它们映射为 0）
  * 以运行时取值域为准，确保每个选项都实际生效。
