@@ -222,7 +222,8 @@ void CameraMotion::RecordMotion(vk::CommandBuffer cmdbuf, vk::ImageView depth_vi
 void CameraMotion::OnConstants(const float* data) {
     // The 864-byte camera signature and offsets belong to Bloodborne.
     // No matching CUSA01715 camera layout was found in the sampled buffers.
-    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) return;
+    // Never disable constant acquisition in Android FSR mode. Validation below
+    // remains strict until a CUSA01715-specific camera layout is established.
     // The far=3000/offset52 camera layout is inherited from Bloodborne.
     // Do not assume GoW3 uses it: record a bounded fingerprint of the first
     // few real G-buffer constant blocks so the layout can be established
