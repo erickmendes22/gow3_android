@@ -70,6 +70,7 @@ final class RuntimeInstaller {
         requireExecutable(root, "rootfs/usr/bin/python3.13");
         requireExecutable(root, "gow3port/arm64/bin/gow3-probe");
         requireExecutable(root, "gow3port/arm64/bin/kgsl-chip-id");
+        requireExecutable(root, "gow3port/arm64/bin/orbis-pkg-util");
         requireExecutable(root, LOADER);
         requireDirectory(root, "home/gow3port");
         if (path(root, "bbport/rootfs").exists() || path(root, "gow3port/rootfs").exists())
