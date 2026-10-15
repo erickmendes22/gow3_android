@@ -107,7 +107,10 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertNotIn("std::popcount(key.mrt_mask) >= 5 && db_desc.first", raster)
         self.assertIn("cmdbuf.clearColorImage(vk::Image(motion_image)", fsr)
         self.assertIn("reprojection ? camera_motion.Near() : 0.1f", fsr)
-        self.assertIn('if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) return;', camera)
+        self.assertNotIn('if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) return;', camera)
+        self.assertIn('GOW3_CAMERA_CONSTANTS block=', camera)
+        self.assertIn('GOW3_FSR_STATUS state=CONTEXT_FAILED', fsr)
+        self.assertIn('GOW3_FSR_STATUS state=DISPATCH_RECORDED', fsr)
         self.assertNotIn("GOW3_CAMERA_BUFFER sample=", raster)
         self.assertNotIn("GOW3_FSR_TOPOLOGY", raster)
 
