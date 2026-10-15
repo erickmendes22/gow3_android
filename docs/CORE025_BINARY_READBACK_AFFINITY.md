@@ -30,6 +30,8 @@ The public `zenithblue-oss/shadps4-arm64` tree is older and **does not expose ev
 
 In both `bachata-diagnostic-BS4-20261015-852B84AB.zip` and `...-91F991B9.zip`, the `shadps4.log` reports:
 
+The log's launcher command explicitly runs `host/shadps4-arm64-025` (N055 in the first diagnostic and N054 in the second), confirming these are actual core 025 sessions rather than another selected host. **Both logs are from CUSA03173, not God of War III CUSA01715**: the settings evidence is real but must not be represented as a matched game FPS comparison.
+
 ```
 GPU readbacksMode: 0
 GPU readbackLinearImages: false
@@ -44,7 +46,7 @@ Host big-core affinity is **supported in the binary** but was **not requested or
 ## Relevant GoW III differences
 
 - GoW III Port `gpu/shim/core/emulator_settings.h` defaults to `GOW3_READBACKS=Relaxed` (value 1), explicitly because the game's `FaceGen` GPU-written vertices explode with stale reads when fully disabled. Do **not** copy BACHATA's disabled mode indiscriminately.
-- The Port's Android `scripts/launch_env.py` defaults `GOW3_READBACK_LINEAR=1`, whereas the inspected BACHATA sessions had linear image readbacks **false**. A matched A/B with `GOW3_READBACK_LINEAR=0` is a reasonable further performance test, after checking GoW III rendering, exposure and CPU read correctness.
+- The Port's Android `scripts/launch_env.py` defaults `GOW3_READBACK_LINEAR=1`, whereas the inspected BACHATA sessions had linear image readbacks **false**. This is a **confirmed configuration difference** and a plausible extra GPU-to-CPU copy cost. A matched A/B with `GOW3_READBACK_LINEAR=0` is a reasonable further performance test, after checking GoW III rendering, exposure and CPU read correctness. In contrast, leave `GOW3_READBACKS=Relaxed` enabled due FaceGen correctness.
 - Port already has deferred/stale texture readbacks, prefetch windows for GPU-modified buffer ranges, staging reuse, page watchers, partial-write protection, and demand waits. Binary strings from BACHATA show telemetry for these concepts, not enough by themselves to justify overwriting the Port's working implementation.
 - The separate source-audited Vulkan scheduler optimization in this branch limits Android to eight in-flight submissions and avoids a per-submit timeline counter query; this is congruent with the public ARM64 BACHATA scheduler policy. The embedded binary comparison alone does **not** establish exactly which scheduler instructions executed in the tested session.
 - The additional zero-download fast path in the Port avoids `WaitHostCopies()` when no image transfer is queued, but preserves all mandatory waits for actual image transfers.
