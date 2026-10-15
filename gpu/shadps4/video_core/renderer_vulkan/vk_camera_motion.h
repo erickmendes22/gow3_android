@@ -62,6 +62,9 @@ public:
     /// Vertical field of view and near/far planes of the current camera.
     [[nodiscard]] float VerticalFov() const noexcept;
     [[nodiscard]] float Near() const noexcept;
+    // Reference-centre motion predicted by independently validated guest matrices,
+    // in render pixels. Useful to check that camera movement isn't being zero-filled.
+    [[nodiscard]] std::array<float, 2> EstimatedMotion(u32 width, u32 height) const noexcept;
     // Current projection, previous projection, and row Z of previous-view * inverse-view.
     [[nodiscard]] std::array<std::array<float, 4>, 3> TaaDepthParameters() const noexcept;
 
