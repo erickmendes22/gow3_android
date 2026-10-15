@@ -23,10 +23,16 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertIn('key = "render_resolution"', ui)
         self.assertNotIn('key = "upscaler"', ui)
         self.assertNotIn('key = "preset"', ui)
-        for size in ("480p","720p","800p","1440p","1800p","4K",
-                     "960x540","854x480","752x424","640x360","426x240"):
-            self.assertIn('LaunchOption("' + size + '",', ui)
+        values = ("240p", "360p", "424p", "480p", "540p", "720p",
+                  "800p", "native", "1440p", "1800p", "4K")
+        for size in values:
+            self.assertEqual(ui.count('LaunchOption("' + size + '",'), 1)
             self.assertIn('"' + size + '"', java)
+        for duplicate in ("1280x720", "854x480", "960x540", "752x424",
+                          "640x360", "426x240"):
+            self.assertNotIn('LaunchOption("' + duplicate + '",', ui)
+        self.assertIn('key = "render_resolution"', ui)
+        self.assertEqual(java.count("private static final String[] RESOLUTION_NAMES"), 1)
         self.assertIn("export GOW3_UPSCALER=none", run)
         self.assertIn("unset GOW3_ANDROID_FSR_FIXED_OUTPUT", run)
         self.assertNotIn("GOW3_FSR_STARTUP", run)
