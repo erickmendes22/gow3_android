@@ -40,19 +40,22 @@
     <string name="param_fsr_input">FSR input quality</string>
     <string name="param_render_resolution">Render resolution (FSR disabled)</string>
     <string name="param_render_resolution_desc">Native game resolution patch, no FSR upscaling.</string>
-    <string name="param_resolution_original">1080p original</string>
+    <string name="param_resolution_original">1080p</string>
     <string name="param_resolution_480">480p</string>
     <string name="param_resolution_720">720p</string>
     <string name="param_resolution_800">800p</string>
     <string name="param_resolution_1440">1440p</string>
     <string name="param_resolution_1800">1800p</string>
     <string name="param_resolution_4k">4K</string>
-    <string name="param_resolution_1280">1280x720</string>
-    <string name="param_resolution_960">960x540</string>
-    <string name="param_resolution_854">854x480</string>
-    <string name="param_resolution_752">752x424</string>
-    <string name="param_resolution_640">640x360</string>
-    <string name="param_resolution_426">426x240</string>
+    <string name="param_resolution_240">240p</string>
+    <string name="param_resolution_360">360p</string>
+    <string name="param_resolution_424">424p</string>
+    <string name="param_resolution_540">540p</string>
+    
+    
+    
+    
+    
     <string name="param_desc_fsr_input">FSR 3.1 output is always 1280x720. Native renders 1280x720, Quality 854x480, Performance 640x360, and Ultra Performance approximately 426x240 before temporal upscaling.</string>
     <string name="param_option_quality">Quality</string>
     <string name="param_option_performance">Performance</string>
