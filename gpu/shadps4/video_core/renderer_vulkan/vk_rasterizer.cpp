@@ -2099,9 +2099,11 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                 const bool android_scene_camera =
                     std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") &&
                     camera_motion->Depth() && stage.sw_stage == Shader::SwStage::Vertex;
-                if (ring->size == 864 && (gbuffer_draw || android_scene_camera) &&
-                    memory->IsValidGpuMapping(ring->address, 864)) {
-                    camera_motion->OnConstants(reinterpret_cast<const float*>(ring->address));
+                if (ring->size >= 64 && ring->size <= 4096 &&
+                    (gbuffer_draw || android_scene_camera) &&
+                    ring->address && memory->IsValidGpuMapping(ring->address, ring->size)) {
+                    camera_motion->OnConstants(reinterpret_cast<const float*>(ring->address),
+                                               ring->size / sizeof(float));
                 }
                 push_data.AddOffset(binding.buffer, 0);
             }
@@ -2163,9 +2165,11 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
             const bool android_scene_camera =
                 std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") &&
                 camera_motion->Depth() && stage.sw_stage == Shader::SwStage::Vertex;
-            if (vsharp.GetSize() == 864 && (gbuffer_draw || android_scene_camera) &&
-                memory->IsValidGpuMapping(vsharp.base_address, 864)) {
-                camera_motion->OnConstants(reinterpret_cast<const float*>(vsharp.base_address));
+            if (vsharp.GetSize() >= 64 && vsharp.GetSize() <= 4096 &&
+                (gbuffer_draw || android_scene_camera) && vsharp.base_address &&
+                memory->IsValidGpuMapping(vsharp.base_address, vsharp.GetSize())) {
+                camera_motion->OnConstants(reinterpret_cast<const float*>(vsharp.base_address),
+                                           vsharp.GetSize() / sizeof(float));
             }
             // Object motion research: the vertex shader buffers of G-buffer draws.
             if (FrameCapture::Active() && gbuffer_draw && stage.sw_stage == Shader::SwStage::Vertex &&
