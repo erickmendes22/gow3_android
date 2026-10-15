@@ -174,7 +174,8 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
     }
     // Available unless GOW3_UPSCALER=none; on/off and the parameters are the menu's settings.
     const char* env = std::getenv("GOW3_UPSCALER");
-    enabled = !(env && std::strcmp(env, "none") == 0);
+    enabled = !std::getenv("GOW3_ANDROID_PORT") &&
+              !(env && std::strcmp(env, "none") == 0);
     if (const char* hash = std::getenv("GOW3_UPSCALE_BEFORE_CS")) {
         trigger_hash = std::strtoull(hash, nullptr, 16);
     }
