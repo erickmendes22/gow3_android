@@ -86,22 +86,48 @@ class Cusa01715ResolutionTests(unittest.TestCase):
                 patches.android_native_resolution_writes(
                     XML, image, [(0, len(image))], sha, "640x360", names)
 
-    def test_launcher_sets_direct_resolution_without_fsr(self):
+    def test_one_canonical_selection_for_each_resolution_without_fsr(self):
         verified = {"title_id": "CUSA01715", "app_version": "01.02",
                     "eboot_sha256": HASH, "eboot_matches": True,
                     "reason": "validated"}
-        for render in ("1280x720","960x540","854x480","752x424","640x360","426x240"):
-            with self.subTest(render=render), tempfile.TemporaryDirectory() as t:
+        direct = {"240p": "426x240", "360p": "640x360",
+                  "424p": "752x424", "540p": "960x540"}
+        for resolution, actual in direct.items():
+            with self.subTest(resolution=resolution), tempfile.TemporaryDirectory() as t:
                 folder = Path(t)
                 config = folder / "gow3.ini"
-                config.write_text(f"upscaler=fsr3\nrender_resolution={render}\n")
+                config.write_text(f"upscaler=fsr3\nrender_resolution={resolution}\n")
                 with patch.object(patches, "patch_profile_status", return_value=verified):
                     plan = launch_env.derive(folder, config, folder / "state.json",
                                              {"GOW3_ANDROID_PORT": "1"})
-                self.assertEqual(plan["updates"]["GOW3_PATCH_INPUT_RES"], render)
+                self.assertEqual(plan["updates"]["GOW3_PATCH_INPUT_RES"], actual)
                 self.assertEqual(plan["updates"]["GOW3_UPSCALER"], "none")
                 self.assertNotIn("GOW3_RENDER_RES", plan["updates"])
                 self.assertIn("Resolution Patch - 720p", plan["patch_names"])
+
+        # 480p and 720p already have PS4 resolution patches. There must NOT
+        # be another 854x480 or 1280x720 entry for the same game size.
+        for resolution in ("480p", "720p"):
+            with self.subTest(resolution=resolution), tempfile.TemporaryDirectory() as t:
+                folder = Path(t)
+                config = folder / "gow3.ini"
+                config.write_text(f"render_resolution={resolution}\n")
+                with patch.object(patches, "patch_profile_status", return_value=verified):
+                    plan = launch_env.derive(folder, config, folder / "state.json",
+                                             {"GOW3_ANDROID_PORT": "1"})
+                self.assertNotIn("GOW3_PATCH_INPUT_RES", plan["updates"])
+                self.assertIn(f"Resolution Patch - {resolution}", plan["patch_names"])
+
+    def test_old_pixel_resolutions_are_migrated_without_duplicate_entries(self):
+        from graphics_options import canonical_resolution, RESOLUTIONS, patch_names, startup_options
+        aliases = {"1280x720": "720p", "854x480": "480p",
+                   "960x540": "540p", "752x424": "424p",
+                   "640x360": "360p", "426x240": "240p"}
+        for old, canonical in aliases.items():
+            with self.subTest(old=old):
+                self.assertEqual(canonical_resolution(old), canonical)
+                self.assertEqual(startup_options({"render_resolution": old})["render_resolution"], canonical)
+        self.assertEqual(len(RESOLUTIONS), len(set(RESOLUTIONS)))
 
 
 if __name__ == "__main__":
