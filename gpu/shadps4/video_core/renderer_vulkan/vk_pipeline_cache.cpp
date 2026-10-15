@@ -402,7 +402,7 @@ PipelineCache::PipelineCache(const Instance& instance_, Scheduler& scheduler_,
         // workers and one capture worker by default, without losing async
         // compilation. For A/B measurements, GOW3_GPU_COMPILER_WORKERS=1..6
         // restores/reduces the pool; the original desktop policy is unchanged.
-        const bool android_port = std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") != nullptr;
+        const bool android_port = std::getenv("GOW3_ANDROID_PORT") != nullptr;
         auto count = android_port ? 2u : std::clamp(Gow3Threads::Available() / 2, 1u, 6u);
         const auto capture_count = android_port ? 1u :
             std::min(2u, std::max(1u, Gow3Threads::Available() / 4));
