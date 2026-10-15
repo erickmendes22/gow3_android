@@ -402,7 +402,7 @@ bool Rasterizer::DrawPipeWanted() {
     // on desktop cores, not a heterogeneous 8-core Android SoC. Prefer the
     // deterministic direct path for Android; GOW3_DRAW_PIPE=1 (handled above)
     // enables the existing path for matched-scene A/B measurement.
-    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) return false;
+    if (std::getenv("GOW3_ANDROID_PORT")) return false;
     return Gow3Threads::Available() >= 8;
 }
 
