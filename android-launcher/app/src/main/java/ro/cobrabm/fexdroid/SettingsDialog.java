@@ -197,7 +197,7 @@ final class SettingsDialog {
         final TextView nativeNote=new TextView(activity);
         nativeNote.setText(UiText.get(activity, "Choose the game rendering resolution. Changes apply after restart."));
         nativeNote.setTextSize(13); nativeNote.setAlpha(0.7f); box.addView(nativeNote);
-        final Switch expandArena=toggle(box,"Expand video arena","1".equals(get("expand_video_arena","1")));
+        final Switch expandArena=toggle(box,"Texture corruption fix","1".equals(get("expand_video_arena","1")));
         final Switch startupFix=toggle(box,"Startup black screen fix","1".equals(get("patch_startup_black_screen","1")));
         TextView arenaNote=new TextView(activity); arenaNote.setTextSize(13); arenaNote.setAlpha(0.7f);
         arenaNote.setText(UiText.get(activity, "OFF keeps the original arena. Texture errors or crashes may occur, especially at higher resolutions. Requires restart."));
@@ -393,7 +393,8 @@ final class SettingsDialog {
      *  帧生成仅通过 Lossless Scaling 实现，不提供其他帧生成开关。 */
     void showLossless(java.util.function.BooleanSupplier gameRunning,Runnable onLiveApplied) {
         load();
-        final File live=new File(file.getParentFile(),"lsfg-vk.toml");
+        final boolean bionic="com.gow3.android.bionic".equals(activity.getPackageName());
+        final File live=new File(file.getParentFile(),bionic ? "lsfg.state" : "lsfg-vk.toml");
         LinearLayout box=new LinearLayout(activity); box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(24),dp(4),dp(24),dp(8));
         heading(box,"Frames");
@@ -402,7 +403,7 @@ final class SettingsDialog {
         final RadioGroup lsfgFlow=choices(box,LSFG_FLOW_NAMES,indexOf(LSFG_FLOW_VALUES,get("lsfg_flow_scale","1.0"),0));
         final Switch lsfgPerformance=toggle(box,"Performance mode","1".equals(get("lsfg_performance","0")));
         TextView lsfgNote=new TextView(activity); lsfgNote.setTextSize(13); lsfgNote.setAlpha(0.7f);
-        lsfgNote.setText(UiText.get(activity, "Needs Lossless.dll from your own Lossless Scaling (Steam) next to the game "
+        lsfgNote.setText(UiText.get(activity, bionic ? "Requires your own Lossless.dll. Generates frames from the final game image. Fast motion and the HUD may show artifacts. Changes apply while you play." : "Needs Lossless.dll from your own Lossless Scaling (Steam) next to the game "
             +"folder. Uses the final game image and requires no game resolution changes. "
             +"It sees only finished frames, so fast motion and the HUD show more artifacts. Lower flow "
             +"scale and performance mode are faster. Changes apply while you play; only turning it on "
@@ -424,9 +425,11 @@ final class SettingsDialog {
                 changed.put("lsfg_multiplier",multiplier);
                 changed.put("lsfg_flow_scale",LSFG_FLOW_VALUES[Math.max(0,checkedIndex(lsfgFlow))]);
                 changed.put("lsfg_performance",lsfgPerformance.isChecked() ? "1" : "0");
-                if (gameRunning.getAsBoolean() && live.isFile()) {
-                    boolean ok=save(changed) && writeLsfgProfile(live,"0".equals(multiplier) ? "1" : multiplier,
-                        changed.get("lsfg_flow_scale"),lsfgPerformance.isChecked());
+                if (gameRunning.getAsBoolean() && (bionic || live.isFile())) {
+                    boolean ok=save(changed) && (bionic
+                        ? writeBionicLsfgState(live,multiplier,changed.get("lsfg_flow_scale"),lsfgPerformance.isChecked())
+                        : writeLsfgProfile(live,"0".equals(multiplier) ? "1" : multiplier,
+                            changed.get("lsfg_flow_scale"),lsfgPerformance.isChecked()));
                     android.widget.Toast.makeText(activity,UiText.get(activity, ok ? "Lossless Scaling: applied"
                         : "Lossless Scaling: could not apply"),android.widget.Toast.LENGTH_SHORT).show();
                     // layer 已按新倍率热更新 toml；这里同步重选设备显示模式，否则层参数和刷新率会
@@ -438,6 +441,14 @@ final class SettingsDialog {
                     new AlertDialog.Builder(activity).setMessage(UiText.get(activity, "The settings could not be saved.")).setPositiveButton(UiText.get(activity, "OK"),null).show();
                 }
             }).show();
+    }
+
+    private static boolean writeBionicLsfgState(File config,String multiplier,String flow,boolean performance) {
+        File temporary=new File(config.getPath()+".tmp");
+        try (Writer w=new OutputStreamWriter(new FileOutputStream(temporary),"UTF-8")) {
+            w.write("multiplier="+multiplier+"\nflow="+flow+"\nperformance="+(performance ? "1" : "0")+"\n");
+        } catch (Exception ex) { android.util.Log.e("God of War III","lsfg state: "+ex); return false; }
+        return temporary.renameTo(config);
     }
 
     /** Rewrites the profile values of the running layer's config (written whole, then renamed:

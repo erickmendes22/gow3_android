@@ -42,7 +42,8 @@ final class UiText {
         PT.put("Off", "Desativado");
         PT.put("On", "Ativado");
         PT.put("Startup black screen fix", "Correção de tela preta ao iniciar");
-        PT.put("Expand video arena", "Aumentar arena de vídeo");
+        PT.put("Requires your own Lossless.dll. Generates frames from the final game image. Fast motion and the HUD may show artifacts. Changes apply while you play.", "Requer seu próprio Lossless.dll. Gera quadros a partir da imagem final do jogo. Movimentos rápidos e o HUD podem apresentar artefatos. As alterações são aplicadas durante o jogo.");
+        PT.put("Texture corruption fix", "Correção de texturas corrompidas");
         PT.put("OFF keeps the original arena. Texture errors or crashes may occur, especially at higher resolutions. Requires restart.", "Desativado mantém a arena original. Podem ocorrer erros de textura ou falhas, especialmente em resoluções maiores. Requer reiniciar.");
         PT.put("Render resolution", "Resolução de renderização");
         PT.put("Choose the game rendering resolution. Changes apply after restart.", "Escolha a resolução de renderização. As alterações são aplicadas após reiniciar.");

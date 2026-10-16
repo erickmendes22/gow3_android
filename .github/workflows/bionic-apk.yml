@@ -47,6 +47,8 @@ jobs:
           "$ANDROID_HOME/build-tools/$GOW3_BUILD_TOOLS/aapt2" compile --dir android-launcher/app/src/main/res -o "$RUNNER_TEMP/resources.zip"
       - name: Check launcher compilation before building native runtime
         run: bash android-launcher/gradlew -p android-launcher :app:compileReleaseJavaWithJavac :app:testReleaseUnitTest --tests com.gow3.android.GameSfoTest -Pgow3Bionic=true --no-daemon --max-workers=2
+      - name: Build native Android LSFG backend before the game runtime
+        run: GOW3_NDK="$ANDROID_HOME/ndk/29.0.14206865" bash tools/android/bionic/build_lsfg.sh
       - name: Build Android Python for existing patch validators
         run: GOW3_NDK="$ANDROID_HOME/ndk/29.0.14206865" bash tools/android/bionic/build_python.sh
       - uses: mamba-org/setup-micromamba@v2

@@ -4,6 +4,9 @@
 #pragma once
 
 #include <deque>
+#ifdef __ANDROID__
+#include "video_core/renderer_vulkan/vk_lsfg.h"
+#endif
 
 #include <condition_variable>
 
@@ -104,6 +107,23 @@ public:
     Frame* PrepareLastFrame();
 
 private:
+    struct PresentSource {
+        vk::Image image{};
+        u32 width{};
+        u32 height{};
+        bool external = false;
+        vk::Semaphore wait{};
+        vk::Fence done{};
+        Frame* frame{};
+    };
+    bool SubmitToSwapchain(const PresentSource& source);
+    bool SendToApp();
+#ifdef __ANDROID__
+    void PollLsfgState();
+    void ApplyLsfgState(const Gow3LsfgState::State& next);
+    void ApplyLsfgOutputMode();
+    bool PresentWithLsfg(Frame* frame);
+#endif
     Frame* GetRenderFrame();
 
     void RecreateFrame(Frame* frame, u32 width, u32 height);
@@ -126,6 +146,11 @@ private:
     std::deque<u64> recent_frame_ticks; ///< gow3: GOW3_FRAMES_AHEAD bound (PrepareFrame)
     Scheduler present_scheduler;
     Scheduler flip_scheduler;
+#ifdef __ANDROID__
+    Gow3LsfgState::State lsfg_requested;
+    Gow3LsfgState::Watcher lsfg_watch;
+    std::unique_ptr<Lsfg> lsfg;
+#endif
     Swapchain swapchain;
     Runtime runtime;
     std::unique_ptr<Rasterizer> rasterizer;

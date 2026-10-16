@@ -37,3 +37,10 @@ Adreno 7xx automatic driver: Turnip v26.3.0-R6 by StevenMXZ.
 Source: https://github.com/StevenMXZ/Adreno-Tools-Drivers/releases/tag/v37
 Exact archive/library hashes: arm64/drivers/adreno7xx/PINNED-DRIVER.json.
 Adreno 8xx keeps the existing V37 patched driver; other GPU defaults are unchanged.
+
+Native Lossless Scaling frame generation is adapted from ducvd89/Bloodborne-Android
+(commit 856bd99b05ee088782e881b99fca7945110ea0ca, GPL-2.0-or-later integration),
+using GameNative/Ragnarok93 lsfg-vk-android commit
+0802cd33319c101e4c41f6828153d3331d8a3258 (MIT). See licenses/lsfg for
+backend, DXBC, pe-parse and volk notices. No Lossless.dll or proprietary shaders
+are distributed; players must supply their own copy.

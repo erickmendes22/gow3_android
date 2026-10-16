@@ -29,7 +29,7 @@ def main():
         (base/'logs').mkdir()
         for directory,names in {
             'bin':['gow3-probe','gow3-prepare','kgsl-chip-id','orbis-pkg-util'],
-            'lib':['libgow3cpu.so','libgow3gpu.so','libgow3present.so','libc++_shared.so']}.items():
+            'lib':['libgow3cpu.so','libgow3gpu.so','libgow3present.so','libc++_shared.so','liblsfg-gow3.so']}.items():
             (runtime/directory).mkdir(parents=True)
             for name in names:shutil.copy2(source/directory/name,runtime/directory/name)
         shutil.copytree(source/'drivers',runtime/'drivers',ignore=shutil.ignore_patterns('.*'))
@@ -54,6 +54,7 @@ def main():
         shutil.copy2(ROOT/'android-launcher/app/src/main/assets/THIRD_PARTY_LICENSES.txt',notices/'THIRD_PARTY_LICENSES.txt')
         shutil.copy2(ROOT/'tools/android/bionic/NOTICE.txt',notices/'BIONIC-NOTICE.txt')
         shutil.copytree(ROOT/'tools/android/bionic/licenses',notices/'driver')
+        shutil.copytree(source/'licenses/lsfg',notices/'lsfg')
         for dep, license in [('fmt-12.1.0','LICENSE'),('zydis-4.1.1','LICENSE'),
                              ('zycore-1.5.2','LICENSE'),('xxhash-0.8.3','LICENSE'),
                              ('miniz-3.1.2','LICENSE'),('ffmpeg-7.1.5','COPYING.LGPLv2.1')]:

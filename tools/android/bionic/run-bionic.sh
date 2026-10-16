@@ -97,6 +97,13 @@ printf '%s\n' "{\"title_id\":\"${GOW3_GAME_TITLE:-unknown}\",\"app_version\":\"$
     --game-dir "$game" --patches-dir "${GOW3_PATCHES_DIR:-$base/patches}" \
     --patches-config "${GOW3_PATCHES_CONFIG:-$base/patches.json}"
 
+# Native frame generation: state lives beside gow3.ini and can be updated live by the app.
+export GOW3_LSFG_STATE_FILE="$base/lsfg.state"
+export GOW3_LSFG_LIB="$runtime/lib/liblsfg-gow3.so"
+printf 'multiplier=%s\nflow=%s\nperformance=%s\n' "${GOW3_LSFG_MULTIPLIER:-$(setting lsfg_multiplier)}" \
+    "${GOW3_LSFG_FLOW_SCALE:-$(setting lsfg_flow_scale)}" "${GOW3_LSFG_PERFORMANCE:-$(setting lsfg_performance)}" > "$base/lsfg.state.tmp"
+mv "$base/lsfg.state.tmp" "$GOW3_LSFG_STATE_FILE"
+
 cd "$base"
 echo "Bionic: driver=$turnip chip=$chip; starting God of War III"
 "$probe" "$out/boot-linked.bin" --content-profile "$out/content.bin" --patches "$out/patches.bin" \

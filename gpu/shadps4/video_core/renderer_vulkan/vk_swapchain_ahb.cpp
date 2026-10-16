@@ -6,6 +6,7 @@
 #include <poll.h>
 #include <unistd.h>
 #include <chrono>
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include "common/assert.h"
@@ -32,7 +33,7 @@ u32 BufferCount(u32 lsfg_multiplier) {
     if (const char* value = std::getenv("GOW3_PRESENT_BUFFERS")) {
         const long count = std::strtol(value, nullptr, 10);
         if (count >= 2 && count <= static_cast<long>(8)) {
-            return static_cast<u32>(count);
+            return std::max(static_cast<u32>(count), lsfg_multiplier >= 2 ? lsfg_multiplier + 3 : 2u);
         }
     }
     if (lsfg_multiplier >= 2 && lsfg_multiplier <= 4) {
@@ -54,11 +55,12 @@ bool WaitSyncFile(int fd, int timeout_ms) {
 } // namespace
 
 u32 Swapchain::MaxImageCount() {
-    return BufferCount(0); // the buffer count can follow the live state
+    return BufferCount(4); // Enough overlay resources for live activation through 4x.
 }
 
 Swapchain::Swapchain(const Instance& instance_, const Frontend::WindowSDL& window_, u32 lsfg_multiplier)
     : instance{instance_}, window{window_} {
+    frame_generation_multiplier = lsfg_multiplier;
     image_count = BufferCount(lsfg_multiplier);
     const vk::PhysicalDeviceExternalSemaphoreInfo semaphore_info{
         .handleType = vk::ExternalSemaphoreHandleTypeFlagBits::eSyncFd,
@@ -81,7 +83,7 @@ Swapchain::Swapchain(const Instance& instance_, const Frontend::WindowSDL& windo
 }
 
 void Swapchain::UpdateVsync() {
-    const bool fifo = Gow3Settings::Get().vsync;
+    const bool fifo = Gow3Settings::Get().vsync.load() || frame_generation_multiplier >= 2;
     if (client.Connected()) client.SetFifo(fifo);
 }
 
@@ -257,6 +259,7 @@ void Swapchain::CreateBuffer(u32 index) {
 }
 
 void Swapchain::SetFrameGeneration(u32 lsfg_multiplier) {
+    frame_generation_multiplier = lsfg_multiplier;
     if (client.Connected() &&
         !client.SetFifo(Gow3Settings::Get().vsync.load() || lsfg_multiplier >= 2)) {
         PeerGone();

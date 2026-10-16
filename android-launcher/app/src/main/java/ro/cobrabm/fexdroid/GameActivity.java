@@ -396,8 +396,8 @@ public final class GameActivity extends Activity {
         //  preflight 找不到它时会静默不开 layer（只剩 30 FPS），玩家看不出是自己漏了导入。
         //  所以直接把这一行置灰不可点，并说明去 Home 页导入，而不是让它"看着能开却不生效"。
         boolean dllPresent=hasFrameGenDll();
-        setRowEnabled(losslessItem,dllPresent && !bionicRuntime());
-        setDetail(losslessItem,bionicRuntime() ? (UiText.portuguese(this) ? "Indisponível no runtime Bionic" : "Unavailable in the Bionic runtime") : !dllPresent ? "Import Lossless.dll on the Home page first"
+        setRowEnabled(losslessItem,dllPresent);
+        setDetail(losslessItem,!dllPresent ? "Import Lossless.dll on the Home page first"
             : lsfgOn ? lsfg+"× frames · flow "
             +(setting("lsfg_flow_scale")==null ? "1.0" : setting("lsfg_flow_scale")) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
@@ -683,8 +683,9 @@ public final class GameActivity extends Activity {
         if (!hadError && (bionicRuntime() ? Gow3Present.framesIfLoaded() : DisplayBridge.directFrames())>0) status.setVisibility(View.GONE);
         // run-gow3.sh 在 LSFG 运行时失败、自动回退到普通 Vulkan 时会写这个标记：这时刷新率要退回
         // 「无 LSFG」的目标，否则会停在 LSFG 倍率对应的高刷上空跑（4.1 复评）。
-        if (!lsfgFallbackOff && new File(BASE,"lsfg-fallback.marker").isFile()) {
-            lsfgFallbackOff=true;
+        boolean fallbackMarker=new File(BASE,"lsfg-fallback.marker").isFile();
+        if ((!lsfgFallbackOff && fallbackMarker) || (bionicRuntime() && lsfgFallbackOff != fallbackMarker)) {
+            lsfgFallbackOff=fallbackMarker;
             pickRefreshRate();
         }
         main.postDelayed(this::pollFrames,1000);
@@ -769,9 +770,9 @@ public final class GameActivity extends Activity {
      *  运行时的 layer（manifest + liblsfg-vk.so）都在、玩家的 Lossless.dll 在两处查找位置之一。
      *  刷新率必须依此判断，而不是只看 gow3.ini 的 lsfg_multiplier（4.2 复评）。 */
     private boolean lsfgLaunchable() {
-        if (bionicRuntime()) return false;
         String lsfg=setting("lsfg_multiplier");
         if (!"2".equals(lsfg) && !"3".equals(lsfg) && !"4".equals(lsfg)) return false;
+        if (bionicRuntime()) return new File(BASE,"arm64/lib/liblsfg-gow3.so").isFile() && hasFrameGenDll();
         if (!new File(BASE,"arm64/lsfg/VkLayer_LS_frame_generation.json").isFile()) return false;
         if (!new File(BASE,"arm64/lsfg/liblsfg-vk.so").isFile()) return false;
         return hasFrameGenDll();

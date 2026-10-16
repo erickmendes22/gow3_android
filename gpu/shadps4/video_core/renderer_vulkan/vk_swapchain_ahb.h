@@ -137,6 +137,7 @@ private:
     u32 image_count = 3;
     u32 image_index = 0;
     u32 generation = 0;
+    u32 frame_generation_multiplier = 0;
     u64 frame_counter = 0;
     bool zero_extent = false;
     bool needs_recreation = true;

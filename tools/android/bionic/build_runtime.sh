@@ -11,6 +11,7 @@ llvm=$ndk/toolchains/llvm/prebuilt/linux-x86_64
 out=$PWD/out/bionic
 prefix=$PWD/.local-deps/android/bionic-prefix
 if [[ ${1:-} != --link-only ]]; then
+    bash tools/android/bionic/build_lsfg.sh
     bash tools/android/bionic/build_deps.sh
     bash tools/android/bionic/build_gpu.sh --configure-only
     bash tools/android/bionic/build_cpu.sh

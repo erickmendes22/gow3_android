@@ -19,7 +19,7 @@ def main():
                'libc++_shared.so', 'libgow3cpu.so', 'libgow3gpu.so', 'libpython3.13.so', 'libz.so'}
     files = [args.root/'bin/gow3-probe', args.root/'bin/gow3-prepare', args.root/'bin/kgsl-chip-id',
              args.root/'lib/libgow3cpu.so', args.root/'lib/libgow3gpu.so', args.root/'lib/libgow3present.so',
-             args.root/'lib/libc++_shared.so']
+             args.root/'lib/libc++_shared.so', args.root/'lib/liblsfg-gow3.so']
     extra = [args.root/'bin/orbis-pkg-util', args.root/'python/bin/python3.13']
     extra += list((args.root/'python/lib').glob('libpython*.so'))
     extra += list((args.root/'python/lib/python3.13/lib-dynload').glob('*.so'))
