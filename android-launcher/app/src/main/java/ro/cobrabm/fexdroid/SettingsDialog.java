@@ -196,6 +196,11 @@ final class SettingsDialog {
         final TextView nativeNote=new TextView(activity);
         nativeNote.setText(UiText.get(activity, "Choose the game rendering resolution. Changes apply after restart."));
         nativeNote.setTextSize(13); nativeNote.setAlpha(0.7f); box.addView(nativeNote);
+        final Switch expandArena=toggle(box,"Expand video arena","1".equals(get("expand_video_arena","1")));
+        final Switch startupFix=toggle(box,"Startup black screen fix","1".equals(get("patch_startup_black_screen","1")));
+        TextView arenaNote=new TextView(activity); arenaNote.setTextSize(13); arenaNote.setAlpha(0.7f);
+        arenaNote.setText(UiText.get(activity, "OFF keeps the original arena. Texture errors or crashes may occur, especially at higher resolutions. Requires restart."));
+        box.addView(arenaNote);
         heading(box,"Anisotropic filtering");
         final String[] anisotropyValues={"0","2","4","8","16"};
         final RadioGroup anisotropy=choices(box,new String[]{"Game default","2×","4×","8×","16×"},
@@ -271,6 +276,8 @@ final class SettingsDialog {
             .setNegativeButton(UiText.get(activity, "Cancel"),null)
             .setPositiveButton(UiText.get(activity, "Apply & restart"),(d,w) -> {
                 Map<String,String> changed=new LinkedHashMap<>();
+                changed.put("expand_video_arena",expandArena.isChecked() ? "1" : "0");
+                changed.put("patch_startup_black_screen",startupFix.isChecked() ? "1" : "0");
                 changed.put("anisotropy",anisotropyValues[Math.max(0,checkedIndex(anisotropy))]);
                 changed.put("upscaler","off");
                 changed.put("fps_limit",FPS_VALUES[Math.max(0,checkedIndex(fpsLimit))]);

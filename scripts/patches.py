@@ -130,7 +130,8 @@ def encode(line):
     raise ValueError(f'unsupported patch type {kind!r}')
 
 
-def compile_patches(xml, names, app_version, segments, image=None, skipped=None):
+def compile_patches(xml, names, app_version, segments, image=None, skipped=None,
+                    expand_video_arena=True):
     """Writes of the named patches. With the game's image, each site is found by its signature
     (any build); without it, at the reference build's Address. A Line with a Target writes at that
     Target instead: data the code points to, such as a .bss variable (no bytes of its own to find).
@@ -161,7 +162,8 @@ def compile_patches(xml, names, app_version, segments, image=None, skipped=None)
                 data=fill(line.get('Value'),offset,targets) if '{' in line.get('Value','') else encode(line)
                 if not 0 < len(data) <= 4096 or not any(start<=offset and offset+len(data)<=end for start,end in segments):
                     raise ValueError(f'address {offset+EBOOT_BASE:#x} or write length is outside the eboot')
-                ours.append((offset,data))
+                if expand_video_arena or line.get('VideoArena') != 'true':
+                    ours.append((offset,data))
         except (LookupError, ValueError, TypeError, struct.error, OverflowError) as error:
             if skipped is None: raise ValueError(f'{name}: {error}')
             skipped[name]=str(error)
@@ -280,7 +282,7 @@ REPLACED_BY_EXCLUSIVE={'Bug Fix - Texture Corruption Fix'}
 ALWAYS_ON={'Bug Fix - Startup Black Screen'}
 
 
-def selected_patches(xml, app_version, extra, only=False):
+def selected_patches(xml, app_version, extra, only=False, startup_black_screen=True):
     """The file's isEnabled patches for this version, then the names in extra (";"-separated).
     only: extra is the whole selection (the launcher's), without the file's defaults but with
     the ALWAYS_ON ones."""
@@ -291,17 +293,20 @@ def selected_patches(xml, app_version, extra, only=False):
     exclusive=[n for n in names if n.startswith(EXCLUSIVE_PREFIX)]
     if len(exclusive)>1:
         raise ValueError(f'choose one resolution patch, not {exclusive}')
-    return [n for n in names if not (exclusive and n in REPLACED_BY_EXCLUSIVE)]
+    return [n for n in names if not (exclusive and n in REPLACED_BY_EXCLUSIVE)
+            and (startup_black_screen or n != 'Bug Fix - Startup Black Screen')]
 
 
-def patch_requirements(xml, names, app_version):
+def patch_requirements(xml, names, app_version, expand_video_arena=True):
     """(direct memory MiB, VBlank Hz) the selected patches' notes ask for, None when not needed.
     shadPS4 notes say "Requires setting DMEM to N MB": N is on top of the retail pool."""
     dmem=vblank=None
     for meta in ET.parse(xml).getroot().iter('Metadata'):
         if meta.get('Name') not in names or meta.get('AppVer')!=app_version: continue
         note=meta.get('Note','')
-        if m:=re.search(r'DMEM to (\d+) MB',note): dmem=max(dmem or 0,DMEM_RETAIL_MB+int(m.group(1)))
+        arena_only = any(line.get('VideoArena') == 'true' for line in meta.iter('Line'))
+        if expand_video_arena or not arena_only:
+            if m:=re.search(r'DMEM to (\d+) MB',note): dmem=max(dmem or 0,DMEM_RETAIL_MB+int(m.group(1)))
         if m:=re.search(r'VBlank to (\d+) FPS',note): vblank=max(vblank or 0,int(m.group(1)))
     return dmem,vblank
 
@@ -440,12 +445,16 @@ def main():
     ids,xml,tag,_name=profile
     sha=eboot_sha256(a.game_dir)
     print(f'Patches: {title} {game_app_version(a.game_dir)}, eboot.bin sha256 {sha}')
-    names=selected_patches(xml,tag,a.extra,os.environ.get('GOW3_PATCHES_ONLY')=='1')
+    names=selected_patches(xml,tag,a.extra,os.environ.get('GOW3_PATCHES_ONLY')=='1',
+                          startup_black_screen=os.environ.get('GOW3_STARTUP_BLACK_SCREEN', '1') != '0')
     elf=(a.out/'eboot.elf').read_bytes()
     segments=eboot_segments(elf)
     skipped={}
     image=eboot_image(elf)
-    writes=compile_patches(xml,names,None,segments,image,skipped)
+    expand_arena = os.environ.get('GOW3_EXPAND_VIDEO_ARENA', '1') != '0'
+    writes=compile_patches(xml,names,None,segments,image,skipped,
+                           expand_video_arena=expand_arena)
+    print(f'Video arena: {"expanded (resolution preset)" if expand_arena else "original (expansion disabled)"}')
     native_input = os.environ.get('GOW3_PATCH_INPUT_RES', '')
     native_info = None
     if native_input:
@@ -477,7 +486,8 @@ def main():
     write_patches(a.out,writes)
     applied=[n for n in names if n not in skipped]
     (a.out/'patch_status.json').write_text(json.dumps({'sha256':sha,'applied':applied,
-        'skipped':skipped,'android_native_resolution':native_info}))
+        'skipped':skipped,'android_native_resolution':native_info,
+        'expand_video_arena':expand_arena}))
     print(f'Patches: {title}; {len(writes)} writes from {applied or "none"}')
 
 if __name__=='__main__':

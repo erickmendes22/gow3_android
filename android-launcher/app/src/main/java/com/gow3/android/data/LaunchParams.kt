@@ -67,6 +67,13 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_android_fullscreen,
         ),
         LaunchParam(
+            key = "expand_video_arena", labelRes = R.string.param_expand_video_arena,
+            groupRes = R.string.param_group_display,
+            options = listOf(LaunchOption("0", R.string.param_option_off),
+                LaunchOption("1", R.string.param_option_on)), defaultValue = "1",
+            descriptionRes = R.string.param_desc_expand_video_arena,
+        ),
+        LaunchParam(
             key = "render_resolution", labelRes = R.string.param_render_resolution,
             groupRes = R.string.param_group_display,
             options = listOf(

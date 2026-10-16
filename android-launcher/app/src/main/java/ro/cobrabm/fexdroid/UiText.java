@@ -41,6 +41,9 @@ final class UiText {
         PT.put("Import Lossless.dll on the Home page first", "Importe o Lossless.dll na tela inicial primeiro");
         PT.put("Off", "Desativado");
         PT.put("On", "Ativado");
+        PT.put("Startup black screen fix", "Correção de tela preta ao iniciar");
+        PT.put("Expand video arena", "Aumentar arena de vídeo");
+        PT.put("OFF keeps the original arena. Texture errors or crashes may occur, especially at higher resolutions. Requires restart.", "Desativado mantém a arena original. Podem ocorrer erros de textura ou falhas, especialmente em resoluções maiores. Requer reiniciar.");
         PT.put("Render resolution", "Resolução de renderização");
         PT.put("Choose the game rendering resolution. Changes apply after restart.", "Escolha a resolução de renderização. As alterações são aplicadas após reiniciar.");
         PT.put("Image", "Imagem");

@@ -225,4 +225,6 @@
     <string name="patch_save_failed">Não foi possível salvar os patches.</string>
     <string name="patch_effect_note">Os patches opcionais de efeitos exigem um executável 01.02 compatível.</string>
     <string name="gpu_driver_adreno7xx">Turnip 26.3 R6 (Adreno 7xx)</string>
+    <string name="param_expand_video_arena">Aumentar arena de vídeo</string>
+    <string name="param_desc_expand_video_arena">Aumenta a arena de vídeo do jogo independentemente da resolução. Desativado mantém a arena original e pode causar erros de textura ou falhas, especialmente em resoluções maiores. Requer reiniciar.</string>
 </resources>

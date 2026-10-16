@@ -31,6 +31,8 @@ private val options = listOf(
     PatchOption("patch_disable_bloom", R.string.patch_bloom),
     PatchOption("patch_disable_soft_particles", R.string.patch_particles),
     PatchOption("disable_dynamic_shadows", R.string.param_shadows),
+    PatchOption("expand_video_arena", R.string.patch_texture_fix, "1"),
+    PatchOption("patch_startup_black_screen", R.string.patch_black_screen, "1"),
 )
 
 @Composable
@@ -69,10 +71,6 @@ internal fun ModsScreen() {
                     })
             }
         }
-        // Existing mandatory fixes remain automatic; this screen does not replace
-        // the runtime patch list or change the Home resolution behind the user.
-        Text(stringResource(R.string.patch_texture_fix), color = LauncherColors.textPrimary)
-        Text(stringResource(R.string.patch_black_screen), color = LauncherColors.textPrimary)
-        Text(stringResource(R.string.patch_automatic), color = LauncherColors.textMuted, fontSize = 12.sp)
+        Text(stringResource(R.string.param_desc_expand_video_arena), color = LauncherColors.textMuted, fontSize = 12.sp)
     }
 }

@@ -105,7 +105,8 @@ def derive(game, config, state_path, env):
     if profile and identity['reason'] == 'validated':
         try:
             names = selected_patches(profile[1], profile[2], env.get('GOW3_PATCHES', ''),
-                                     env.get('GOW3_PATCHES_ONLY') == '1')
+                                     env.get('GOW3_PATCHES_ONLY') == '1',
+                                     startup_black_screen=graphics['patch_startup_black_screen'] != '0')
         except ValueError:
             # Two resolution patches (or another exclusivity violation) cannot both apply.
             names, reason = [], 'patch-conflict'
@@ -139,7 +140,12 @@ def derive(game, config, state_path, env):
                         names.append(patch)
                     elif ini[key] != '1':
                         names = [name for name in names if name != patch]
-            dmem, vblank = patch_requirements(profile[1], names, profile[2])
+            expand_arena = graphics['expand_video_arena'] != '0'
+            dmem, vblank = patch_requirements(profile[1], names, profile[2],
+                                              expand_video_arena=expand_arena)
+            if not expand_arena:
+                from patches import DMEM_RETAIL_MB
+                dmem = max(dmem or 0, DMEM_RETAIL_MB)
             # The retail pool plus the patches' extra DMEM must fit the device (design: gate
             # values by device/runtime capability and fail with a clear log, not an OOM kill).
             device_mem = env.get('GOW3_DEVICE_MEM_MB')
@@ -172,7 +178,7 @@ def main(argv):
         print(json.dumps(plan))
         return 0
     exports = dict(plan['updates'])
-    if plan['patch_names']:
+    if plan['patch_names'] or plan['updates'].get('GOW3_PATCH_STATUS') == 'validated':
         exports['GOW3_PATCHES'] = ';'.join(plan['patch_names'])
         exports['GOW3_PATCHES_ONLY'] = '1'
     if plan['dmem']:

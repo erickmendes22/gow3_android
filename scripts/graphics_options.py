@@ -32,7 +32,8 @@ def canonical_resolution(value):
     return LEGACY_RESOLUTION_ALIASES.get(value, value)
 ENGINE_FPS = (60, 120, 240)
 DEFAULTS = {'render_resolution': 'native', 'engine_fps': '120', 'deferred_readback': '1',
-            'stale_readback': '1', 'async_shaders': '1'}
+            'stale_readback': '1', 'async_shaders': '1', 'expand_video_arena': '1',
+            'patch_startup_black_screen': '1'}
 RESOLUTION_PREFIX = 'Resolution Patch'
 FPS_PREFIX = 'Frame Rate Patch'
 TEXTURE_FIX = 'Bug Fix - Texture Corruption Fix'
@@ -78,7 +79,8 @@ def startup_options(ini):
         options['render_resolution'] = 'native'
     if options['engine_fps'] not in {str(f) for f in ENGINE_FPS}:
         options['engine_fps'] = '120'
-    for key in ('deferred_readback', 'stale_readback', 'async_shaders'):
+    for key in ('deferred_readback', 'stale_readback', 'async_shaders', 'expand_video_arena',
+                'patch_startup_black_screen'):
         options[key] = '0' if options[key] == '0' else '1'
     return options
 
@@ -112,10 +114,13 @@ def patch_names(names, options, texture_fix_available=True):
     """The launcher's patch list with the resolution and frame rate patches of `options`."""
     names = [n for n in names if not n.startswith(RESOLUTION_PREFIX) and not n.startswith(FPS_PREFIX)]
     resolution = options['render_resolution']
+    expand_arena = options.get('expand_video_arena', '1') != '0'
+    if not expand_arena:
+        names = [n for n in names if n != TEXTURE_FIX]
     if resolution != 'native':
         patch_resolution = '720p' if resolution in DIRECT_RESOLUTIONS else resolution
         names = [n for n in names if n != TEXTURE_FIX] + [f'{RESOLUTION_PREFIX} - {patch_resolution}']
-    elif texture_fix_available and TEXTURE_FIX not in names:
+    elif expand_arena and texture_fix_available and TEXTURE_FIX not in names:
         names.insert(0, TEXTURE_FIX)
     if options['engine_fps'] != '60':
         names.append(f'{FPS_PREFIX} - {options["engine_fps"]} FPS')
@@ -125,4 +130,6 @@ def patch_names(names, options, texture_fix_available=True):
 def environment(options):
     return {'GOW3_DEFERRED_READBACK': options['deferred_readback'],
             'GOW3_STALE_READBACK': options['stale_readback'],
-            'GOW3_ASYNC_SHADERS': options['async_shaders']}
+            'GOW3_ASYNC_SHADERS': options['async_shaders'],
+            'GOW3_EXPAND_VIDEO_ARENA': options.get('expand_video_arena', '1'),
+            'GOW3_STARTUP_BLACK_SCREEN': options.get('patch_startup_black_screen', '1')}
