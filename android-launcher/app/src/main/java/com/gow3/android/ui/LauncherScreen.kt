@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gow3.android.R
 import com.gow3.android.data.LogManager
-import com.gow3.android.data.LosslessDllManager
 import com.gow3.android.data.SaveManager
 import com.gow3.android.feature.about.AboutScreen
 import com.gow3.android.feature.home.HomeScreen
@@ -48,8 +47,6 @@ private enum class LauncherTab { HOME, MODS, ABOUT }
 @Composable
 internal fun LauncherScreen(
     onStartGame: () -> Unit,
-    losslessDlls: LosslessDllManager,
-    onGetFromSteam: ((Boolean, String) -> Unit) -> Unit,
     onChooseGameFolder: () -> Unit,
     onChooseUpdateFolder: () -> Unit,
     onInstallBasePkg: () -> Unit,
@@ -85,7 +82,7 @@ internal fun LauncherScreen(
                     .background(Brush.radialGradient(listOf(LauncherColors.backgroundTop.copy(alpha = 0.55f), LauncherColors.backgroundBottom.copy(alpha = 0.85f)), radius = 950f)),
             )
             when (tab) {
-                LauncherTab.HOME -> HomeScreen(onStartGame, losslessDlls, onGetFromSteam, onChooseGameFolder, onChooseUpdateFolder, onInstallBasePkg, onInstallUpdatePkg, pkgInstallBusy, pkgInstallMessage, pkgGeneration, onChangeLanguage)
+                LauncherTab.HOME -> HomeScreen(onStartGame, onChooseGameFolder, onChooseUpdateFolder, onInstallBasePkg, onInstallUpdatePkg, pkgInstallBusy, pkgInstallMessage, pkgGeneration, onChangeLanguage)
                 LauncherTab.MODS -> ModsScreen()
                 LauncherTab.ABOUT -> AboutScreen(saves, logs, onChangeLanguage)
             }
