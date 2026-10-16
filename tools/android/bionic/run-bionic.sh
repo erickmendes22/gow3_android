@@ -22,7 +22,7 @@ case "$turnip" in
  gen8|adreno7xx|system|custom) ;;
  *) echo "Invalid Bionic driver selection: $turnip" >&2; exit 2 ;;
 esac
-unset VK_DRIVER_FILES VK_ICD_FILENAMES VK_LAYER_PATH GOW3_LSFG LSFG_CONFIG
+unset VK_DRIVER_FILES VK_ICD_FILENAMES VK_LAYER_PATH GOW3_LSFG LSFG_CONFIG GOW3_LSFG_STATE_FILE GOW3_LSFG_LIB
 if [ "$turnip" = gen8 ] || [ "$turnip" = adreno7xx ]; then
  export GOW3_VULKAN_DRIVER="$runtime/drivers/$turnip/libvulkan_freedreno.so"
  [ -f "$GOW3_VULKAN_DRIVER" ] || { echo "Bundled $turnip driver is missing" >&2; exit 2; }
@@ -98,10 +98,6 @@ printf '%s\n' "{\"title_id\":\"${GOW3_GAME_TITLE:-unknown}\",\"app_version\":\"$
     --patches-config "${GOW3_PATCHES_CONFIG:-$base/patches.json}"
 
 # Native frame generation: state lives beside gow3.ini and can be updated live by the app.
-export GOW3_LSFG_STATE_FILE="$base/lsfg.state"
-export GOW3_LSFG_LIB="$runtime/lib/liblsfg-gow3.so"
-printf 'multiplier=%s\nflow=%s\nperformance=%s\n' "${GOW3_LSFG_MULTIPLIER:-$(setting lsfg_multiplier)}" \
-    "${GOW3_LSFG_FLOW_SCALE:-$(setting lsfg_flow_scale)}" "${GOW3_LSFG_PERFORMANCE:-$(setting lsfg_performance)}" > "$base/lsfg.state.tmp"
 mv "$base/lsfg.state.tmp" "$GOW3_LSFG_STATE_FILE"
 
 cd "$base"
