@@ -44,13 +44,6 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_upscaler,
         ),
         LaunchParam(
-            key = "android_fullscreen", labelRes = R.string.param_android_fullscreen,
-            groupRes = R.string.param_group_display,
-            options = listOf(LaunchOption("0", R.string.param_option_off),
-                             LaunchOption("1", R.string.param_option_on)),
-            defaultValue = "0", descriptionRes = R.string.param_desc_android_fullscreen,
-        ),
-        LaunchParam(
             key = "render_resolution", labelRes = R.string.param_resolution, groupRes = R.string.param_group_display,
             options = listOf(
                 LaunchOption("native", R.string.param_option_native),
@@ -111,6 +104,14 @@ internal object LaunchParams {
         ),
         LaunchParam(
             key = "skip_network_choice", labelRes = R.string.param_offline_start, groupRes = R.string.param_group_startup,
+            options = listOf(
+                LaunchOption("0", R.string.param_option_off),
+                LaunchOption("1", R.string.param_option_on),
+            ),
+            defaultValue = "1",
+        ),
+        LaunchParam(
+            key = "skip_intro", labelRes = R.string.param_skip_intros, groupRes = R.string.param_group_startup,
             options = listOf(
                 LaunchOption("0", R.string.param_option_off),
                 LaunchOption("1", R.string.param_option_on),

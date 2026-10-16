@@ -58,7 +58,7 @@ public final class GameActivity extends Activity {
     private LinearLayout drawerItems;
     private TextView status;
     private View resume;
-    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem, swapFaceItem;
+    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem;
     private TouchControllerOverlay controllerOverlay;
     private PadBridge pad;
     private AudioBridge audio;
@@ -73,18 +73,6 @@ public final class GameActivity extends Activity {
     private boolean edgeGesture, imeOpen, imePolling;
     private final AtomicBoolean imeAnswered=new AtomicBoolean();
 
-    @Override protected void attachBaseContext(android.content.Context base) {
-        String chosen=base.getSharedPreferences("gow3",MODE_PRIVATE).getString("language","system");
-        java.util.Locale locale="pt".equals(chosen) ? new java.util.Locale("pt","BR")
-            : "en".equals(chosen) ? java.util.Locale.ENGLISH
-            : "zh".equals(chosen) ? java.util.Locale.SIMPLIFIED_CHINESE
-            : java.util.Locale.getDefault();
-        android.content.res.Configuration config=
-            new android.content.res.Configuration(base.getResources().getConfiguration());
-        config.setLocale(locale);
-        super.attachBaseContext(base.createConfigurationContext(config));
-    }
-
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
         FILES=getFilesDir().getAbsolutePath();
@@ -98,8 +86,7 @@ public final class GameActivity extends Activity {
             getWindow().setAttributes(attrs);
         }
         displayOnly="x".equals(getIntent().getStringExtra("action"));
-        pad=new PadBridge(new File(BASE,"android-pad.state"),
-            getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false));
+        pad=new PadBridge(new File(BASE,"android-pad.state"));
         audio=new AudioBridge(new File(BASE,"audio.fifo"));
         buildScreen();
         immersive();
@@ -115,10 +102,7 @@ public final class GameActivity extends Activity {
     private void fitSurface(int width,int height) {
         if (width<=0 || height<=0) return;
         int w=width, h=height;
-        // Optional phone-display fill; default preserves the port's original 16:9 fit.
-        if (!"1".equals(setting("android_fullscreen"))) {
-            if ((long)w*9>(long)h*16) w=h*16/9; else h=w*9/16;
-        }
+        if ((long)w*9>(long)h*16) w=h*16/9; else h=w*9/16;
         FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)surface.getLayoutParams();
         if (p.width==w && p.height==h) return;
         p.width=w; p.height=h;
@@ -235,20 +219,12 @@ public final class GameActivity extends Activity {
                 .showLossless(() -> { Process p=game; return p!=null && p.isAlive(); }, this::pickRefreshRate);
         });
 
-        section(getString(com.gow3.android.R.string.drawer_controls));
+        section("Controls");
         controllerItem=menuItem("ic_gamepad","On-screen controller","",() -> {
             boolean enabled=!controllerEnabled();
             getSharedPreferences("gow3",MODE_PRIVATE).edit().putBoolean("controller_overlay",enabled).apply();
             controllerOverlay.release();
             closeDrawer();
-        });
-        swapFaceItem=menuItem("ic_gamepad",getString(com.gow3.android.R.string.drawer_swap_face),"",() -> {
-            boolean on=!getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false);
-            getSharedPreferences("gow3",MODE_PRIVATE).edit().putBoolean("swap_square_triangle",on).apply();
-            pad.reset();
-            pad.setSwapFaceButtons(on);
-            setDetail(swapFaceItem,getString(on ? com.gow3.android.R.string.drawer_on
-                                               : com.gow3.android.R.string.drawer_off));
         });
         menuItem("ic_edit","Edit controller layout","Drag and resize the buttons",() -> {
             getSharedPreferences("gow3",MODE_PRIVATE).edit().putBoolean("controller_overlay",true).apply();
@@ -365,9 +341,6 @@ public final class GameActivity extends Activity {
             : lsfgOn ? lsfg+"× frames · flow "
             +(setting("lsfg_flow_scale")==null ? "1.0" : setting("lsfg_flow_scale")) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
-        setDetail(swapFaceItem,getString(getSharedPreferences("gow3",MODE_PRIVATE)
-            .getBoolean("swap_square_triangle",false) ? com.gow3.android.R.string.drawer_on
-                                                      : com.gow3.android.R.string.drawer_off));
     }
 
     private void openDrawer() {
@@ -488,9 +461,6 @@ public final class GameActivity extends Activity {
         env.put("HOME",FILES+"/home/gow3port"); env.put("LANG","C.UTF-8");
         env.put("TMPDIR",ROOT+"/tmp"); env.put("XDG_RUNTIME_DIR",ROOT+"/tmp");
         env.put("FXD_FILES",FILES); env.put("FXD_ROOT",ROOT); env.put("GOW3_ANDROID_INPUT","1");
-        // The PS4 guest reads console language id 7 for Portuguese (Portugal).
-        String lang=getResources().getConfiguration().getLocales().get(0).getLanguage();
-        env.put("GOW3_LANGUAGE","pt".equals(lang) ? "7" : "1");
         // Keep native port libraries and rootfs libraries visible to the explicit rootfs loader.
         env.put("LD_LIBRARY_PATH",BASE+"/arm64/lib:"+ROOT+"/usr/lib/aarch64-linux-gnu:"+ROOT+"/usr/lib");
         // Its libc emulates SysV shared memory through fxshmd (started below).

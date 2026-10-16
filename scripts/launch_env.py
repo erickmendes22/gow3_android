@@ -52,32 +52,20 @@ def derive(game, config, state_path, env):
             updates['GOW3_PATCH_STATUS'] = identity['reason']
     if profile and identity['reason'] == 'validated':
         try:
-            # Per-title and version selection from the Android Patches tab.
-            saved = graphics_options.read_ini(config)
-            selection_key = 'patches_{}_{}'.format(identity['title_id'],
-                                                   identity['app_version'].replace('.', '_'))
-            use_saved = selection_key in saved and 'GOW3_PATCHES' not in env
-            extra = saved[selection_key] if use_saved else env.get('GOW3_PATCHES', '')
-            only = use_saved or env.get('GOW3_PATCHES_ONLY') == '1'
-            names = selected_patches(profile[1], profile[2], extra, only)
+            names = selected_patches(profile[1], profile[2], env.get('GOW3_PATCHES', ''),
+                                     env.get('GOW3_PATCHES_ONLY') == '1')
         except ValueError:
             # Two resolution patches (or another exclusivity violation) cannot both apply.
             names, reason = [], 'patch-conflict'
-        if names or use_saved:
-            # Home resolution/engine FPS still apply when every other patch is off.
-            names = graphics_options.patch_names(names, graphics,
-                        texture_fix_available=not use_saved)
+        if names:
+            # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).
+            names = graphics_options.patch_names(names, graphics)
             dmem, vblank = patch_requirements(profile[1], names, profile[2])
             # The retail pool plus the patches' extra DMEM must fit the device (design: gate
             # values by device/runtime capability and fail with a clear log, not an OOM kill).
             device_mem = env.get('GOW3_DEVICE_MEM_MB')
             if dmem and device_mem and str(device_mem).isdigit() and dmem > int(device_mem):
                 names, dmem, vblank, reason = [], None, None, 'insufficient-memory-budget'
-    if profile and identity['reason'] == 'validated' and use_saved:
-        # Explicit OFF must stay OFF even if the saved list is empty. The shell
-        # script calls patches.py again; without ONLY it would restore XML defaults.
-        updates['GOW3_PATCHES_ONLY'] = '1'
-        updates['GOW3_PATCHES'] = ';'.join(names)
     updates.update({'GOW3_GAME_TITLE': identity['title_id'] or 'unknown',
                     'GOW3_GAME_VERSION': identity['app_version'] or 'unknown',
                     'GOW3_EBOOT_SHA256': identity['eboot_sha256'] or 'unavailable',
