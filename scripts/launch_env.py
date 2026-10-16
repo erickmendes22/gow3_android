@@ -63,8 +63,8 @@ def derive(game, config, state_path, env):
         except ValueError:
             # Two resolution patches (or another exclusivity violation) cannot both apply.
             names, reason = [], 'patch-conflict'
-        if names:
-            # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).
+        if names or use_saved:
+            # Home resolution/engine FPS still apply when every other patch is off.
             names = graphics_options.patch_names(names, graphics,
                         texture_fix_available=not use_saved)
             dmem, vblank = patch_requirements(profile[1], names, profile[2])
@@ -73,6 +73,11 @@ def derive(game, config, state_path, env):
             device_mem = env.get('GOW3_DEVICE_MEM_MB')
             if dmem and device_mem and str(device_mem).isdigit() and dmem > int(device_mem):
                 names, dmem, vblank, reason = [], None, None, 'insufficient-memory-budget'
+    if profile and identity['reason'] == 'validated' and use_saved:
+        # Explicit OFF must stay OFF even if the saved list is empty. The shell
+        # script calls patches.py again; without ONLY it would restore XML defaults.
+        updates['GOW3_PATCHES_ONLY'] = '1'
+        updates['GOW3_PATCHES'] = ';'.join(names)
     updates.update({'GOW3_GAME_TITLE': identity['title_id'] or 'unknown',
                     'GOW3_GAME_VERSION': identity['app_version'] or 'unknown',
                     'GOW3_EBOOT_SHA256': identity['eboot_sha256'] or 'unavailable',

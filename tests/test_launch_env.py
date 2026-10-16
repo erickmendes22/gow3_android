@@ -61,6 +61,20 @@ class LaunchEnvReasonTests(unittest.TestCase):
         self.assertEqual(plan['updates']['GOW3_PATCH_STATUS'], 'validated')
         self.assertIsNotNone(plan['dmem'])
 
+    def test_android_saved_all_off_is_not_overridden_by_xml_defaults(self):
+        self.config.write_text('render_resolution=native\nengine_fps=60\npatches_CUSA01623_01_02=\n')
+        plan = self._plan()
+        self.assertEqual(plan['patch_names'], [])
+        self.assertEqual(plan['updates']['GOW3_PATCHES_ONLY'], '1')
+        self.assertEqual(plan['updates']['GOW3_PATCHES'], '')
+
+    def test_android_saved_all_off_preserves_home_resolution(self):
+        self.config.write_text('render_resolution=720p\nengine_fps=60\npatches_CUSA01623_01_02=\n')
+        plan = self._plan()
+        self.assertEqual(plan['patch_names'], ['Resolution Patch - 720p'])
+        self.assertEqual(plan['updates']['GOW3_PATCHES_ONLY'], '1')
+        self.assertEqual(plan['updates']['GOW3_PATCHES'], 'Resolution Patch - 720p')
+
     def test_player_files_remain_byte_identical(self):
         game = self.dir / 'game'
         (game / 'sce_sys').mkdir(parents=True)

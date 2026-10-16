@@ -20,6 +20,8 @@ class AndroidRequestedFeatures(unittest.TestCase):
         self.assertNotIn('key = "skip_intro"',params)
         self.assertIn("selection_key = 'patches_{}_{}'",launch)
         self.assertIn('texture_fix_available=not use_saved',launch)
+        self.assertIn('if names or use_saved:',launch)
+        self.assertIn("updates['GOW3_PATCHES_ONLY'] = '1'",launch)
         self.assertEqual((BASE/'assets/God_of_War_III_Remastered.xml').read_bytes(),
                          (ROOT/'patches/God_of_War_III_Remastered.xml').read_bytes())
         names=[m.attrib['Name'] for m in ET.parse(ROOT/'patches/God_of_War_III_Remastered.xml').getroot().iter('Metadata')]
