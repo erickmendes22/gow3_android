@@ -13,7 +13,6 @@ import androidx.core.view.WindowCompat
 import com.gow3.android.data.GameFolderManager
 import com.gow3.android.data.LanguageManager
 import com.gow3.android.data.LogManager
-import com.gow3.android.data.LosslessDllManager
 import com.gow3.android.data.SaveManager
 import com.gow3.android.data.PkgInstallManager
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,7 +26,6 @@ class MainActivity : ComponentActivity() {
         private const val REQUEST_INITIAL_STORAGE = 1015
     }
     private lateinit var gameFolderManager: GameFolderManager
-    private lateinit var losslessDllManager: LosslessDllManager
     private lateinit var saveManager: SaveManager
     private lateinit var logManager: LogManager
     private lateinit var pkgInstallManager: PkgInstallManager
@@ -54,7 +52,6 @@ class MainActivity : ComponentActivity() {
         window.decorView.systemUiVisibility = 0
 
         gameFolderManager = GameFolderManager(this)
-        losslessDllManager = LosslessDllManager(this)
         saveManager = SaveManager(this)
         logManager = LogManager(this)
         pkgInstallManager = PkgInstallManager(this) { busy, message ->
@@ -71,12 +68,6 @@ class MainActivity : ComponentActivity() {
                         } else if (gameFolderManager.hasGameFolder()) {
                             startActivity(Intent(this, ro.cobrabm.fexdroid.GameActivity::class.java))
                         }
-                    },
-                    losslessDlls = losslessDllManager,
-                    onGetFromSteam = { onDownloaded ->
-                        ro.cobrabm.fexdroid.SteamDllDialog(this, losslessDllManager.appCopy()) { ok, msg ->
-                            onDownloaded(ok, msg)
-                        }.show()
                     },
                     onChooseGameFolder = { gameFolderManager.chooseGameFolder() },
                     onChooseUpdateFolder = { gameFolderManager.chooseUpdateFolder() },
@@ -154,7 +145,6 @@ class MainActivity : ComponentActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (saveManager.onActivityResult(requestCode, resultCode, data)) return
         if (logManager.onActivityResult(requestCode, resultCode, data)) return
-        if (losslessDllManager.onPickerResult(requestCode, resultCode, data)) return
         if (pkgInstallManager.onPickerResult(requestCode, resultCode, data)) return
         gameFolderManager.onFolderResult(requestCode, resultCode, data)
     }
