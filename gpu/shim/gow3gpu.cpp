@@ -378,6 +378,14 @@ extern "C" int gow3gpu_choice_poll(void) {
     return Gow3Overlay::PollChoice();
 }
 
+extern "C" void gow3gpu_choice_cancel(void) {
+    Gow3Overlay::CancelChoice();
+}
+
+extern "C" void gow3gpu_pad_publish(uint32_t buttons) {
+    Gow3Overlay::PublishPad(buttons);
+}
+
 extern "C" int gow3gpu_text_input_poll(char* out, uint64_t size) {
     if (!g_window) return 2;
     std::string text;

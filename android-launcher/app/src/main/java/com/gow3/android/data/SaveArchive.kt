@@ -10,14 +10,18 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /**
- * 纯存档归档逻辑：将游戏的 `savedata/` 目录树打包成保留 `savedata/1/CUSA01623/...`
+ * 纯存档归档逻辑：将游戏的 `savedata/` 目录树打包成保留 `savedata/<user_id>/<title>/...`
  * 前缀的 `.zip`，校验此类归档（防 zip-slip、校验布局和标题）、解压到暂存目录，
  * 并为备份目录命名。
  *
  * 保持不依赖 Android，以便宿主端 JVM 测试可以直接验证它，与 [Gow3Ini] 思路一致。
- * 本移植只支持单一标题（God of War III，`CUSA01623`）和单一用户（`1`），因此
- * 只有当所有条目都位于该目录树之下（包括 `<title>.memory/` 的 SaveDataMemory 目录）
- * 时，归档才会被接受。
+ * 用户 id 固定为 [USER_ID]（`1`）；标题目录名**不是常量**，由运行时按游戏
+ * `sce_sys/param.sfo` 的 `INSTALL_DIR_SAVEDATA`／`TITLE_ID` 推导（`src/probe.c`）。
+ * 因此调用方必须把期望目录名作为 [validate] 的 `expectedTitle` 传入；传 null 表示
+ * 推导不出，此时退到形状检查（接受任意非空标题目录名，仍保留 zip-slip 与结构校验）。
+ *
+ * 只有当所有条目都位于 `savedata/<user_id>/<title>/` 之下（含 `<title>.memory/` 的
+ * SaveDataMemory 目录）时，归档才会被接受。
  */
 /**
  * 存档归档校验失败的原因；由 UI 层（SaveManager）映射为本地化提示文本。
@@ -29,13 +33,13 @@ internal sealed class SaveArchiveProblem {
     data class UnsafePath(val name: String) : SaveArchiveProblem()
     data class DuplicateEntry(val name: String) : SaveArchiveProblem()
     data class WrongLayout(val name: String) : SaveArchiveProblem()
-    data class UnsupportedTitle(val name: String) : SaveArchiveProblem()
+    /** [expected] 为当前游戏推导出的期望目录名；null 表示推导不出（形状检查下的命名问题）。 */
+    data class UnsupportedTitle(val name: String, val expected: String?) : SaveArchiveProblem()
 }
 
 internal object SaveArchive {
 
     const val USER_ID = "1"
-    const val TITLE_ID = "CUSA01623"
     private const val ROOT = "savedata"    /** 当目录中至少含一个存档文件（游戏非空的 savedata 目录树）时为 true。 */
     fun hasSaves(savedata: File): Boolean =
         savedata.isDirectory && savedata.walkTopDown().any { it.isFile }
@@ -72,8 +76,11 @@ internal object SaveArchive {
         }
     }
 
-    /** 当 [input] 是有效的 God of War III 存档归档时返回 null，否则返回失败原因。 */
-    fun validate(input: InputStream): SaveArchiveProblem? {
+    /**
+     * 当 [input] 是有效的存档归档时返回 null，否则返回失败原因。
+     * [expectedTitle] 为当前游戏推导出的期望标题目录名；null 表示推导不出，退到形状检查。
+     */
+    fun validate(input: InputStream, expectedTitle: String?): SaveArchiveProblem? {
         val seen = HashSet<String>()
         var contentFiles = 0
         try {
@@ -81,7 +88,7 @@ internal object SaveArchive {
                 while (true) {
                     val entry = zip.nextEntry ?: break
                     val name = entry.name
-                    val problem = validateEntry(name, seen)
+                    val problem = validateEntry(name, seen, expectedTitle)
                     if (problem != null) return problem
                     if (!entry.isDirectory) contentFiles++
                 }
@@ -92,11 +99,11 @@ internal object SaveArchive {
         return if (contentFiles == 0) SaveArchiveProblem.NoContent else null
     }
 
-    private fun validateEntry(name: String, seen: MutableSet<String>): SaveArchiveProblem? {
+    private fun validateEntry(name: String, seen: MutableSet<String>, expectedTitle: String?): SaveArchiveProblem? {
         if (!isSafePath(name)) return SaveArchiveProblem.UnsafePath(name)
         if (!seen.add(name)) return SaveArchiveProblem.DuplicateEntry(name)
         if (!name.startsWith(ROOT)) return SaveArchiveProblem.WrongLayout(name)
-        if (!isSupportedName(name)) return SaveArchiveProblem.UnsupportedTitle(name)
+        if (!isSupportedName(name, expectedTitle)) return SaveArchiveProblem.UnsupportedTitle(name, expectedTitle)
         return null
     }
 
@@ -107,15 +114,18 @@ internal object SaveArchive {
         return name.trimEnd('/').split('/').none { it.isEmpty() || it == "." || it == ".." }
     }
 
-    /** 接受 `savedata/` 结构树以及 `savedata/1/CUSA01623(/)` 或 `.memory` 下的所有内容。 */
-    private fun isSupportedName(name: String): Boolean {
+    /**
+     * 接受 `savedata/` 结构树，以及 `savedata/<user_id>/<title>(/)` 或 `<title>.memory` 下的内容。
+     * [expectedTitle] 非 null 时要求标题目录名精确匹配；为 null 时只要求非空（形状检查）。
+     */
+    private fun isSupportedName(name: String, expectedTitle: String?): Boolean {
         val parts = name.trimEnd('/').split('/')
         return when {
             parts.size == 1 -> parts[0] == ROOT
             parts[0] != ROOT || parts[1] != USER_ID -> false
             parts.size == 2 -> true
-            parts[2] == TITLE_ID || parts[2] == "$TITLE_ID.memory" -> true
-            else -> false
+            expectedTitle == null -> parts[2].isNotEmpty()
+            else -> parts[2] == expectedTitle || parts[2] == "$expectedTitle.memory"
         }
     }
 

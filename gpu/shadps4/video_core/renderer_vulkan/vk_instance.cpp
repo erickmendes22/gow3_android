@@ -408,12 +408,32 @@ bool Instance::CreateDevice() {
         return false;
     }
 
+    u32 sparse_queue_family_index = queue_family_index;
+    if (!(family_properties[queue_family_index].queueFlags & vk::QueueFlagBits::eSparseBinding)) {
+        const auto sparse_family = std::find_if(
+            family_properties.begin(), family_properties.end(), [](const auto& family) {
+                return family.queueCount && (family.queueFlags & vk::QueueFlagBits::eSparseBinding);
+            });
+        if (sparse_family == family_properties.end()) {
+            LOG_CRITICAL(Render_Vulkan,
+                         "Unable to find a queue family with VK_QUEUE_SPARSE_BINDING_BIT; "
+                         "sparse buffer bindings are unavailable on this device.");
+            return false;
+        }
+        sparse_queue_family_index = static_cast<u32>(sparse_family - family_properties.begin());
+    }
+    LOG_INFO(Render_Vulkan, "Queue families: graphics={}, sparse={}, reused_graphics={}",
+             queue_family_index, sparse_queue_family_index,
+             queue_family_index == sparse_queue_family_index);
+
     static constexpr std::array queue_priorities = {1.0f};
     const vk::DeviceQueueCreateInfo queue_info = {
         .queueFamilyIndex = queue_family_index,
         .queueCount = static_cast<u32>(queue_priorities.size()),
         .pQueuePriorities = queue_priorities.data(),
     };
+    std::array queue_infos = {queue_info, queue_info};
+    queue_infos[1].queueFamilyIndex = sparse_queue_family_index;
 
     const auto vk11_features = feature_chain.get<vk::PhysicalDeviceVulkan11Features>();
     vk12_features = feature_chain.get<vk::PhysicalDeviceVulkan12Features>();
@@ -432,8 +452,8 @@ bool Instance::CreateDevice() {
     }
     vk::StructureChain device_chain = {
         vk::DeviceCreateInfo{
-            .queueCreateInfoCount = 1u,
-            .pQueueCreateInfos = &queue_info,
+            .queueCreateInfoCount = queue_family_index == sparse_queue_family_index ? 1u : 2u,
+            .pQueueCreateInfos = queue_infos.data(),
             .enabledExtensionCount = static_cast<u32>(enabled_extensions.size()),
             .ppEnabledExtensionNames = enabled_extensions.data(),
         },
@@ -695,6 +715,7 @@ bool Instance::CreateDevice() {
     }
 
     graphics_queue = device->getQueue(queue_family_index, 0);
+    sparse_queue = device->getQueue(sparse_queue_family_index, 0);
     present_queue = device->getQueue(queue_family_index, 0);
 
     if (calibrated_timestamps) {

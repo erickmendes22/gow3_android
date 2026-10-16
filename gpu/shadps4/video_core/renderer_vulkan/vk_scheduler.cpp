@@ -231,23 +231,30 @@ void Scheduler::KickRecording(bool force) {
     if (!recording_threaded) {
         return;
     }
+    std::scoped_lock kick_lock{kick_mutex};
     // Callers kick where nobody holds the raw command buffer: deferral resumes.
     direct_mode = false;
     // Batches of tens of KiB keep the queue handoff cheap relative to the work it carries.
-    if (!force && full_chunks.empty() && record_chunk->Size() < 32 * 1024) {
+    if (!force && full_chunks.empty() && CurrentChunk().Size() < 32 * 1024) {
         return;
     }
-    if (full_chunks.empty() && record_chunk->Empty()) {
+    if (full_chunks.empty() && CurrentChunk().Empty()) {
         return;
     }
+    // Acquire the replacement before handing over the current chunk. This mirrors Bloodborne's
+    // issue #100 fix: record_chunk remains valid throughout the handover, including if another
+    // recording path is entered while the queue lock is held.
+    std::unique_ptr<RecordChunk> next_record =
+        CurrentChunk().Empty() ? nullptr : AcquireChunk();
     bool wake;
     {
         std::scoped_lock lk{recorder_mutex};
         for (auto& chunk : full_chunks) {
             recorder_queue.push_back(std::move(chunk));
         }
-        if (!record_chunk->Empty()) {
-            recorder_queue.push_back(std::move(record_chunk));
+        if (next_record) {
+            record_chunk.swap(next_record);
+            recorder_queue.push_back(std::move(next_record));
         }
         wake = recorder_sleeping;
         queued_chunks.store(recorder_queue.size(), std::memory_order_release);
@@ -256,9 +263,6 @@ void Scheduler::KickRecording(bool force) {
     // A busy recorder picks the new chunks up by itself: waking it is a syscall per draw.
     if (wake) {
         recorder_cv.notify_one();
-    }
-    if (!record_chunk) {
-        record_chunk = AcquireChunk();
     }
 }
 

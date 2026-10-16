@@ -72,6 +72,8 @@ public final class GameActivity extends Activity {
     private float touchX, touchY;
     private boolean edgeGesture, imeOpen, imePolling;
     private final AtomicBoolean imeAnswered=new AtomicBoolean();
+    private EditText imeField;
+    private AlertDialog imeDialog;
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -425,6 +427,7 @@ public final class GameActivity extends Activity {
             }
             return super.dispatchKeyEvent(e);
         }
+        if (imeGamepad(e)) return true;
         if (pad.key(e)) return true;
         if (shmid>=0 && e.getScanCode()>0 && e.getScanCode()+8<=255) {
             XInput.key(e.getScanCode()+8,e.getAction()==KeyEvent.ACTION_DOWN); return true;
@@ -652,8 +655,25 @@ public final class GameActivity extends Activity {
             dialog.dismiss(); answerIme(true,field.getText().toString()); return true;
         });
         dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
-        dialog.setOnDismissListener(d -> { imeOpen=false; immersive(); surface.requestFocus(); });
+        dialog.setOnDismissListener(d -> { imeOpen=false; imeField=null; imeDialog=null; immersive(); surface.requestFocus(); });
+        dialog.setOnKeyListener((d,code,event) -> imeGamepad(event));
+        imeField=field; imeDialog=dialog;
         dialog.show(); field.requestFocus();
+    }
+    /** Consume both edges so accepting a name cannot also press Cross in the game. */
+    private boolean imeGamepad(KeyEvent e) {
+        if (!imeOpen) return false;
+        int code=e.getKeyCode(), scan=e.getScanCode();
+        boolean cross=code==KeyEvent.KEYCODE_BUTTON_A || scan==304;
+        boolean circle=code==KeyEvent.KEYCODE_BUTTON_B || scan==305;
+        if (!cross && !circle) return false;
+        if (e.getAction()==KeyEvent.ACTION_UP) {
+            EditText field=imeField;
+            AlertDialog dialog=imeDialog;
+            answerIme(cross, cross && field!=null ? field.getText().toString() : "");
+            if (dialog!=null) dialog.dismiss();
+        }
+        return true;
     }
     private void answerIme(boolean ok,String value) {
         if (!imeAnswered.compareAndSet(false,true)) return;

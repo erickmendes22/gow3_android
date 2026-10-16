@@ -4,6 +4,7 @@
 #include "../src/runtime_pad.c"
 
 int gow3gpu_overlay_captures_input(void) { return 0; }
+void gow3gpu_pad_publish(uint32_t buttons) { (void)buttons; }
 uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *name) {
     (void)table; (void)count; (void)name;
     return 0;

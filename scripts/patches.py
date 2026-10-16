@@ -70,9 +70,11 @@ def find_pattern(image, pattern, limit=2):
 
 
 def locate(image, element, prefix=''):
-    """Image offset of a Line's or Target's site: its Pattern (unique) plus At, else Address."""
+    """实际映像必须唯一匹配特征码；无映像的参考编译才允许 Address。"""
     pattern=element.get(prefix+'Pattern')
     if not pattern:
+        if image is not None:
+            raise ValueError('missing signature')
         return int(element.get('Address'),0)-EBOOT_BASE
     found=find_pattern(image,parse_pattern(pattern))
     if len(found)!=1:
@@ -88,10 +90,15 @@ def resolve_targets(image, meta, sites):
     for target in meta.iter('Target'):
         name=target.get('Name')
         if target.get('Line'):
-            targets[name]=sites[int(target.get('Line'))]
+            index=int(target.get('Line'))
+            if not 0 <= index < len(sites) or sites[index] is None:
+                raise ValueError('invalid target line reference')
+            targets[name]=sites[index]
             continue
         at=locate(image,target)
         if target.get('Ref'):
+            if at < 0 or at + 4 > len(image):
+                raise ValueError('reference operand outside the image')
             disp,=struct.unpack_from('<i',image,at)
             at=at+4+int(target.get('Tail','0'))+disp
         targets[name]=at
@@ -133,26 +140,34 @@ def compile_patches(xml, names, app_version, segments, image=None, skipped=None)
     for meta in ET.parse(xml).getroot().iter('Metadata'):
         if meta.get('Name') in names and app_version in (None,meta.get('AppVer')) and meta.get('AppElf','eboot.bin')=='eboot.bin':
             found[meta.get('Name')]=meta
-    missing=[n for n in names if n not in found]
-    if missing: raise ValueError(f'patches not found for app version {app_version}: {missing}')
     writes=[]
-    for name in names:
-        lines=list(found[name].iter('Line'))
+    for name in dict.fromkeys(names):
         try:
-            sites=[locate(image,line) if image is not None else int(line.get('Address'),0)-EBOOT_BASE
+            if name not in found:
+                raise ValueError(f'patch not found for app version {app_version}')
+            lines=list(found[name].iter('Line'))
+            if not lines:
+                raise ValueError('empty patch')
+            sites=[(None if line.get('Target') else locate(image,line)) if image is not None else int(line.get('Address'),0)-EBOOT_BASE
                    for line in lines]
             targets=(resolve_targets(image,found[name],sites) if image is not None else
                      {t.get('Name'):int(t.get('Address'),0)-EBOOT_BASE for t in found[name].iter('Target')})
+            if any(not any(start <= target < end for start,end in segments)
+                   for target in targets.values()):
+                raise ValueError('target outside the eboot')
             sites=[targets[line.get('Target')] if line.get('Target') else site for line,site in zip(lines,sites)]
-        except LookupError as error:
+            ours=[]
+            for line,offset in zip(lines,sites):
+                data=fill(line.get('Value'),offset,targets) if '{' in line.get('Value','') else encode(line)
+                if not 0 < len(data) <= 4096 or not any(start<=offset and offset+len(data)<=end for start,end in segments):
+                    raise ValueError(f'address {offset+EBOOT_BASE:#x} or write length is outside the eboot')
+                ours.append((offset,data))
+        except (LookupError, ValueError, TypeError, struct.error, OverflowError) as error:
             if skipped is None: raise ValueError(f'{name}: {error}')
             skipped[name]=str(error)
             continue
-        for line,offset in zip(lines,sites):
-            data=fill(line.get('Value'),offset,targets) if '{' in line.get('Value','') else encode(line)
-            if not any(start<=offset and offset+len(data)<=end for start,end in segments):
-                raise ValueError(f'{name}: address {offset+EBOOT_BASE:#x} is outside the eboot')
-            writes.append((offset,data))
+        # 整项验证完成后才提交，避免后续行失败时留下部分写入。
+        writes.extend(ours)
     return writes
 
 

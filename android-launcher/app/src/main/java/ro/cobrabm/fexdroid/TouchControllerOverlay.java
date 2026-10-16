@@ -108,8 +108,9 @@ final class TouchControllerOverlay extends View {
                 right=true; PointF c=center(control);
                 rx=axis(Math.max(-1f,Math.min(1f,(p.x-c.x)/56f)));
                 ry=axis(Math.max(-1f,Math.min(1f,(p.y-c.y)/56f)));
-            } else if (control.equals("l2")) l2=255;
-            else if (control.equals("r2")) r2=255;
+            } else if (control.equals("l2")) { l2=255; pressed.add(control); }
+            else if (control.equals("r2")) { r2=255; pressed.add(control); }
+            else if (control.equals("touchpad")) pressed.add("touchpad_right"); /* 右侧点击:打开游戏暂停菜单,进而可进存档列表 */
             else if (control.equals("mouse")) {
                 if (!mouse) XInput.moveTo(Math.max(0,Math.min(1279,Math.round(p.x))),
                                           Math.max(0,Math.min(719,Math.round(p.y))));
@@ -192,8 +193,12 @@ final class TouchControllerOverlay extends View {
     }
     private void rectangle(Canvas c,String name,float width,String label) {
         PointF p=center(name);
+        // The touchpad button presses "touchpad_right" (right-side click, opens the pause menu),
+        // not "touchpad", so highlight it from that signal too.
+        boolean lit=pressed.contains(name) ||
+            (name.equals("touchpad") && pressed.contains("touchpad_right"));
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(name.equals(dragged) ? 0xffe8dfc9 : pressed.contains(name) ? 0xaae8dfc9 : 0x6630394c);
+        paint.setColor(name.equals(dragged) ? 0xffe8dfc9 : lit ? 0xaae8dfc9 : 0x6630394c);
         c.drawRoundRect(p.x-width/2,p.y-25,p.x+width/2,p.y+25,14,14,paint);
         paint.setStyle(Paint.Style.STROKE); paint.setColor(0xbbc6ad76); paint.setStrokeWidth(2);
         c.drawRoundRect(p.x-width/2,p.y-25,p.x+width/2,p.y+25,14,14,paint);

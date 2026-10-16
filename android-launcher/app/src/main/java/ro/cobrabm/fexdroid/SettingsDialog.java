@@ -196,6 +196,10 @@ final class SettingsDialog {
         final TextView nativeNote=new TextView(activity);
         nativeNote.setText(UiText.get(activity, "Choose the game rendering resolution. Changes apply after restart."));
         nativeNote.setTextSize(13); nativeNote.setAlpha(0.7f); box.addView(nativeNote);
+        heading(box,"Anisotropic filtering");
+        final String[] anisotropyValues={"0","2","4","8","16"};
+        final RadioGroup anisotropy=choices(box,new String[]{"Game default","2×","4×","8×","16×"},
+            indexOf(anisotropyValues,get("anisotropy","0"),0));
         heading(box,"Image");
         final Switch sharpen=toggle(box,"Sharpening","1".equals(get("sharpen","0")));
         final TextView sharpLabel=new TextView(activity); sharpLabel.setTextSize(14); box.addView(sharpLabel);
@@ -267,6 +271,7 @@ final class SettingsDialog {
             .setNegativeButton(UiText.get(activity, "Cancel"),null)
             .setPositiveButton(UiText.get(activity, "Apply & restart"),(d,w) -> {
                 Map<String,String> changed=new LinkedHashMap<>();
+                changed.put("anisotropy",anisotropyValues[Math.max(0,checkedIndex(anisotropy))]);
                 changed.put("upscaler","off");
                 changed.put("fps_limit",FPS_VALUES[Math.max(0,checkedIndex(fpsLimit))]);
                 changed.put("preset","0");

@@ -747,10 +747,9 @@ public:
             func(current_cmdbuf);
             return;
         }
-        if (!record_chunk->Push(std::forward<Func>(func))) {
-            full_chunks.push_back(std::move(record_chunk));
-            record_chunk = AcquireChunk();
-            const bool pushed = record_chunk->Push(std::forward<Func>(func));
+        if (!CurrentChunk().Push(std::forward<Func>(func))) {
+            RetireChunk();
+            const bool pushed = CurrentChunk().Push(std::forward<Func>(func));
             ASSERT(pushed);
         }
     }
@@ -768,9 +767,8 @@ public:
             return;
         }
         ASSERT(bytes + 1024 <= RecordChunk::Capacity);
-        if (RecordChunk::Capacity - record_chunk->Size() < bytes + 1024) {
-            full_chunks.push_back(std::move(record_chunk));
-            record_chunk = AcquireChunk();
+        if (RecordChunk::Capacity - CurrentChunk().Size() < bytes + 1024) {
+            RetireChunk();
         }
     }
 
@@ -784,7 +782,7 @@ public:
         // Room for the data and the command that follows it, so both stay in one chunk.
         const size_t bytes = data.size_bytes();
         ReserveRecordData(bytes + alignof(T));
-        auto* dst = static_cast<T*>(record_chunk->Allocate(bytes, alignof(T)));
+        auto* dst = static_cast<T*>(CurrentChunk().Allocate(bytes, alignof(T)));
         std::memcpy(dst, data.data(), bytes);
         return {dst, data.size()};
     }
@@ -881,6 +879,24 @@ private:
 
     std::unique_ptr<RecordChunk> AcquireChunk();
 
+    /// Returns the writable chunk. The replacement is installed before a chunk is handed over,
+    /// so recording never observes the transient null window that caused issue #100 upstream.
+    RecordChunk& CurrentChunk() {
+        if (!record_chunk) [[unlikely]] {
+            record_chunk = AcquireChunk();
+        }
+        return *record_chunk;
+    }
+
+    /// Moves the current chunk aside while keeping a writable chunk installed at all times.
+    void RetireChunk() {
+        auto full = AcquireChunk();
+        record_chunk.swap(full);
+        if (full) {
+            full_chunks.push_back(std::move(full));
+        }
+    }
+
     void RecorderThread(std::stop_token stoken);
 
     void SubmitExecution(SubmitInfo& info);
@@ -912,6 +928,8 @@ private:
     // gow3: threaded recording
     std::unique_ptr<RecordChunk> record_chunk;
     std::vector<std::unique_ptr<RecordChunk>> full_chunks;
+    // gow3: SignalAfterHostCopies 与等待路径都可能触发 KickRecording，保护 chunk 移交。
+    std::mutex kick_mutex;
     std::mutex recorder_mutex;
     std::condition_variable_any recorder_cv;
     std::condition_variable_any recorder_idle_cv;

@@ -189,4 +189,11 @@
     <string name="fps_size_300" formatted="false">300%</string>
     <string name="contact_base_label">Projeto base</string>
     <string name="contact_youtube_label">YouTube</string>
+    <string name="param_anisotropy">Filtragem anisotrópica</string>
+    <string name="param_option_game_default">Padrão do jogo</string>
+    <string name="param_desc_anisotropy">Melhora a nitidez de texturas vistas em ângulo. Pode reduzir o desempenho. Aplicado ao reiniciar.</string>
+    <string name="param_option_2x">2×</string>
+    <string name="param_option_4x">4×</string>
+    <string name="param_option_8x">8×</string>
+    <string name="param_option_16x">16×</string>
 </resources>

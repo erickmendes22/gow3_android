@@ -226,4 +226,11 @@
     <string name="fps_size_300" formatted="false">300%</string>
     <string name="contact_base_label">Base project</string>
     <string name="contact_youtube_label">YouTube</string>
+    <string name="param_anisotropy">Anisotropic filtering</string>
+    <string name="param_option_game_default">Game default</string>
+    <string name="param_desc_anisotropy">Sharpens textures viewed at an angle. May reduce performance. Applied after restart.</string>
+    <string name="param_option_2x">2×</string>
+    <string name="param_option_4x">4×</string>
+    <string name="param_option_8x">8×</string>
+    <string name="param_option_16x">16×</string>
 </resources>

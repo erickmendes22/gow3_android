@@ -46,11 +46,21 @@ bool CapturesInput();
 /// `active` is false; typing goes to the window (sdl_window), the box only displays it.
 void SetTextEntry(bool active, const std::string& prompt, const std::string& text);
 
+/// 游戏线程(scePadReadState):注入的 pad 文件按键,供下面的对话框使用。
+void PublishPad(u32 buttons);
+/// 上次发布的掩码中,自上次读取以来新按下的那些位。
+u32 PadEdges();
+/// Present thread: handles the Android/injected R3+L2 shortcut, which has no SDL events.
+void PollMenuShortcut();
+
 /// The game's save list: shown until the player chooses (arrows/D-pad, Enter/Cross) or
 /// cancels (Esc/Circle). `pictures`: one per item (empty = none), drawn beside its text.
 /// PollChoice: -1 while open, -2 cancelled, else the chosen index.
 void BeginChoice(const std::string& title, const std::vector<std::string>& items,
                  std::vector<Gow3Png::Image> pictures, int focus);
 int PollChoice();
+/// 按取消关掉一个打开的列表,由 runtime 自己的超时触发。不关的话,游戏已经被告知对话框结束了,
+/// 列表却还在绘制、还在扣住游戏的输入。
+void CancelChoice();
 
 } // namespace Gow3Overlay

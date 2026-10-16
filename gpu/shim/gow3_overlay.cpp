@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "gow3_overlay.h"
 #include "gow3_overlay_position.h"
+#include "gow3_pad_input.h"
 
 #include <algorithm>
 #include <atomic>
@@ -101,6 +102,9 @@ unsigned ChoicePadMask() {
 std::vector<Gow3Png::Image> choice_pictures;
 std::vector<ImTextureData*> choice_textures, choice_retired;
 std::atomic<bool> choice_retiring{false};
+// runtime_pad.c 发布的 pad 文件按键(Android 的屏幕手柄不产生任何 SDL 事件,存档列表只能靠它)。
+// 桌面的 SDL 文本框走 SDL 事件,Android 的文本输入走 app 自己的对话框,两者都不消费这个快照。
+std::atomic<u32> pad_published{0}, pad_seen{0};
 float base_scale = 1.0f;
 
 // Present rate for the FPS counter.
@@ -409,6 +413,14 @@ void ImageTab() {
         ImGui::BeginDisabled(!s.rcas || rcas_blocked);
         SliderRow("Sharpening strength", s.rcas_strength, 0, 100, "%d%%", "How strong the sharpening is.");
         ImGui::EndDisabled();
+        ImGui::EndTable();
+    }
+    ImGui::SeparatorText("Textures (applied on restart)");
+    if (BeginRows("##textures")) {
+        static const char* const labels[] = {"Game default", "2x", "4x", "8x", "16x"};
+        ChoiceRow("Anisotropic filtering", s.anisotropy, labels, G::Anisotropies.data(),
+                  int(G::Anisotropies.size()),
+                  "Sharper floors and walls seen at an angle. Little cost on most GPUs.");
         ImGui::EndTable();
     }
     ImGui::SeparatorText("Information");
@@ -948,6 +960,20 @@ void UpdateChoiceTextures() {
     choice_retiring = !choice_retired.empty();
 }
 
+// 施加列表动作的唯一入口,这样 SDL 事件和 pad 快照不会对同一个键各移动或各关闭一次。
+// finish:1 确认,2 取消。调用方持有 imgui_mutex。
+static void ApplyChoiceAction(int move, int finish) {
+    const int count = int(choice_items.size());
+    if (move && count) {
+        choice_index = (choice_index + move + count) % count;
+    }
+    if (finish) {
+        choice_result = finish == 1 && count ? choice_index : -2;
+        choice_active = false;
+        RetireChoiceTextures();
+    }
+}
+
 // The save list takes the keys and buttons that move and confirm; the rest stays with the game
 // (held neutral by CapturesInput).
 bool HandleChoiceEvent(const SDL_Event& event) {
@@ -965,15 +991,7 @@ bool HandleChoiceEvent(const SDL_Event& event) {
     } else {
         return event.type == SDL_EVENT_KEY_UP || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP;
     }
-    const int count = int(choice_items.size());
-    if (move && count) {
-        choice_index = (choice_index + move + count) % count;
-    }
-    if (finish) {
-        choice_result = finish == 1 && count ? choice_index : -2;
-        choice_active = false;
-        RetireChoiceTextures();
-    }
+    ApplyChoiceAction(move, finish);
     return true;
 }
 
@@ -1124,6 +1142,32 @@ bool CapturesInput() {
     return menu_open || text_entry_active || choice_active;
 }
 
+void PublishPad(u32 buttons) { pad_published.store(buttons); }
+
+/* 自上次读取以来新出现的位:按下是边沿,不是 pad 文件里那种持续的电平。调用方负责让
+ * `pad_seen` 跟上,所以对话框弹出时仍被按住的键不会被当成一次新的按下。 */
+u32 PadEdges() {
+    return Gow3Pad::Edges(pad_published.load(), pad_seen);
+}
+
+void PollMenuShortcut() {
+    static const bool android_input = [] {
+        const char* value = std::getenv("GOW3_ANDROID_INPUT");
+        return value && value[0] == '1';
+    }();
+    if (!android_input) {
+        return;
+    }
+    static bool combo_down = false;
+    const u32 buttons = pad_published.load(std::memory_order_relaxed);
+    const bool combo = (buttons & (Gow3Pad::kR3 | Gow3Pad::kL2)) ==
+                       (Gow3Pad::kR3 | Gow3Pad::kL2);
+    if (combo && !combo_down) {
+        SetOpen(!menu_open.load(std::memory_order_relaxed));
+    }
+    combo_down = combo;
+}
+
 void BeginChoice(const std::string& title, const std::vector<std::string>& items,
                  std::vector<Gow3Png::Image> pictures, int focus) {
     std::scoped_lock lock{imgui_mutex};
@@ -1137,6 +1181,8 @@ void BeginChoice(const std::string& title, const std::vector<std::string>& items
     // Ignore buttons held when entering the save menu; require a new press.
     choice_pad_held = ChoicePadMask();
     choice_active = true;
+    /* 列表弹出之前就被按住的键,不算对它的一次按下。 */
+    Gow3Pad::Forget(pad_seen, pad_published.load());
 }
 
 int PollChoice() {
@@ -1159,6 +1205,13 @@ int PollChoice() {
     return choice_result.load();
 }
 
+void CancelChoice() {
+    // runtime 放弃等待了(没有任何输入源能到达列表)。列表必须真的关掉:choice_active 只要还是
+    // true,它就会继续绘制,并继续扣住游戏的输入。
+    std::scoped_lock lock{imgui_mutex};
+    if (choice_active) ApplyChoiceAction(0, 2);
+}
+
 void SetTextEntry(bool active, const std::string& prompt, const std::string& text) {
     std::scoped_lock lock{imgui_mutex};
     text_entry_active = active;
@@ -1167,6 +1220,7 @@ void SetTextEntry(bool active, const std::string& prompt, const std::string& tex
 }
 
 void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
+    PollMenuShortcut();
     // Present interval for the FPS readout (measured also while nothing is drawn).
     const auto now = std::chrono::steady_clock::now();
     const float ms = std::chrono::duration<float, std::milli>(now - last_present).count();

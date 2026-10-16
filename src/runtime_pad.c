@@ -1,6 +1,10 @@
 /* libScePad on SDL3 gamepads, with a keyboard fallback. SDL events are pumped
  * by the window thread (gpu/shim/window.cpp); here state is only sampled.
  *
+ * pad 文件注入、GOW3_ANDROID_INPUT 门控,以及让 overlay 对话框读到注入按键的 pad 快照,都移植
+ * 自同谱系的 Bloodborne-Android(src/runtime_pad.c),改动时留意这份渊源。其中扳机解析和快照是
+ * 本仓库新增的:Bloodborne 从不弹宿主侧的存档列表,因此它没有快照的消费者。
+ *
  * Default keyboard layout (GOW3_KEY_MAP changes the buttons, see apply_button_map):
  *   WASD left stick, arrow keys right stick, Space Cross, LShift Circle,
  *   E Square, Q Triangle, 1 L1, 3 R1, R L2, F R2, Z L3, C R3,
@@ -75,6 +79,8 @@ static void touch_click(PadData *d, int right) {
 
 /* Opens the first gamepad SDL knows about; called under lock. */
 static SDL_Gamepad *current_gamepad(void) {
+    /* Android app 把所有手柄交给本文件(GOW3_PAD_FILE),那里没有 SDL 手柄可开:见 window.cpp。 */
+    if (!sdl_ready) { const char *android=getenv("GOW3_ANDROID_INPUT"); if (android && android[0]=='1') sdl_ready=-1; }
     if (!sdl_ready) sdl_ready = SDL_WasInit(SDL_INIT_GAMEPAD) ? 1 : SDL_InitSubSystem(SDL_INIT_GAMEPAD) ? 1 : -1;
     if (sdl_ready<0) return NULL;
     if (gamepad && !SDL_GamepadConnected(gamepad)) { SDL_CloseGamepad(gamepad); gamepad=NULL; }
@@ -230,7 +236,7 @@ static void sample_host(PadData *d) {
  * options touchpad touchpad_left touchpad_right up down left right) are held while listed;
  * touchpad defaults to a left-side click; lx= ly= rx= ry= (0..255) override
  * the sticks. An empty file releases everything. */
-static struct { uint32_t buttons; int stick[4]; int touch_side; } injected={0,{-1,-1,-1,-1},-1};
+static struct { uint32_t buttons; int stick[4]; int trigger[2]; int touch_side; } injected={0,{-1,-1,-1,-1},{-1,-1},-1};
 static int replay_armed;      /* 1 while a GOW3_PAD_REPLAY recording plays, 2 once it ended */
 static uint64_t replay_start; /* 0: (re)start at the next sample */
 static void read_inject(void) {
@@ -253,9 +259,12 @@ static void read_inject(void) {
     FILE *f=fopen(path,"r");
     if (!f) return;
     static const char *sticks[]={"lx=","ly=","rx=","ry="};
+    /* Android 的 PadBridge 在扳机值大于 0 时跳过 l2/r2 token,只写 l2=/r2= 数值。 */
+    static const char *triggers[]={"l2=","r2="};
     injected.buttons=0;
     injected.touch_side=-1;
     for (int i=0;i<4;++i) injected.stick[i]=-1;
+    for (int i=0;i<2;++i) injected.trigger[i]=-1;
     char token[64];
     while (fscanf(f,"%63s",token)==1) {
         if (!strcmp(token,"replay") && replay_armed!=1) { replay_armed=1; replay_start=0; } /* GOW3_PAD_REPLAY */
@@ -265,6 +274,7 @@ static void read_inject(void) {
         }
         for (size_t i=0;i<sizeof(ps_names)/sizeof(*ps_names);++i) if (!strcmp(token,ps_names[i].name)) injected.buttons|=ps_names[i].ps;
         for (int i=0;i<4;++i) if (!strncmp(token,sticks[i],3)) { int v=atoi(token+3); injected.stick[i]=v<0 ? 0 : v>255 ? 255 : v; }
+        for (int i=0;i<2;++i) if (!strncmp(token,triggers[i],3)) { int v=atoi(token+3); injected.trigger[i]=v<0 ? 0 : v>255 ? 255 : v; }
     }
     fclose(f);
     // The touch overlay rewrites the same state frequently. Only report a
@@ -361,15 +371,31 @@ static void replay_sample(PadData *d) {
 static int hold_after_capture;
 static void sample(PadData *d) {
     sample_host(d);
-    if (gow3gpu_overlay_captures_input()) { hold_after_capture=1; return; }
-    record_sample(d);
+    const int capture = gow3gpu_overlay_captures_input();
+    /* The pad file is read (and published to the overlay) even while the overlay captures input:
+     * on Android that file is the only way the save list and the text box hear a press. What the
+     * overlay captured is deliberately withheld from the game below, so one key is never taken
+     * twice — see the two early returns. Only the file is published; a GOW3_PAD_REPLAY recording
+     * drives the game, not the overlay dialogs, and a script that needs the dialogs writes the
+     * pad file directly instead. */
     read_inject();
+    gow3gpu_pad_publish(injected.buttons);
+    if (capture) { hold_after_capture=1; return; }
+    record_sample(d);
     replay_sample(d);
     d->buttons|=injected.buttons;
     if (injected.touch_side>=0) touch_click(d,injected.touch_side);
     else if ((d->buttons & BTN_TOUCHPAD) && !d->touch_count) touch_click(d,0);
     if (injected.buttons & BTN_L2) d->l2=255;
     if (injected.buttons & BTN_R2) d->r2=255;
+    /* 二值 token 已被上面的 255 覆盖,数值解析填其余的模拟量。 */
+    if (injected.trigger[0]>0 && d->l2<injected.trigger[0]) d->l2=(uint8_t)injected.trigger[0];
+    if (injected.trigger[1]>0 && d->r2<injected.trigger[1]) d->r2=(uint8_t)injected.trigger[1];
+    /* 与 sample_host() 的物理手柄路径一致:模拟扳机越过阈值时同时置位数字按键位,
+     * 否则 GOW3_PAD_FILE 注入(Android 触屏手柄只写 l2=/r2= 数值、省略 token)的游戏
+     * 侧 PadData.buttons 里永远没有 BTN_L2/BTN_R2,游戏按数字位响应的动作无响应。 */
+    if (d->l2>30) d->buttons|=BTN_L2;
+    if (d->r2>30) d->buttons|=BTN_R2;
     uint8_t *axes[4]={&d->left_x,&d->left_y,&d->right_x,&d->right_y};
     for (int i=0;i<4;++i) if (injected.stick[i]>=0) *axes[i]=(uint8_t)injected.stick[i];
     if (hold_after_capture) {

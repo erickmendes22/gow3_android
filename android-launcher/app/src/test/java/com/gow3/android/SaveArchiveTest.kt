@@ -12,8 +12,15 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import com.gow3.android.data.SaveArchive
+import com.gow3.android.data.SaveArchiveProblem
 
 class SaveArchiveTest {
+
+    companion object {
+        /** 真实设备上游戏 `param.sfo` 的 TITLE_ID（Android 版 dump 是 CUSA01740）。 */
+        private const val TITLE = "CUSA01740"
+        private const val OTHER_TITLE = "CUSA01623"
+    }
 
     private fun tempDir(): File {
         val dir = java.nio.file.Files.createTempDirectory("savearchive-test").toFile()
@@ -21,12 +28,12 @@ class SaveArchiveTest {
         return dir
     }
 
-    private fun makeSavedata(root: File): File {
+    private fun makeSavedata(root: File, title: String = TITLE): File {
         val savedata = File(root, "savedata").apply { mkdirs() }
-        val slot = File(savedata, "1/CUSA01623/AUTOSAVE").apply { mkdirs() }
+        val slot = File(savedata, "1/$title/AUTOSAVE").apply { mkdirs() }
         File(slot, "data.bin").writeText("v1")
         File(File(slot, "AUTOSAVE.sce_sys").apply { mkdirs() }, "param.bin").writeText("p")
-        File(File(savedata, "1/CUSA01623.memory").apply { mkdirs() }, "memory.dat").writeText("m")
+        File(File(savedata, "1/$title.memory").apply { mkdirs() }, "memory.dat").writeText("m")
         return savedata
     }
 
@@ -76,49 +83,72 @@ class SaveArchiveTest {
         val dir = tempDir()
         val zip = File(dir, "export.zip")
         SaveArchive.pack(makeSavedata(dir), zip)
-        assertNull(SaveArchive.validate(zip.inputStream()))
+        assertNull(SaveArchive.validate(zip.inputStream(), TITLE))
     }
 
     @Test
     fun `validate rejects a file that is not a zip`() {
-        val reason = SaveArchive.validate(ByteArrayInputStream("not a zip".toByteArray()))
+        val reason = SaveArchive.validate(ByteArrayInputStream("not a zip".toByteArray()), TITLE)
         assertNotNull(reason)
     }
 
     @Test
     fun `validate rejects zip-slip paths`() {
-        val bytes = zipBytes(listOf("savedata/1/CUSA01623/AUTOSAVE/../data.bin" to "x"))
-        assertNotNull(SaveArchive.validate(ByteArrayInputStream(bytes)))
+        val bytes = zipBytes(listOf("savedata/1/$TITLE/AUTOSAVE/../data.bin" to "x"))
+        assertNotNull(SaveArchive.validate(ByteArrayInputStream(bytes), TITLE))
     }
 
     @Test
-    fun `validate rejects a mismatched title`() {
-        val bytes = zipBytes(listOf("savedata/1/CUSA01740/AUTOSAVE/data.bin" to "x"))
-        val reason = SaveArchive.validate(ByteArrayInputStream(bytes))
-        assertNotNull(reason)
+    fun `validate rejects a title that differs from the current game`() {
+        // 这台设备的真实代号是 CUSA01740；带另一个区域代号（例如 PC dump 的 CUSA01623）的归档
+        // 不能被导入 —— 运行时不会去读那个目录。拒绝时须报出推导出的期望代号。
+        val bytes = zipBytes(listOf("savedata/1/$OTHER_TITLE/AUTOSAVE/data.bin" to "x"))
+        val reason = SaveArchive.validate(ByteArrayInputStream(bytes), TITLE)
+        assertTrue(reason is SaveArchiveProblem.UnsupportedTitle)
+        assertEquals(TITLE, (reason as SaveArchiveProblem.UnsupportedTitle).expected)
+    }
+
+    @Test
+    fun `validate accepts the current game's title, not a fixed one`() {
+        // 同一个归档在期望代号为 CUSA01623 时必须通过 —— 说明校验跟着 expectedTitle 走，
+        // 而不是绑死在某个常量上。
+        val bytes = zipBytes(listOf("savedata/1/$OTHER_TITLE/AUTOSAVE/data.bin" to "x"))
+        assertNull(SaveArchive.validate(ByteArrayInputStream(bytes), OTHER_TITLE))
+    }
+
+    @Test
+    fun `validate falls back to a shape check when the title cannot be derived`() {
+        // game_dir 未配置或 param.sfo 不可读时 expectedTitle 为 null：接受任意非空标题目录名……
+        val accepted = zipBytes(listOf("savedata/1/$OTHER_TITLE/AUTOSAVE/data.bin" to "x"))
+        assertNull(SaveArchive.validate(ByteArrayInputStream(accepted), null))
+        // ……但仍拒绝不安全路径与空归档。
+        val unsafe = zipBytes(listOf("savedata/1/$OTHER_TITLE/../../escape.bin" to "x"))
+        assertNotNull(SaveArchive.validate(ByteArrayInputStream(unsafe), null))
+        val empty = zipBytes(listOf("savedata/" to null, "savedata/1/" to null, "savedata/1/$OTHER_TITLE/" to null))
+        assertNotNull(SaveArchive.validate(ByteArrayInputStream(empty), null))
     }
 
     @Test
     fun `validate rejects a layout outside the savedata tree`() {
-        val bytes = zipBytes(listOf("home/1/CUSA01623/data.bin" to "x"))
-        assertNotNull(SaveArchive.validate(ByteArrayInputStream(bytes)))
+        val bytes = zipBytes(listOf("home/1/$TITLE/data.bin" to "x"))
+        assertNotNull(SaveArchive.validate(ByteArrayInputStream(bytes), TITLE))
     }
 
     @Test
     fun `validate rejects an archive with no content files`() {
-        val bytes = zipBytes(listOf("savedata/" to null, "savedata/1/" to null, "savedata/1/CUSA01623/" to null))
-        assertNotNull(SaveArchive.validate(ByteArrayInputStream(bytes)))
+        val bytes = zipBytes(listOf("savedata/" to null, "savedata/1/" to null, "savedata/1/$TITLE/" to null))
+        assertNotNull(SaveArchive.validate(ByteArrayInputStream(bytes), TITLE))
     }
 
     @Test
     fun `validate accepts the memory folder alongside the title dir`() {
         val bytes = zipBytes(
             listOf(
-                "savedata/1/CUSA01623/AUTOSAVE/data.bin" to "x",
-                "savedata/1/CUSA01623.memory/memory.dat" to "m",
+                "savedata/1/$TITLE/AUTOSAVE/data.bin" to "x",
+                "savedata/1/$TITLE.memory/memory.dat" to "m",
             ),
         )
-        assertNull(SaveArchive.validate(ByteArrayInputStream(bytes)))
+        assertNull(SaveArchive.validate(ByteArrayInputStream(bytes), TITLE))
     }
 
     @Test

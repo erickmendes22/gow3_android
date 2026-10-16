@@ -9,6 +9,8 @@ import java.util.Locale;
 final class UiText {
     private static final Map<String,String> PT = new LinkedHashMap<>();
     static {
+        PT.put("Anisotropic filtering", "Filtragem anisotrópica");
+        PT.put("Game default", "Padrão do jogo");
         PT.put("Lossless Scaling: could not apply", "Lossless Scaling: não foi possível aplicar");
         PT.put("Swipe left or press A to return", "Deslize para a esquerda ou pressione A para voltar");
         PT.put("Game", "Jogo");

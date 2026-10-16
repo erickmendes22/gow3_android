@@ -63,6 +63,11 @@ inline constexpr std::array<int, 3> FramesQueued = {1, 2, 0};
 inline int ParseFramesQueued(int value) {
     return IndexOf(FramesQueued, value, -1) >= 0 ? value : 1;
 }
+/// Forced anisotropic filtering levels; 0 keeps the game's sampler choice.
+inline constexpr std::array<int, 5> Anisotropies = {0, 2, 4, 8, 16};
+inline int ParseAnisotropy(int value) {
+    return IndexOf(Anisotropies, value, -1) >= 0 ? value : 0;
+}
 /// RCAS strength in percent; invalid values fall back to 75.
 inline int ParseRcasStrength(int value) {
     return value >= 0 && value <= 100 ? value : 75;

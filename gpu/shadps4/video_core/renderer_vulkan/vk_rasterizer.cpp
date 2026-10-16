@@ -2092,9 +2092,10 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
         const RingBinding* ring = num_ring_stages ? FindRingBinding(stage, buffer_index) : nullptr;
         if (ring) {
             // Copied by the GPU command thread into the constant ring (read-only).
-            if (FrameCapture::Active() && memory->IsValidGpuMapping(ring->address, 0)) {
+            // ring->address 只是 guest 地址标签；实际可读数据位于 constant ring 的 host 副本。
+            if (FrameCapture::Active()) {
                 FrameCapture::Buffer(stage.pgm_hash, buffer_index, ring->address,
-                                     reinterpret_cast<const void*>(ring->address), ring->size);
+                                     constant_ring->Data(ring->offset), ring->size);
             }
             if (!desc.IsSpecial()) {
                 // CUSA01715 uses a forward renderer: gbuffer_draw is never

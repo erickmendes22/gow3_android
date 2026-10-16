@@ -2,6 +2,7 @@
 #undef NDEBUG /* the checks are asserts; release builds define NDEBUG */
 #include "../src/runtime_services.c"
 #include <assert.h>
+#include <unistd.h>
 
 uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *nid) { (void)table; (void)count; (void)nid; return 0; }
 int gow3gpu_text_input_begin(const char *text, const char *prompt) { (void)text; (void)prompt; return 0; }
@@ -10,8 +11,10 @@ int64_t runtime_file_open(const char *path, int flags, int mode) { (void)path; (
 int64_t runtime_file_read(int fd, void *buffer, uint64_t size) { (void)fd; (void)buffer; (void)size; return -1; }
 int64_t runtime_file_close(int fd) { (void)fd; return 0; }
 static int choice_next=-1;
+static int choice_cancelled=0;
 int gow3gpu_choice_begin(const char *title, const char *const *items, const char *const *images, int count, int focus) { (void)title; (void)items; (void)images; (void)focus; return count>0; }
 int gow3gpu_choice_poll(void) { return choice_next; }
+void gow3gpu_choice_cancel(void) { choice_cancelled=1; }
 int runtime_savedata_param(int32_t user, const char *dir, void *param) { (void)user; (void)dir; (void)param; return -1; }
 int runtime_savedata_icon(int32_t user, const char *dir, char *out, size_t size) { (void)user; (void)dir; (void)out; (void)size; return -1; }
 
@@ -65,7 +68,52 @@ int main(void) {
     choice_next=-2;
     assert(save_status()==DIALOG_FINISHED && save_result(out)==0);
     memcpy(&value,out+4,4); assert(value==SAVE_RESULT_CANCELED);
+
+    /* Nobody answered the list: the game must get its dialog back instead of waiting forever, and
+     * the list must really close (otherwise it keeps drawing and keeps holding the game's input).
+     * The deadline is a second here so the test does not have to wait for the real one. */
+    setenv("GOW3_SAVE_LIST_TIMEOUT","1",1);
+    choice_cancelled=0; choice_next=-1; /* still on screen, nobody has pressed anything */
+    assert(save_open(list)==0 && save_status()==DIALOG_RUNNING && !choice_cancelled);
+    assert(save_status()==DIALOG_RUNNING && !choice_cancelled); /* still inside the second */
+    sleep(2);
+    assert(save_status()==DIALOG_FINISHED && choice_cancelled);
+    assert(save_result(out)==0);
+    memcpy(&value,out+4,4); assert(value==SAVE_RESULT_CANCELED);
+    unsetenv("GOW3_SAVE_LIST_TIMEOUT");
+
+    /* A choice that arrives in time is not overridden by the deadline. */
+    choice_cancelled=0; choice_next=1;
+    assert(save_open(list)==0);
+    assert(save_status()==DIALOG_FINISHED && !choice_cancelled);
+    assert(save_result(out)==0 && !strcmp(chosen,"SAVE0001"));
     assert(save_term()==0);
+
+    /* Android IME round trip: the runtime emits a request and consumes the app reply. */
+    char ime_dir[]="/tmp/gow3-ime-test-XXXXXX";
+    assert(mkdtemp(ime_dir));
+    char request[600], response[620];
+    snprintf(request,sizeof(request),"%s/ime.request",ime_dir);
+    snprintf(response,sizeof(response),"%s.result",request);
+    setenv("GOW3_IME_FILE",request,1);
+    uint16_t text[32]={'K','r','a','t','o','s',0};
+    ImeParam ime_param={.buffer=text,.max_length=31};
+    assert(ime_init(&ime_param,NULL)==0 && ime_status()==1 && ime_uses_bridge);
+    FILE *reply=fopen(response,"w"); assert(reply);
+    fputs("ok\nTeste\n",reply); fclose(reply);
+    assert(ime_status()==2 && text[0]=='T' && text[4]=='e' && text[5]==0);
+    assert(ime_term()==0);
+    /* A cancelled entry must leave the player's original text intact. */
+    assert(ime_init(&ime_param,NULL)==0);
+    reply=fopen(response,"w"); assert(reply); fputs("cancel\n\n",reply); fclose(reply);
+    assert(ime_status()==2 && text[0]=='T');
+    uint32_t ime_out[2]; assert(ime_result(ime_out)==0 && ime_out[0]==1);
+    assert(ime_term()==0);
+    unlink(request); rmdir(ime_dir);
+    /* An unavailable file bridge falls back, instead of waiting forever for a reply. */
+    assert(ime_init(&ime_param,NULL)==0 && !ime_uses_bridge && ime_status()==2);
+    assert(ime_term()==0);
+    unsetenv("GOW3_IME_FILE");
 
     /* PlayGo: installed, full speed, progress never divides by zero. */
     int32_t handle=0; uint64_t progress[2]; int32_t speed; uint16_t chunk=0;

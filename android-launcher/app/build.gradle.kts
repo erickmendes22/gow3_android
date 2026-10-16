@@ -22,8 +22,8 @@ android {
         applicationId = "com.gow3.android"
         minSdk = 28
         targetSdk = 28
-        versionCode = 2010602
-        versionName = "2.1.6-android2"
+        versionCode = 2010603
+        versionName = "2.1.6-android3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

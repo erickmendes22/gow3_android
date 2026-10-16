@@ -79,6 +79,17 @@ internal object LaunchParams {
             descriptionRes = R.string.param_render_resolution_desc,
         ),
         LaunchParam(
+            key = "anisotropy", labelRes = R.string.param_anisotropy,
+            groupRes = R.string.param_group_display,
+            options = listOf(
+                LaunchOption("0", R.string.param_option_game_default),
+                LaunchOption("2", R.string.param_option_2x),
+                LaunchOption("4", R.string.param_option_4x),
+                LaunchOption("8", R.string.param_option_8x),
+                LaunchOption("16", R.string.param_option_16x)),
+            defaultValue = "0", descriptionRes = R.string.param_desc_anisotropy,
+        ),
+        LaunchParam(
             key = "disable_dynamic_shadows", labelRes = R.string.param_shadows,
             groupRes = R.string.param_group_display,
             options = listOf(
