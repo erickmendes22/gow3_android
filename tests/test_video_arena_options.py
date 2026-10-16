@@ -16,7 +16,7 @@ XML = paths.ROOT / 'patches/God_of_War_III_Remastered.xml'
 
 class ArenaPatchTests(unittest.TestCase):
     def test_only_arena_operand_is_removed_at_every_resolution(self):
-        for resolution in ('480p', '720p', '1440p', '1800p', '4K'):
+        for resolution in ('480p', '720p', '900p', '1440p', '1800p', '4K'):
             with self.subTest(resolution=resolution):
                 names = ['Resolution Patch - ' + resolution]
                 expanded = patches.compile_patches(XML, names, '01.02', [(0, 0x4000000)])
@@ -41,7 +41,7 @@ class ArenaPatchTests(unittest.TestCase):
         # Attributes separate the policy; the existing arena values remain unchanged.
         tagged = [line for line in ET.parse(XML).iter('Line')
                   if line.get('VideoArena') == 'true']
-        self.assertEqual(len(tagged), 6)
+        self.assertEqual(len(tagged), 7)
         self.assertEqual({line.get('Address') for line in tagged}, {'0x007cd918'})
 
 

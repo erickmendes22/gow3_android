@@ -21,7 +21,7 @@ inline constexpr std::array<int, 5> FpsLimits = {30, 60, 120, 240, 0};
 /// Game patch suffixes ("Resolution Patch - <name>"); "native" is no resolution patch.
 inline constexpr std::array<std::string_view, 11> Resolutions = {
     "240p", "360p", "424p", "480p", "540p", "720p",
-    "800p", "native", "1440p", "1800p", "4K"};
+    "900p", "native", "1440p", "1800p", "4K"};
 /// Engine frame rate ceilings: 60 is the game's own, 120 and 240 are frame rate patches.
 inline constexpr std::array<int, 3> EngineFps = {60, 120, 240};
 
@@ -50,6 +50,7 @@ inline int ParseResolution(std::string_view text) {
     else if (text == "854x480") text = "480p";
     else if (text == "960x540") text = "540p";
     else if (text == "1280x720") text = "720p";
+    else if (text == "800p" || text == "1600x900") text = "900p";
     else if (text == "1080p") text = "native";
     return IndexOf(Resolutions, text, 7);
 }

@@ -30,6 +30,9 @@ int main() {
     assert(G::ParseDisplayMode("borderless") == G::Borderless && G::ParseDisplayMode("bogus") == G::Windowed);
     assert(G::ParseFpsLimit(240) == 240 && G::ParseFpsLimit(75) == 0);
     assert(G::ParseResolution("1440p") == 8 && G::ParseResolution("8K") == 7);
+    assert(G::ParseResolution("900p") == 6);
+    assert(G::ParseResolution("800p") == G::ParseResolution("900p"));
+    assert(G::ParseResolution("1600x900") == G::ParseResolution("900p"));
     assert(G::ParseResolution("native") == G::ParseResolution("1080p"));
     assert(G::ParseResolution("720p") == G::ParseResolution("1280x720"));
     assert(G::ParseResolution("480p") == G::ParseResolution("854x480"));

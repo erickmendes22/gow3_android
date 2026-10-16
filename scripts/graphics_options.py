@@ -12,7 +12,7 @@ from pathlib import Path
 
 # One menu entry per physical resolution; retain the original/old game patches
 # and expose the genuinely new, byte-verified CUSA01715 resolutions.
-RESOLUTIONS = ('240p', '360p', '424p', '480p', '540p', '720p', '800p',
+RESOLUTIONS = ('240p', '360p', '424p', '480p', '540p', '720p', '900p',
                'native', '1440p', '1800p', '4K')
 DIRECT_PIXEL_RESOLUTIONS = {
     '240p': '426x240',
@@ -26,6 +26,7 @@ DIRECT_RESOLUTIONS = frozenset(DIRECT_PIXEL_RESOLUTIONS)
 LEGACY_RESOLUTION_ALIASES = {
     '426x240': '240p', '640x360': '360p', '752x424': '424p',
     '854x480': '480p', '960x540': '540p', '1280x720': '720p',
+    '800p': '900p', '1600x900': '900p',
     '1080p': 'native',
 }
 def canonical_resolution(value):

@@ -42,6 +42,18 @@ def sample_image():
 
 
 class Cusa01715ResolutionTests(unittest.TestCase):
+    def test_900p_writes_all_eight_verified_geometry_operands(self):
+        image = sample_image()
+        for expand in (True, False):
+            writes = patches.compile_patches(
+                XML, ['Resolution Patch - 900p'], '01.02', [(0, len(image))], image,
+                expand_video_arena=expand)
+            self.assertEqual(len(writes), 9 if expand else 8)
+            for i, (offset, data) in enumerate(writes[:8]):
+                self.assertEqual(offset + patches.EBOOT_BASE, patches.CUSA01715_0102_SITES[i])
+                expected = 1600 if patches.CUSA01715_0102_FIELDS[i] == 'width' else 900
+                self.assertEqual(data, expected.to_bytes(len(data), 'little'))
+
     def test_signatures_are_unique_and_identify_exact_operands(self):
         image = sample_image()
         segs = [(0, len(image))]

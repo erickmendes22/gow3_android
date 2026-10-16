@@ -83,7 +83,7 @@ internal object LaunchParams {
                 LaunchOption("480p", R.string.param_resolution_480),
                 LaunchOption("540p", R.string.param_resolution_540),
                 LaunchOption("720p", R.string.param_resolution_720),
-                LaunchOption("800p", R.string.param_resolution_800),
+                LaunchOption("900p", R.string.param_resolution_900),
                 LaunchOption("native", R.string.param_resolution_original),
                 LaunchOption("1440p", R.string.param_resolution_1440),
                 LaunchOption("1800p", R.string.param_resolution_1800),
@@ -180,6 +180,7 @@ internal object LaunchParams {
             "752x424" -> "424p"
             "640x360" -> "360p"
             "426x240" -> "240p"
+            "800p", "1600x900" -> "900p"
             "1080p" -> "native"
             else -> v
         }
