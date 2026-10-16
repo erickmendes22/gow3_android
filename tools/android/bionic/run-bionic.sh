@@ -97,8 +97,6 @@ printf '%s\n' "{\"title_id\":\"${GOW3_GAME_TITLE:-unknown}\",\"app_version\":\"$
     --game-dir "$game" --patches-dir "${GOW3_PATCHES_DIR:-$base/patches}" \
     --patches-config "${GOW3_PATCHES_CONFIG:-$base/patches.json}"
 
-# Native frame generation: state lives beside gow3.ini and can be updated live by the app.
-mv "$base/lsfg.state.tmp" "$GOW3_LSFG_STATE_FILE"
 
 cd "$base"
 echo "Bionic: driver=$turnip chip=$chip; starting God of War III"
