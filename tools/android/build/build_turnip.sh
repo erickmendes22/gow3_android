@@ -15,6 +15,8 @@ die() { echo "build_turnip: $*" >&2; exit 1; }
 step=0; total=6; _t0=0
 begin()    { step=$((step + 1)); _t0=$(date +%s); printf '\n==> [%d/%d] %s\n' "$step" "$total" "$*"; }
 end_stage(){ local sec=$(( $(date +%s) - _t0 )); printf '    %s (%dm%02ds)\n' "$*" "$((sec / 60))" "$((sec % 60))"; }
+# Avoid contaminating target linker with Micromamba host x86-64 libraries.
+source tools/android/build/clean_cross_env.sh
 if [[ -n ${GOW3_LLVM_PREFIX:-} && -d $GOW3_LLVM_PREFIX/bin ]]; then
     export PATH="$GOW3_LLVM_PREFIX/bin:$PATH"
 fi
