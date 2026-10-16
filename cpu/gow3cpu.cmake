@@ -10,3 +10,15 @@ set_target_properties(gow3cpu PROPERTIES
   C_VISIBILITY_PRESET hidden
   CXX_VISIBILITY_PRESET hidden
   VISIBILITY_INLINES_HIDDEN TRUE)
+
+if(ANDROID)
+  # Embedded FEX runs no FEXServer. Its Linux IPC client also requires a noexcept
+  # std::function assignment unsupported by libc++; keep it out of Android Common.
+  # Adapted from Bloodborne-Android cpu/bbcpu.cmake at 2e472653.
+  get_target_property(gow3_common_sources Common SOURCES)
+  list(FILTER gow3_common_sources EXCLUDE REGEX "FEXServerClient\\.cpp$")
+  set_target_properties(Common PROPERTIES SOURCES "${gow3_common_sources}")
+endif()
+if(ANDROID)
+  target_compile_options(FEXCore_Base PRIVATE -include "${GOW3CPU_DIR}/bionic_compat.h")
+endif()

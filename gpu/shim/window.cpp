@@ -1,3 +1,4 @@
+#ifndef __ANDROID__
 // gow3: SDL3 window for the Vulkan swapchain (X11 or Wayland).
 #include <cstdio>
 #include <cstdlib>
@@ -234,3 +235,5 @@ void WindowSDL::UpdateCursor() {
 }
 
 } // namespace Frontend
+
+#endif

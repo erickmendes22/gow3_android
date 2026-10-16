@@ -5,24 +5,34 @@ Branch: `experimental-bionic`, criada de `gow3` no commit
 
 ## Estado desta etapa
 
-Esta branch começa a migração pelo carregamento Vulkan Android, uma condição necessária
-para utilizar o driver enviado pelo usuário. Ainda não substitui o runtime jogável glibc,
-nem integra a apresentação AHardwareBuffer ao jogo. O APK existente continua usando seu
-runtime e drivers atuais. Não se deve publicar esta etapa como uma versão Bionic jogável.
+A branch já compila os componentes centrais do jogo com NDK r29/Bionic:
 
-Implementado:
+- FEX e `libgow3cpu.so`, preservando a revisão `fb925d6fc5cc8576bf0f9ae6978fc6d912485593`.
+  O hook de CMake seleciona os fontes Linux do FEX após o NDK configurar Bionic;
+  uma adaptação local usa syscall para getdents64, sem atualizar o tradutor.
+- `libgow3gpu.so`, sem SDL, X11 ou libvulkan vinculados. O Vulkan usa um único
+  carregador Android ICD/HAL e os ponteiros desse driver também atendem código C de terceiros.
+- Apresentação GPU por AHardwareBuffer com ownership FOREIGN, sync-fd e o receptor
+  `libgow3present.so`/`Gow3Present.java`, sem Xvfb. A implementação ainda não foi exercitada no aparelho.
+- `gow3-probe`, módulos de runtime, áudio PCM por FIFO e entrada PadBridge sem SDL.
+  Os controles de gatilho, touchpad e captura de entrada pelo overlay foram exercitados no host.
+- `gow3-prepare`, para gerar a imagem base e AppContent nativamente. As saídas de imports,
+  relocations, TLS e metadados foram comparadas byte a byte com o Python deste fork em fixtures.
+  O compilador XML de patches e a composição de updates ainda precisam ser integrados ao caminho nativo.
+- Validador ELF que exige ARM64/Bionic, linker Android, dependências permitidas e
+  resolução de símbolos fortes. Todos os sete binários/bibliotecas do conjunto passam.
+- Pacote exato `Turnip_Gen8_V37_patch.zip`, fixado por URL e hashes, com seleção automática
+  no verificador para chip KGSL `0x44xxxxxx` (Adreno Gen8).
 
-- Carregador independente de libvulkan, com entradas ICD, Vulkan loader e Android HAL `HMI`.
-- Pacote exato `Turnip_Gen8_V37_patch.zip`, de StevenMXZ, fixado por URL e SHA256.
-- Seleção automática desse driver no verificador Bionic para chip KGSL `0x44xxxxxx`
-  (Adreno Gen8), com escolha explícita `system` ou `gen8`.
-- Compilação NDK/ARM64 do verificador, que cria uma instância e um dispositivo Vulkan e
-  verifica AHardwareBuffer, queue-family foreign e semáforos SYNC_FD importáveis/exportáveis.
-- Testes executáveis do carregador com bibliotecas ICD e HAL de teste, rejeição de falhas,
-  seleção por GPU e rejeição de arquivos diferentes do pacote fixado.
+**Não é ainda um APK Bionic jogável.** A inicialização do APK continua no caminho glibc;
+launcher, PKG, patches e empacotamento Bionic ainda não foram conectados. Não houve teste
+no Redmagic, nem medição de FPS ou validação da imagem. Em especial, desativar o heap tagging
+não garante que objetos Scudo entregues ao guest estejam abaixo do limite de ponteiros de
+40 bits; as alocações que cruzam essa fronteira precisam ser auditadas antes do teste do jogo.
 
-O driver não deve ser selecionado automaticamente para Adreno 6xx/7xx, Mali ou GPU desconhecida.
-Um driver personalizado solicitado que falha ao abrir não cai silenciosamente no driver do sistema.
+A branch `gow3` e seu runtime permanecem preservados. Não selecionar V37 Gen8 automaticamente
+para Adreno 6xx/7xx, Mali ou GPU desconhecida. Falha no driver solicitado não deve ser escondida
+por fallback silencioso ao driver do sistema.
 
 ## Driver enviado
 
@@ -85,30 +95,47 @@ O código de saída 0 confirma apenas os pré-requisitos consultados, não apres
 quadros, jogo funcional ou vantagem de desempenho. Falhas de `dlopen` registram a dependência
 ou erro do linker. Não instale o verificador como substituto de `gow3-probe`.
 
+## Compilar os componentes do jogo
+
+Pré-requisitos do host: CMake, Ninja, pkg-config, compilador, Python, NDK r29 e um prefixo de
+headers contendo Boost, robin-map, VMA e o executável host glslangValidator. Em CI pode ser
+usado o mesmo prefixo de dependências da build glibc. Os submódulos devem estar inicializados.
+
+```sh
+GOW3_NDK=/caminho/android-ndk-r29 \
+GOW3_BIONIC_HEADERS=/caminho/prefixo/usr \
+GOW3_BIONIC_DRIVER_ZIP=/caminho/Turnip_Gen8_V37_patch.zip \
+bash tools/android/bionic/build_runtime.sh
+```
+
+Saída: `out/bionic/bin`, `out/bionic/lib` e `out/bionic/drivers/gen8`. O runtime usa uma única
+`libc++_shared.so`; as ferramentas independentes de preparação e diagnóstico têm STL estática.
+`--link-only` reaproveita CPU/GPU já compiladas para refazer o executável e verificações.
+O script não produz APK nem substitui o runtime instalado.
+
 ## Validação desta revisão
 
-- 81 testes Android passaram, incluindo 10 testes novos do experimento.
-- Verificador e `kgsl-chip-id` compilados com NDK r29, ARM64, API 30.
-- ELF do verificador usa `/system/bin/linker64` e depende de `libdl.so`, `libm.so`,
-  `libc.so`; não depende de glibc, X11 ou libvulkan.
+- 82 testes Android passaram, incluindo o caminho PadBridge sem SDL.
+- 4 testes de preparação nativa passaram, incluindo comparação byte a byte do boot-linked.bin,
+  content.bin e marcador com o Python do GoW III, reutilização do marcador e rejeição de entradas ruins.
+- FEX, GPU, probe, preparação e receptor foram compilados com NDK r29, ARM64, API 30.
+- Verificação de dependências/símbolos passou nos sete executáveis/bibliotecas do runtime.
+- Shader de pós-processamento de cor, modos de readback e coerência de texturas preservados.
 - ZIP local e download do release têm o mesmo SHA256 fixado no manifesto.
 - Sem execução em hardware Android nesta etapa; desempenho e apresentação no jogo não validados.
 
 ## Próximas integrações necessárias
 
-1. Compilar FEX/libgow3cpu, GPU/HLE e dependências com NDK/Bionic; adaptar os usos específicos
-   de glibc em probe/runtime; usar uma única STL compartilhada.
-2. Adaptar a apresentação Vulkan/AHardwareBuffer e o receptor Android com fences de aquisição
-   e liberação. Substituir X11/Xvfb somente depois de validar o fluxo completo.
-3. Portar a preparação nativa de executáveis e a instalação PKG para Bionic, preservando o
-   comportamento específico de GoW III e os dados/configurações existentes.
-4. Integrar inicialização, áudio, entrada, IME e configurações ao launcher. Conectar todos os
-   usuários Vulkan ao mesmo carregador, sem misturar handles do driver customizado e do sistema.
-5. Validar CUSA01715/01.02, patches de resolução/sombras/tempo, readbacks, coerência de texturas,
-   sincronização, saves e desempenho antes de oferecer um APK experimental jogável.
+1. Portar compilação/validação dos patches XML e seleção de resolução/FPS/sombras, composição
+   de updates e instalação PKG para Bionic, sem reduzir as verificações atuais do GoW III.
+2. Integrar launcher, extração do runtime e receptor AHB ao APK experimental. Conectar o FIFO
+   de áudio e o IME aos caminhos existentes e oferecer o driver Gen8 como padrão do caminho Bionic.
+3. Auditar memória/ponteiros que cruzam a fronteira guest/host no heap Bionic.
+4. Validar no aparelho CUSA01715/01.02, patches, readbacks, coerência de texturas, sincronização,
+   cores, saves, áudio e desempenho antes de oferecer um APK experimental jogável.
 
 Não copiar endereços, patches, hooks de câmera ou políticas de memória específicas do Bloodborne.
-Não mudar driver ou readbacks do runtime glibc ao integrar esta etapa.
+Não mudar driver ou readbacks do runtime glibc ao integrar estas etapas.
 
 ## Origem e créditos
 

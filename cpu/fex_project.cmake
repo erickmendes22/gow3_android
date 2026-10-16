@@ -2,3 +2,10 @@
 # be the top-level project, so libgow3cpu is added to FEX's build once all of its targets exist.
 # EVAL expands the path now; deferred arguments are expanded when the call runs.
 cmake_language(EVAL CODE "cmake_language(DEFER DIRECTORY \"${CMAKE_SOURCE_DIR}\" CALL include \"${CMAKE_CURRENT_LIST_DIR}/gow3cpu.cmake\")")
+
+# The NDK has already selected Bionic/ARM64. FEX checks the kernel platform name
+# against Linux/Windows; retain ANDROID while selecting its Linux kernel sources.
+# Same embedded-FEX integration used by Bloodborne-Android (2e472653).
+if(ANDROID AND CMAKE_SYSTEM_NAME STREQUAL "Android")
+  set(CMAKE_SYSTEM_NAME Linux)
+endif()

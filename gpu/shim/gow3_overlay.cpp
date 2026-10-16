@@ -14,7 +14,9 @@
 #include <mutex>
 #include <vector>
 
+#ifndef __ANDROID__
 #include <SDL3/SDL.h>
+#endif
 #include "gow3_settings.h"
 #include "gow3_orbs.h"
 #include "gow3_actors.h"
@@ -125,6 +127,7 @@ void SetOpen(bool value) {
     }
 }
 
+#ifndef __ANDROID__
 ImGuiKey KeyFromSdl(SDL_Keycode key) {
     switch (key) {
     case SDLK_TAB: return ImGuiKey_Tab;
@@ -177,6 +180,8 @@ float PixelDensity(SDL_WindowID id) {
     const float density = window ? SDL_GetWindowPixelDensity(window) : 1.0f;
     return density > 0.0f ? density : 1.0f;
 }
+
+#endif
 
 // Marks the settings dirty when a widget changed them.
 template <typename T>
@@ -904,6 +909,7 @@ void Init(const Vulkan::Instance& instance, vk::Format format, u32 image_count) 
     std::printf("Overlay: menu ready (Insert or R3+L2)\n");
 }
 
+#ifndef __ANDROID__
 void UpdateTextInput(SDL_Window* window) {
     bool want = false;
     {
@@ -918,6 +924,10 @@ void UpdateTextInput(SDL_Window* window) {
         }
     }
 }
+
+#else
+void UpdateTextInput(SDL_Window*) {}
+#endif
 
 // imgui_mutex held. The backend frees a texture some frames after its last use.
 void RetireChoiceTextures() {
@@ -976,6 +986,7 @@ static void ApplyChoiceAction(int move, int finish) {
 
 // The save list takes the keys and buttons that move and confirm; the rest stays with the game
 // (held neutral by CapturesInput).
+#ifndef __ANDROID__
 bool HandleChoiceEvent(const SDL_Event& event) {
     int move = 0, finish = 0; // finish: 1 accept, 2 cancel
     if (event.type == SDL_EVENT_KEY_DOWN) {
@@ -1106,6 +1117,10 @@ bool HandleEvent(const SDL_Event& event) {
         return false;
     }
 }
+
+#else
+bool HandleEvent(const SDL_Event&) { return false; }
+#endif
 
 // After "Apply and restart", the new options are kept once the game has shown about ten
 // seconds of frames after loading (run.py restores the previous ones otherwise).

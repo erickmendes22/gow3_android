@@ -17,8 +17,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Test ICD/HAL loading and default driver selection
-        run: python -m unittest discover -s tests -p 'test_android_bionic_driver.py' -v
+      - name: Test Android source and Bionic input/driver paths
+        run: python -m unittest discover -s tests -p 'test_android_*.py'
+      - name: Verify native GoW preparation against the existing Python implementation
+        run: |
+          bash tools/android/bionic/build_prepare.sh host
+          python -m unittest discover -s tests -p 'test_bionic_prepare.py' -v
       - uses: android-actions/setup-android@v3
       - name: Install pinned Android NDK
         run: sdkmanager 'ndk;29.0.14206865'

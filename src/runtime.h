@@ -1,5 +1,8 @@
 #ifndef GOW3_RUNTIME_H
 #define GOW3_RUNTIME_H
+#ifdef __ANDROID__
+#define GOW3_NO_SDL 1
+#endif
 #include <stdint.h>
 #include <stddef.h>
 #ifdef _WIN32

@@ -20,7 +20,9 @@
 #include <chrono>
 #include <thread>
 #include <vector>
+#ifndef __ANDROID__
 #include <SDL3/SDL.h>
+#endif
 #include "../gow3gpu.h"
 #include "common/elf_info.h"
 #include "common/logging/log.h"
@@ -189,8 +191,13 @@ bool g_window_ready;
 
 u32 Gow3DisplayRefreshHz() {
     static const u32 hz = [] {
+#ifdef __ANDROID__
+        const char* display_hz = std::getenv("GOW3_DISPLAY_HZ");
+        const u32 rate = display_hz ? u32(std::max(1, std::atoi(display_hz))) : 60;
+#else
         const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
         const u32 rate = mode && mode->refresh_rate > 0 ? u32(mode->refresh_rate + 0.5f) : 60;
+#endif
         std::printf("GPU: vblank follows the display refresh rate, %u Hz\n", rate);
         return std::max<u32>(rate, 60);
     }();
@@ -253,7 +260,7 @@ extern "C" int gow3gpu_init(const Gow3GpuConfig* config) {
         }
         g_window_cv.notify_all();
         while (window->PollEvents()) {
-            SDL_Delay(2);
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
         LOG_INFO(Frontend, "Window closed by user");
         std::fflush(stdout);
