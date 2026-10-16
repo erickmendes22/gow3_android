@@ -74,6 +74,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p 'test_android_bundle_game_free.py' -v
           python3 -m unittest discover -s tests -p 'test_android_requested_features.py' -v
+          python3 -m unittest discover -s tests -p 'test_android_graphics_preflight.py' -v
           python3 -m unittest discover -s tests -p 'test_launch_env.py' -v
 
       - name: Restore Android SDK package cache
@@ -132,6 +133,21 @@ jobs:
         shell: bash -el {0}
         run: bash ci/setup-deps.sh "$CONDA_PREFIX"
 
+      - name: Preflight graphics build tools
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          echo "Active build environment: ${CONDA_PREFIX:-not-set}"
+          for tool in clang clang++ llvm-ar llvm-strip bison flex ninja cmake pkg-config glslangValidator; do
+            command -v "$tool" || {
+              echo "::error title=Missing graphics build tool::$tool is not available in the build environment"
+              exit 1
+            }
+          done
+          glslangValidator --version
+          bison -Wcounterexamples -V >/dev/null
+          echo "Graphics toolchain preflight passed"
+
       - name: Configure temporary paths
         shell: bash
         run: |
@@ -184,7 +200,11 @@ jobs:
             --sysroot .local-deps/android/arm64-sysroot
 
       - name: Build Turnip and LSFG variants
+        shell: bash -el {0}
         run: |
+          set -euo pipefail
+          command -v glslangValidator
+          glslangValidator --version
           bash tools/android/build/build_turnip.sh main
           bash tools/android/build/build_turnip.sh gen8
           bash tools/android/build/build_lsfg.sh

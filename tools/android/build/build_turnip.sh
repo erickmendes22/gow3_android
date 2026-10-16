@@ -36,6 +36,9 @@ fi
 command -v git >/dev/null || die 'git is required'
 command -v clang >/dev/null || die 'clang is required'
 command -v clang++ >/dev/null || die 'clang++ is required'
+# Mesa's meson.build requires a host glslangValidator to generate shaders.
+command -v glslangValidator >/dev/null || die 'glslangValidator is required (activate the host glslang environment)'
+glslangValidator --version >/dev/null 2>&1 || die 'glslangValidator is present but not executable'
 for tool in llvm-ar llvm-strip; do
     command -v "$tool" >/dev/null || die "$tool is required"
 done
