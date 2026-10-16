@@ -60,9 +60,12 @@ final class SettingsDialog {
     // One selector for all original and newly verified in-game resolutions.
     // The PS4 original uses the "native" storage key but appears as 1080p.
     private static final String[] RESOLUTION_VALUES={"240p","360p","424p","480p",
-        "540p","720p","900p","native","1440p","1800p","4K"};
+        "540p","720p","900p","native","1440p","1800p","4K",
+        "840x360","1120x480","1260x540","1680x720"};
     private static final String[] RESOLUTION_NAMES={"240p","360p","424p","480p",
-        "540p","720p","900p","1080p","1440p","1800p","4K"};
+        "540p","720p","900p","1080p","1440p","1800p","4K",
+        "840×360 · 21:9 (beta)","1120×480 · 21:9 (beta)",
+        "1260×540 · 21:9 (beta)","1680×720 · 21:9 (beta)"};
     private static final String[] LSFG_VALUES={"0","2","3","4"};
     private static final String[] LSFG_NAMES={"Off","2× frames","3× frames","4× frames"};
     // flow scale 取值域照 run-gow3.sh 的白名单（0.25|0.5|0.75|1|1.0）：此前缺 0.25 这一档，这里

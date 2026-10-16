@@ -156,10 +156,9 @@ public final class GameActivity extends Activity {
     }
     private void fitSurface(int width,int height) {
         if (width<=0 || height<=0) return;
-        int w=width, h=height;
-        if (!"1".equals(setting("android_fullscreen"))) {
-            if ((long)w*9>(long)h*16) w=h*16/9; else h=w*9/16;
-        }
+        int[] size=RenderAspect.fit(width,height,setting("render_resolution"),
+            "1".equals(setting("android_fullscreen")));
+        int w=size[0], h=size[1];
         FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)surface.getLayoutParams();
         if (p.width==w && p.height==h) return;
         p.width=w; p.height=h;
@@ -171,8 +170,7 @@ public final class GameActivity extends Activity {
         screen=new FrameLayout(this); screen.setBackgroundColor(Color.BLACK);
         surface=new SurfaceView(this);
         screen.addView(surface,frame(-1,-1,Gravity.CENTER));
-        // The game is 16:9: the largest 16:9 area of the screen, black bars around it (a foldable's
-        // near-square inner screen, a tall cover screen). Refitted when folding or rotating.
+        // Fit the selected 16:9 or 21:9 picture, refitting on rotation/folding and restart.
         screen.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> fitSurface(r-l,b-t));
         surface.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override public void surfaceCreated(SurfaceHolder h) {
@@ -312,6 +310,7 @@ public final class GameActivity extends Activity {
 
     private void restartGame() {
         closeDrawer(); status.setText(UiText.get(this, "Restarting God of War III…")); status.setVisibility(View.VISIBLE);
+        fitSurface(screen.getWidth(),screen.getHeight());
         if (!runtimeReady) { startPending(); return; }
         worker.execute(() -> { stopGame(); startGame(); });
     }

@@ -454,6 +454,11 @@ def main():
     expand_arena = os.environ.get('GOW3_EXPAND_VIDEO_ARENA', '1') != '0'
     writes=compile_patches(xml,names,None,segments,image,skipped,
                            expand_video_arena=expand_arena)
+    from graphics_options import ULTRAWIDE_SIZES
+    for size in ULTRAWIDE_SIZES:
+        name = f'Resolution Patch - {size}'
+        if name in skipped:
+            raise ValueError(f'Cannot apply complete 21:9 resolution/camera patch: {skipped[name]}')
     print(f'Video arena: {"expanded (resolution preset)" if expand_arena else "original (expansion disabled)"}')
     native_input = os.environ.get('GOW3_PATCH_INPUT_RES', '')
     native_info = None

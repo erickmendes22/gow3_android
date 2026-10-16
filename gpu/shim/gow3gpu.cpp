@@ -31,6 +31,7 @@
 #include "core/libraries/kernel/orbis_error.h"
 #include "core/libraries/libs.h"
 #include "core/memory.h"
+#include "video_core/renderer_vulkan/movie_bars.h"
 #include "core/signals.h"
 #include "sdl_window.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
@@ -303,6 +304,10 @@ extern "C" int gow3gpu_handle_fault(void* ucontext, void* address) {
 
 extern "C" unsigned gow3gpu_symbol_count(void) {
     return unsigned(g_symbols.size());
+}
+
+extern "C" void gow3gpu_movie_picture(void) {
+    Vulkan::MovieBars::Cutscenes().NotePicture(Vulkan::MovieBars::NowMs());
 }
 
 // Kernel service thread: runs boost::asio timers for equeue timer events.

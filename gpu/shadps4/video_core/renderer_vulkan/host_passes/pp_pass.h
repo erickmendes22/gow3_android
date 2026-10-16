@@ -4,6 +4,7 @@
 #pragma once
 
 #include "common/types.h"
+#include "video_core/renderer_vulkan/movie_bars.h"
 #include "video_core/renderer_vulkan/vk_common.h"
 
 namespace Vulkan {
@@ -18,7 +19,10 @@ public:
         float gamma = 1.0f;
         u32 hdr = 0;
         u32 srgb_input = 0;
+        u32 padding = 0;
+        MovieBars::Rect picture = MovieBars::Whole;
     };
+    static_assert(sizeof(Settings) == 32);
 
     void Create(vk::Device device, vk::Format surface_format);
 
