@@ -12,6 +12,7 @@
 #include "video_core/buffer_cache/buffer.h"
 #include "video_core/renderdoc.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
+#include "video_core/renderer_vulkan/vk_ahb_acquire_wait.h"
 #include "gow3_overlay.h"
 #include "gow3_settings.h"
 #include "gow3_graphics.h"
@@ -670,7 +671,7 @@ void Presenter::PresentLoadingFrame() {
     barrier(vk::ImageLayout::eColorAttachmentOptimal, swapchain.PresentLayout(),
             vk::AccessFlagBits::eColorAttachmentWrite, {});
     SubmitInfo info{};
-    info.AddWait(swapchain.GetImageAcquiredSemaphore());
+    AddImageAcquiredWait(info, swapchain.GetImageAcquiredSemaphore());
     info.AddSignal(swapchain.GetPresentReadySemaphore());
     present_scheduler.Flush(info);
     {
@@ -836,7 +837,7 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
     // Flush vulkan commands.
 
     SubmitInfo info{};
-    info.AddWait(swapchain.GetImageAcquiredSemaphore());
+    AddImageAcquiredWait(info, swapchain.GetImageAcquiredSemaphore());
     info.AddWait(frame->ready_semaphore, frame->ready_tick);
     info.AddSignal(swapchain.GetPresentReadySemaphore());
     info.AddSignal(frame->present_done);
