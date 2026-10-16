@@ -38,19 +38,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.gow3.android.R
 import com.gow3.android.data.Gow3Ini
 import com.gow3.android.feature.about.LanguageSetting
-import com.gow3.android.data.ImportResult
-import com.gow3.android.data.LosslessDllManager
-import com.gow3.android.data.RemoveResult
 import com.gow3.android.ui.components.LauncherColors
 import com.gow3.android.ui.components.ScreenColumn
-import com.gow3.android.ui.components.formatBytes
 import java.io.File
 
 @Composable
 internal fun HomeScreen(
     onStartGame: () -> Unit,
-    losslessDlls: LosslessDllManager,
-    onGetFromSteam: ((Boolean, String) -> Unit) -> Unit,
     onChooseGameFolder: () -> Unit,
     onChooseUpdateFolder: () -> Unit,
     onInstallBasePkg: () -> Unit,
@@ -63,27 +57,13 @@ internal fun HomeScreen(
     val context = LocalContext.current
     val isBionic = context.packageName == "com.gow3.android.bionic"
     var iniValues by remember { mutableStateOf(loadIni(context)) }
-    var dllState by remember { mutableStateOf(losslessDlls.resolve()) }
     var gameDir by remember(pkgGeneration) { mutableStateOf(currentGameDir(context)) }
     var updateDir by remember(pkgGeneration) { mutableStateOf(currentUpdateDir(context)) }
-    var notice by remember { mutableStateOf<String?>(null) }
 
-    fun refreshDll() {
-        dllState = losslessDlls.resolve()
-    }
-
-    fun toast(message: String) {
-        notice = message
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-    }
-
-    // 玩家可能在游戏运行期间把 Lossless.dll 放到游戏目录旁，因此每次 Home 回到前台
-    // 时都会从磁盘重新读取状态。
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                refreshDll()
                 gameDir = currentGameDir(context)
                 updateDir = currentUpdateDir(context)
             }
@@ -121,44 +101,6 @@ internal fun HomeScreen(
         Spacer(Modifier.height(16.dp))
         LanguageSetting(onChangeLanguage)
         Spacer(Modifier.height(16.dp))
-        FrameGenerationCard(
-            state = dllState,
-            notice = notice,
-            onImport = {
-                losslessDlls.launchPicker { result ->
-                    when (result) {
-                        is ImportResult.Success -> {
-                            refreshDll()
-                            toast(context.getString(R.string.home_imported_fmt, LosslessDllManager.FILE_NAME, formatBytes(result.state.sizeBytes)))
-                        }
-                        ImportResult.Cancelled -> refreshDll()
-                        is ImportResult.Failed -> toast(result.message)
-                    }
-                }
-            },
-            onSteam = {
-                // Steam 下载成功后（该构建不含 Steam 时则由 stub 自行提示）回到这里刷新，
-                // 让完成的下载无需重新进入页面即可显示。
-                onGetFromSteam { _, message ->
-                    refreshDll()
-                    toast(message)
-                }
-            },
-            onRemove = {
-                when (val result = losslessDlls.remove()) {
-                    is RemoveResult.Done -> {
-                        refreshDll()
-                        toast(
-                            if (result.gameFolderRemains)
-                                context.getString(R.string.home_removed_game_folder_copy)
-                            else
-                                context.getString(R.string.home_removed_fmt, LosslessDllManager.FILE_NAME),
-                        )
-                    }
-                    is RemoveResult.Failed -> toast(result.message)
-                }
-            },
-        )
         Spacer(Modifier.height(24.dp))
     }
 }
