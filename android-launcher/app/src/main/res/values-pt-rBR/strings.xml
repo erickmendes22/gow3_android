@@ -196,4 +196,16 @@
     <string name="param_option_4x">4×</string>
     <string name="param_option_8x">8×</string>
     <string name="param_option_16x">16×</string>
+    <string name="gpu_driver_title">DRIVER VULKAN</string>
+    <string name="gpu_driver_auto">Automático (incluído no Adreno Gen8; sistema nos demais)</string>
+    <string name="gpu_driver_system">Driver do sistema</string>
+    <string name="gpu_driver_bundled">Turnip Gen8 V37 patched incluído</string>
+    <string name="gpu_driver_import">Importar ZIP do driver</string>
+    <string name="gpu_driver_importing">Importando driver…</string>
+    <string name="gpu_driver_hint">Importe um ZIP de driver AdrenoTools Android ARM64. O driver importado é selecionado automaticamente. As alterações valem na próxima inicialização do jogo.</string>
+    <string name="gpu_driver_error">Falha ao selecionar driver</string>
+    <string name="gpu_driver_invalid">Não foi possível importar ou selecionar este driver. Escolha um ZIP AdrenoTools Android válido com meta.json e a biblioteca do driver.</string>
+    <string name="gpu_driver_wrong_abi">Este driver não é uma biblioteca Android ARM64. Drivers de Windows e Linux não são compatíveis.</string>
+    <string name="gpu_driver_newer_android">Este driver exige uma versão mais recente do Android.</string>
+    <string name="gpu_driver_missing">Driver selecionado indisponível. Importe-o novamente ou escolha outro driver.</string>
 </resources>

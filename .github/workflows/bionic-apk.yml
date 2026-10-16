@@ -71,6 +71,11 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           bash tools/android/bionic/build_pkg.sh
+      - name: Preserve experimental signing key across builds
+        uses: actions/cache@v4
+        with:
+          path: .local-deps/android/bionic-development.keystore
+          key: bionic-development-signing-v1
       - name: Package, sign and validate experimental APK
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"

@@ -19,14 +19,22 @@ chip=$("$runtime/bin/kgsl-chip-id" 2>/dev/null || true)
 turnip=${GOW3_BIONIC_DRIVER:-auto}
 case "$turnip" in
  auto) case "$chip" in 0x44??????) turnip=gen8 ;; *) turnip=system ;; esac ;;
- gen8|system) ;;
+ gen8|system|custom) ;;
  *) echo "Invalid Bionic driver selection: $turnip" >&2; exit 2 ;;
 esac
 unset VK_DRIVER_FILES VK_ICD_FILENAMES VK_LAYER_PATH GOW3_LSFG LSFG_CONFIG
 if [ "$turnip" = gen8 ]; then
  export GOW3_VULKAN_DRIVER="$runtime/drivers/gen8/libvulkan_freedreno.so"
  [ -f "$GOW3_VULKAN_DRIVER" ] || { echo 'Bundled V37 patched is missing' >&2; exit 2; }
+elif [ "$turnip" = custom ]; then
+ custom=${GOW3_CUSTOM_VULKAN_DRIVER:-}
+ case "$custom" in "$files"/gpu-drivers/*/*.so) ;; *) echo 'Invalid custom driver path' >&2; exit 2 ;; esac
+ [ -f "$custom" ] || { echo 'Selected custom driver is missing; select a driver on Home' >&2; exit 2; }
+ export GOW3_VULKAN_DRIVER="$custom"
+ # Companion libraries supplied in the package resolve beside the selected driver.
+ export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${custom%/*}"
 else unset GOW3_VULKAN_DRIVER; fi
+echo "Bionic Vulkan selection: $turnip${GOW3_VULKAN_DRIVER:+ ($GOW3_VULKAN_DRIVER)}"
 export GOW3_ANDROID_INPUT=1 GOW3_PAD_FILE="$base/android-pad.state" GOW3_PAD_QUIET=1
 export GOW3_IME_FILE="$base/ime.request" GOW3_AUDIO_FIFO="$base/audio.fifo"
 export GOW3_PRESENT_SOCKET="$base/present.sock"

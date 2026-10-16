@@ -517,6 +517,7 @@ public final class GameActivity extends Activity {
         if (gameDir!=null) env.put("GOW3_GAME_DIR",gameDir);
         if (updateDir!=null) env.put("GOW3_PATCH_DIR",updateDir);
         if (bionicRuntime()) {
+            GpuDriverManager.configureEnvironment(this,env);
             env.put("GOW3_SCREEN_W","1280"); env.put("GOW3_SCREEN_H","720");
             env.put("PATH","/system/bin"); env.put("TMPDIR",BASE+"/tmp"); env.put("XDG_RUNTIME_DIR",BASE+"/tmp");
             env.put("LD_LIBRARY_PATH",BASE+"/arm64/lib:"+BASE+"/arm64/python/lib");

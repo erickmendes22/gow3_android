@@ -33,6 +33,28 @@ carregamento do driver/HAL, apresentação e cores, áudio, controles/IME, PKG/u
 patches e desempenho. Não há medição de FPS Bionic nem correção comprovada para o relato de
 tom branco do android3. Shader de cor, readbacks e coerência de texturas foram preservados.
 
+## Seleção de driver no launcher
+
+Na tela inicial do APK Bionic, **Vulkan Driver / Driver Vulkan** permite selecionar:
+
+- Automático: mantém o V37 patched no Adreno Gen8 e o sistema nas demais GPUs.
+- Driver do sistema: usa o carregador Vulkan do Android, sem o Turnip incluído/importado.
+- Turnip Gen8 V37 patched incluído.
+- Drivers importados pelo botão **Import driver ZIP / Importar ZIP do driver**.
+
+O importador aceita o formato AdrenoTools com `meta.json` (`schemaVersion=1`, `name`,
+`libraryName`, `minApi`) e biblioteca Android ARM64. A seleção é aplicada na próxima
+inicialização do jogo. Uma falha do driver escolhido é reportada, sem trocar de driver.
+
+Os pacotes são validados e instalados em `files/gpu-drivers/<sha256-do-zip>`, fora da
+pasta `gow3port` substituída em atualizações do runtime. A extração usa área temporária,
+limites de tamanho e promoção após validar metadados/ELF; um ZIP inválido preserva os
+pacotes anteriores. Pacotes com ABI incorreta, dependências glibc ou Android mínimo
+superior ao aparelho são rejeitados. O seletor aparece somente no APK Bionic.
+
+Esse recurso usa o carregador ICD/HAL já validado na branch, compatível com pacotes
+AdrenoTools. Não adiciona uma segunda implementação de `libadrenotools`.
+
 ## Driver enviado
 
 | Campo | Valor |

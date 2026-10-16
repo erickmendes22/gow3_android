@@ -107,6 +107,7 @@ internal fun HomeScreen(
         LaunchButton(onStartGame)
         Spacer(Modifier.height(20.dp))
         LaunchParameters(gameDir, updateDir, iniValues, ::save, onChooseGameFolder, onChooseUpdateFolder)
+        GpuDriverCard()
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             PkgAction(stringResource(R.string.pkg_install), onInstallBasePkg, !pkgInstallBusy, Modifier.weight(1f))
