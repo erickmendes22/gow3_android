@@ -53,8 +53,7 @@ class GraphicsOptionsTest(unittest.TestCase):
     def test_resolution_names_are_unique_and_legacy_aliases_migrate(self):
         self.assertEqual(g.RESOLUTIONS, (
             '240p', '360p', '424p', '480p', '540p', '720p',
-            '900p', 'native', '1440p', '1800p', '4K',
-            '840x360', '1120x480', '1260x540', '1680x720'))
+            '900p', 'native', '1440p', '1800p', '4K'))
         for value, expected in (('800p', '900p'), ('1600x900', '900p'),
                                 ('1280x720', '720p'), ('854x480', '480p'),
                                 ('960x540', '540p'), ('640x360', '360p'),

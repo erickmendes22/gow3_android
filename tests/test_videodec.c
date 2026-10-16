@@ -9,8 +9,6 @@ uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *n
 
 static unsigned char frame_buffer[1<<16];
 static int pictures, first_luma_sum, seen;
-static int movie_notifications;
-void gow3gpu_movie_picture(void) { ++movie_notifications; }
 
 static void check_picture(const PictureInfo *p) {
     if (!p->is_valid) return;
@@ -67,7 +65,6 @@ int main(int argc, char **argv) {
         check_picture(&picture);
     }
     assert(pictures==6 && seen==0x3f && first_luma_sum>0);
-    assert(movie_notifications==pictures);
 
     /* Errors are codes, not crashes. */
     InputData empty={sizeof(InputData),stream,0,0,0,0};

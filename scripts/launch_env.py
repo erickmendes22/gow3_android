@@ -155,13 +155,6 @@ def derive(game, config, state_path, env):
                     'GOW3_GAME_VERSION': identity['app_version'] or 'unknown',
                     'GOW3_EBOOT_SHA256': identity['eboot_sha256'] or 'unavailable',
                     'GOW3_PATCH_STATUS': reason})
-    if android_port:
-        # Match the Android presentation buffers to the selected wide picture;
-        # a fixed 16:9 intermediate would add another set of black bars.
-        size = graphics_options.ULTRAWIDE_SIZES.get(resolution) if reason == 'validated' else None
-        width, height = size or (1280, 720)
-        updates['GOW3_SCREEN_W'] = str(width)
-        updates['GOW3_SCREEN_H'] = str(height)
     return {'updates': updates, 'patch_names': names, 'dmem': dmem, 'vblank': vblank,
             'reverted': reverted, 'identity': identity}
 

@@ -472,9 +472,7 @@ void PerformanceTab() {
     if (BeginRows("##restart")) {
         static const char* const resolution_labels[] = {
             "240p", "360p", "424p", "480p", "540p", "720p",
-            "900p", "1080p", "1440p", "1800p", "4K",
-            "840x360 - 21:9 (beta)", "1120x480 - 21:9 (beta)",
-            "1260x540 - 21:9 (beta)", "1680x720 - 21:9 (beta)"};
+            "900p", "1080p", "1440p", "1800p", "4K"};
         ChoiceRow("Render resolution", s.render_resolution, resolution_labels, nullptr, int(G::Resolutions.size()),
                   "The resolution the game draws at. Higher is sharper and slower.");
         static const char* const engine_labels[] = {"60 (original)", "120", "240"};

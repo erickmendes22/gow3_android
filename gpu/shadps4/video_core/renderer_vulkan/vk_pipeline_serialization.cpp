@@ -1350,8 +1350,10 @@ void PipelineCache::StopWarmUp() {
 }
 
 void PipelineCache::Sync() {
+    StopDriverCache();
     StopWarmUp();
     FinishCompilations();
+    SaveDriverCache();
     Storage::DataBase::Instance().Close();
 }
 

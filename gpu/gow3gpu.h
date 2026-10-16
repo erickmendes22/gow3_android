@@ -43,8 +43,6 @@ void gow3gpu_pad_publish(uint32_t buttons);
 int gow3gpu_overlay_captures_input(void);
 /* Number of symbols registered by the vendored libraries (diagnostics). */
 unsigned gow3gpu_symbol_count(void);
-/* Notify the presenter of decoded pictures so 21:9 cutscenes retain clean 16:9 bars. */
-void gow3gpu_movie_picture(void);
 #ifdef __cplusplus
 }
 #endif

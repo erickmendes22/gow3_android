@@ -24,8 +24,7 @@ class AndroidFsrIntegrationTests(unittest.TestCase):
         self.assertNotIn('key = "upscaler"', ui)
         self.assertNotIn('key = "preset"', ui)
         values = ("240p", "360p", "424p", "480p", "540p", "720p",
-                  "900p", "native", "1440p", "1800p", "4K",
-                  "840x360", "1120x480", "1260x540", "1680x720")
+                  "900p", "native", "1440p", "1800p", "4K")
         for size in values:
             self.assertEqual(ui.count('LaunchOption("' + size + '",'), 1)
             self.assertIn('"' + size + '"', java)

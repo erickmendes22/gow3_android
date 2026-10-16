@@ -41,7 +41,7 @@ class ArenaPatchTests(unittest.TestCase):
         # Attributes separate the policy; the existing arena values remain unchanged.
         tagged = [line for line in ET.parse(XML).iter('Line')
                   if line.get('VideoArena') == 'true']
-        self.assertEqual(len(tagged), 11)
+        self.assertEqual(len(tagged), 7)
         self.assertEqual({line.get('Address') for line in tagged}, {'0x007cd918'})
 
 

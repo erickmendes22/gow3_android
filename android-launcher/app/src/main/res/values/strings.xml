@@ -264,8 +264,4 @@
     <string name="gpu_driver_adreno7xx">Turnip 26.3 R6 (Adreno 7xx)</string>
     <string name="param_expand_video_arena">Expand video arena</string>
     <string name="param_desc_expand_video_arena">Increases the game video arena independently of resolution. OFF keeps the original arena and may cause texture errors or crashes, especially at higher resolutions. Requires restart.</string>
-    <string name="param_resolution_wide_360">840×360 · 21:9 (beta)</string>
-    <string name="param_resolution_wide_480">1120×480 · 21:9 (beta)</string>
-    <string name="param_resolution_wide_540">1260×540 · 21:9 (beta)</string>
-    <string name="param_resolution_wide_720">1680×720 · 21:9 (beta)</string>
 </resources>

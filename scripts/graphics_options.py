@@ -13,10 +13,7 @@ from pathlib import Path
 # One menu entry per physical resolution; retain the original/old game patches
 # and expose the genuinely new, byte-verified CUSA01715 resolutions.
 RESOLUTIONS = ('240p', '360p', '424p', '480p', '540p', '720p', '900p',
-               'native', '1440p', '1800p', '4K',
-               '840x360', '1120x480', '1260x540', '1680x720')
-ULTRAWIDE_SIZES = {'840x360': (840, 360), '1120x480': (1120, 480),
-                   '1260x540': (1260, 540), '1680x720': (1680, 720)}
+               'native', '1440p', '1800p', '4K')
 DIRECT_PIXEL_RESOLUTIONS = {
     '240p': '426x240',
     '360p': '640x360',
