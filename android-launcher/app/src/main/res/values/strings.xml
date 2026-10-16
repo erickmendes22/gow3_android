@@ -234,7 +234,7 @@
     <string name="param_option_8x">8×</string>
     <string name="param_option_16x">16×</string>
     <string name="gpu_driver_title">VULKAN DRIVER</string>
-    <string name="gpu_driver_auto">Automatic (bundled on Adreno Gen8; system otherwise)</string>
+    <string name="gpu_driver_auto">Automatic (R6 on Adreno 7xx; V37 on 8xx; system otherwise)</string>
     <string name="gpu_driver_system">System driver</string>
     <string name="gpu_driver_bundled">Bundled Turnip Gen8 V37 patched</string>
     <string name="gpu_driver_import">Import driver ZIP</string>
@@ -245,4 +245,21 @@
     <string name="gpu_driver_wrong_abi">This driver is not an Android ARM64 shared library. Windows and Linux drivers are not supported.</string>
     <string name="gpu_driver_newer_android">This driver requires a newer Android version.</string>
     <string name="gpu_driver_missing">Selected driver unavailable. Import it again or choose another driver.</string>
+    <string name="nav_mods">PATCHES</string>
+    <string name="param_android_fullscreen">Fullscreen</string>
+    <string name="param_desc_android_fullscreen">Fill the phone screen. Off keeps the original 16:9 aspect ratio.</string>
+    <string name="patch_next_launch">Changes apply on the next game launch. Resolution and FPS stay on Home.</string>
+    <string name="patch_automatic">Managed automatically with the existing fixes and resolution settings.</string>
+    <string name="patch_skip_intro">Skip Intro</string>
+    <string name="patch_skip_video">Skip Any Video With X Button</string>
+    <string name="patch_texture_fix">Texture corruption fix</string>
+    <string name="patch_black_screen">Startup black screen fix</string>
+    <string name="patch_ssao">Disable SSAO</string>
+    <string name="patch_blur">Disable Motion Blur</string>
+    <string name="patch_dof">Disable Depth of Field</string>
+    <string name="patch_bloom">Disable Bloom</string>
+    <string name="patch_particles">Disable Soft Particles</string>
+    <string name="patch_save_failed">Could not save patch settings.</string>
+    <string name="patch_effect_note">Optional effect patches require a supported 01.02 executable.</string>
+    <string name="gpu_driver_adreno7xx">Turnip 26.3 R6 (Adreno 7xx)</string>
 </resources>

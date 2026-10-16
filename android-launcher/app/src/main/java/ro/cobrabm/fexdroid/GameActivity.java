@@ -58,7 +58,7 @@ public final class GameActivity extends Activity {
     private LinearLayout drawerItems;
     private TextView status;
     private View resume;
-    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem;
+    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem, swapFaceItem;
     private TouchControllerOverlay controllerOverlay;
     private PadBridge pad;
     private AudioBridge audio;
@@ -89,6 +89,7 @@ public final class GameActivity extends Activity {
         }
         displayOnly="x".equals(getIntent().getStringExtra("action"));
         pad=new PadBridge(new File(BASE,"android-pad.state"));
+        pad.setSwapFaceButtons(getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false));
         audio=new AudioBridge(new File(BASE,"audio.fifo"));
         buildScreen();
         immersive();
@@ -131,7 +132,7 @@ public final class GameActivity extends Activity {
         if (destroyed || !holder.getSurface().isValid()) return;
         try {
             if (Build.VERSION.SDK_INT < 30) throw new java.io.IOException("Bionic runtime requires Android 11 or newer");
-            String result=Gow3Present.start(holder,BASE+"/present.sock");
+            String result=Gow3Present.start(holder,BASE+"/present.sock","1".equals(setting("android_fullscreen")));
             if (!result.startsWith("bridge running:")) throw new java.io.IOException(result);
             if (!displayOnly && game==null && !startingX) {
                 startingX=true;
@@ -156,7 +157,9 @@ public final class GameActivity extends Activity {
     private void fitSurface(int width,int height) {
         if (width<=0 || height<=0) return;
         int w=width, h=height;
-        if ((long)w*9>(long)h*16) w=h*16/9; else h=w*9/16;
+        if (!"1".equals(setting("android_fullscreen"))) {
+            if ((long)w*9>(long)h*16) w=h*16/9; else h=w*9/16;
+        }
         FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)surface.getLayoutParams();
         if (p.width==w && p.height==h) return;
         p.width=w; p.height=h;
@@ -276,6 +279,12 @@ public final class GameActivity extends Activity {
             controllerOverlay.release();
             closeDrawer();
         });
+        swapFaceItem=menuItem("ic_gamepad","Swap Square/Triangle","",() -> {
+            boolean enabled=!getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false);
+            getSharedPreferences("gow3",MODE_PRIVATE).edit().putBoolean("swap_square_triangle",enabled).apply();
+            pad.setSwapFaceButtons(enabled);
+            setDetail(swapFaceItem,enabled ? "On" : "Off");
+        });
         menuItem("ic_edit","Edit controller layout","Drag and resize the buttons",() -> {
             getSharedPreferences("gow3",MODE_PRIVATE).edit().putBoolean("controller_overlay",true).apply();
             closeDrawer();
@@ -388,10 +397,11 @@ public final class GameActivity extends Activity {
         //  所以直接把这一行置灰不可点，并说明去 Home 页导入，而不是让它"看着能开却不生效"。
         boolean dllPresent=hasFrameGenDll();
         setRowEnabled(losslessItem,dllPresent && !bionicRuntime());
-        setDetail(losslessItem,bionicRuntime() ? ("17".equals(UiText.gameLanguage(this)) ? "Indisponível no runtime Bionic experimental" : "Unavailable in the experimental Bionic runtime") : !dllPresent ? "Import Lossless.dll on the Home page first"
+        setDetail(losslessItem,bionicRuntime() ? (UiText.portuguese(this) ? "Indisponível no runtime Bionic experimental" : "Unavailable in the experimental Bionic runtime") : !dllPresent ? "Import Lossless.dll on the Home page first"
             : lsfgOn ? lsfg+"× frames · flow "
             +(setting("lsfg_flow_scale")==null ? "1.0" : setting("lsfg_flow_scale")) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
+        setDetail(swapFaceItem,getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false) ? "On" : "Off");
     }
 
     private void openDrawer() {

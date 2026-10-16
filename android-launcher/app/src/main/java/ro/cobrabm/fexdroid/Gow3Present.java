@@ -15,6 +15,7 @@ public final class Gow3Present {
     private static native String nativeStart(String socketPath);
     private static native void nativeSetSurface(Surface surface);
     private static native long nativeFrames();
+    private static native void nativeSetFullscreen(boolean enabled);
     private static native void nativeShutdown();
 
     private static SurfaceHolder.Callback callback;
@@ -22,6 +23,11 @@ public final class Gow3Present {
 
     /** Listens on socketPath (once) and shows the game on this surface until it is destroyed. */
     public static synchronized String start(SurfaceHolder holder, String socketPath) {
+        return start(holder, socketPath, false);
+    }
+
+    public static synchronized String start(SurfaceHolder holder, String socketPath, boolean fullscreen) {
+        nativeSetFullscreen(fullscreen);
         String result = nativeStart(socketPath);
         used = true;
         if (!result.equals("present running")) return result;

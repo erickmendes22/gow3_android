@@ -71,7 +71,8 @@ def main():
         manifest={'schema':1,'runtime_backend':'bionic','application_id':'com.gow3.android.bionic',
                   'java_package':'ro.cobrabm.fexdroid','runtime_name':'gow3-daedalus-bionic-experimental',
                   'version':'2.1.6-android3-bionic-experimental','min_api':30,
-                  'driver':json.loads((ROOT/'tools/android/bionic/driver.json').read_text())}
+                  'driver':json.loads((ROOT/'tools/android/bionic/driver.json').read_text()),
+                  'adreno7xx_driver':json.loads((ROOT/'tools/android/bionic/driver-adreno7xx.json').read_text())}
         (stage/'runtime-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
         archive=output/'runtime.tar.gz'
         with tarfile.open(archive,'w:gz',compresslevel=6) as tar:

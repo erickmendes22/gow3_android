@@ -20,7 +20,7 @@ def stage(archive, output, spec=None):
     spec = spec or json.loads(MANIFEST.read_text())
     data = Path(archive).read_bytes()
     if digest(data) != spec['archive_sha256']:
-        raise ValueError('Driver ZIP SHA256 differs from the pinned user-supplied V37 patched build')
+        raise ValueError('Driver ZIP SHA256 differs from the pinned driver build')
     with zipfile.ZipFile(archive) as z:
         # Do not extract paths from an archive into the filesystem.
         meta_bytes = z.read('meta.json')
@@ -53,13 +53,14 @@ def stage(archive, output, spec=None):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--manifest', type=Path, default=MANIFEST)
     p.add_argument('--archive', type=Path, help='Use the supplied ZIP instead of downloading')
     p.add_argument('--output', type=Path, default=Path('out/bionic-driver-check/drivers/gen8'))
     args = p.parse_args()
+    spec = json.loads(args.manifest.read_text())
     if args.archive:
-        stage(args.archive, args.output)
+        stage(args.archive, args.output, spec)
     else:
-        spec = json.loads(MANIFEST.read_text())
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / spec['archive']
             with urllib.request.urlopen(spec['url'], timeout=120) as response:

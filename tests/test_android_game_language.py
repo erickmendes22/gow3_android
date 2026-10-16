@@ -36,7 +36,7 @@ public class LanguageTest {
  public static void main(String[] args) {
   Context en=new Context(null), pt=new Context("pt");
   assert UiText.gameLanguage(en).equals("1");
-  assert UiText.gameLanguage(pt).equals("17");
+  assert UiText.gameLanguage(pt).equals("7");
   assert UiText.get(en,"Graphics settings").equals("Graphics settings");
   assert UiText.get(pt,"Graphics settings").equals("Configurações gráficas");
   assert UiText.get(pt,"GRAPHICS").equals("GRÁFICOS");
@@ -48,6 +48,9 @@ public class LanguageTest {
  }
 }''',
         }
+        sources['com/gow3/android/data/GameSfo.java'] = """package com.gow3.android.data;
+public class GameSfo { public static String portugueseLanguage(String game,String update) { return "7"; } }
+"""
         sources['ro/cobrabm/fexdroid/UiText.java'] = (ROOT / 'android-launcher/app/src/main/java/ro/cobrabm/fexdroid/UiText.java').read_text()
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)

@@ -24,6 +24,7 @@ final class UiText {
         PT.put("Graphics", "Gráficos");
         PT.put("Graphics settings", "Configurações gráficas");
         PT.put("Controls", "Controles");
+        PT.put("Swap Square/Triangle", "Trocar Quadrado/Triângulo");
         PT.put("On-screen controller", "Controle na tela");
         PT.put("Edit controller layout", "Editar layout dos controles");
         PT.put("Drag and resize the buttons", "Arraste e redimensione os botões");
@@ -87,7 +88,12 @@ final class UiText {
     static boolean portuguese(Context context) {
         return "pt".equals(context.getSharedPreferences("gow3", Context.MODE_PRIVATE).getString("language", "en"));
     }
-    static String gameLanguage(Context context) { return portuguese(context) ? "17" : "1"; }
+    static String gameLanguage(Context context) {
+        if (!portuguese(context)) return "1";
+        android.content.SharedPreferences prefs=context.getSharedPreferences("gow3",Context.MODE_PRIVATE);
+        return com.gow3.android.data.GameSfo.portugueseLanguage(
+            prefs.getString("game_dir",null),prefs.getString("update_dir",null));
+    }
     static String get(Context context, String text) {
         if (text == null || !portuguese(context)) return text;
         String translated = PT.get(text);

@@ -18,14 +18,14 @@ setting() { sed -n "s/^$1=//p" "$GOW3_CONFIG" | tail -n 1; }
 chip=$("$runtime/bin/kgsl-chip-id" 2>/dev/null || true)
 turnip=${GOW3_BIONIC_DRIVER:-auto}
 case "$turnip" in
- auto) case "$chip" in 0x44??????) turnip=gen8 ;; *) turnip=system ;; esac ;;
- gen8|system|custom) ;;
+ auto) case "$chip" in 0x44??????) turnip=gen8 ;; 0x07??????|0x43020[01]00|0x43030b00|0x43050a01|0x43050b00|0x43051401) turnip=adreno7xx ;; *) turnip=system ;; esac ;;
+ gen8|adreno7xx|system|custom) ;;
  *) echo "Invalid Bionic driver selection: $turnip" >&2; exit 2 ;;
 esac
 unset VK_DRIVER_FILES VK_ICD_FILENAMES VK_LAYER_PATH GOW3_LSFG LSFG_CONFIG
-if [ "$turnip" = gen8 ]; then
- export GOW3_VULKAN_DRIVER="$runtime/drivers/gen8/libvulkan_freedreno.so"
- [ -f "$GOW3_VULKAN_DRIVER" ] || { echo 'Bundled V37 patched is missing' >&2; exit 2; }
+if [ "$turnip" = gen8 ] || [ "$turnip" = adreno7xx ]; then
+ export GOW3_VULKAN_DRIVER="$runtime/drivers/$turnip/libvulkan_freedreno.so"
+ [ -f "$GOW3_VULKAN_DRIVER" ] || { echo "Bundled $turnip driver is missing" >&2; exit 2; }
 elif [ "$turnip" = custom ]; then
  custom=${GOW3_CUSTOM_VULKAN_DRIVER:-}
  case "$custom" in "$files"/gpu-drivers/*/*.so) ;; *) echo 'Invalid custom driver path' >&2; exit 2 ;; esac
@@ -81,7 +81,7 @@ eval "$("$python" "$base/scripts/launch_env.py" --game "$game" --config "$GOW3_C
 # merely the preset selected by the UI. scripts/patches.py checks the signature
 # and original bytes again before writing patches.bin.
 echo "GOW3_NATIVE_RESOLUTION: status=${GOW3_RESOLUTION_STATUS:-unknown} patch=${GOW3_PATCH_INPUT_RES:-standard}"
-echo "Game language: system_param=${GOW3_LANGUAGE:-1} (1=English, 17=Portuguese-Brazil)"
+echo "Game language: system_param=${GOW3_LANGUAGE:-1} (1=English, 7=Portuguese, 17=Portuguese-Brazil)"
 # The retail pool is 5056 MiB; the resolution/texture patches ask for more (7104+ for the default
 # set). On a phone RAM is the binding constraint: lower the patch set / resolution if the app is
 # killed. See docs/ANDROID_PORT.md.

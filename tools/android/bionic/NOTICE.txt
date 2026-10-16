@@ -32,3 +32,8 @@ This Bionic package does not include the glibc Turnip build or the Linux lsfg-vk
 mentioned in the shared legacy THIRD_PARTY_LICENSES.txt.
 
 No Sony game files, firmware, PKG, update, save or Lossless.dll are included.
+
+Adreno 7xx automatic driver: Turnip v26.3.0-R6 by StevenMXZ.
+Source: https://github.com/StevenMXZ/Adreno-Tools-Drivers/releases/tag/v37
+Exact archive/library hashes: arm64/drivers/adreno7xx/PINNED-DRIVER.json.
+Adreno 8xx keeps the existing V37 patched driver; other GPU defaults are unchanged.

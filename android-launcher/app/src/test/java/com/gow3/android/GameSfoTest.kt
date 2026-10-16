@@ -128,4 +128,19 @@ class GameSfoTest {
         broken[16] = 0xFF.toByte(); broken[17] = 0xFF.toByte()
         assertNull(GameSfo.read(tempFile(broken)))
     }
+    @Test
+    fun `Portuguese follows supported console languages and European title fallback`() {
+        val game = java.nio.file.Files.createTempDirectory("gow3-language").toFile()
+        val sfo = File(game, "sce_sys/param.sfo")
+        sfo.parentFile.mkdirs()
+        try {
+            sfo.writeBytes(sfoBytes("TITLE_ID" to "CUSA01715"))
+            assertEquals("7", GameSfo.portugueseLanguage(game.path, null))
+            sfo.writeBytes(sfoBytes("TITLE_ID" to "CUSA01623", "SUPPORTED_LANGUAGES" to "131072"))
+            assertEquals("17", GameSfo.portugueseLanguage(game.path, null))
+            sfo.writeBytes(sfoBytes("TITLE_ID" to "CUSA01623", "SUPPORTED_LANGUAGES" to "128"))
+            assertEquals("7", GameSfo.portugueseLanguage(game.path, null))
+        } finally { game.deleteRecursively() }
+    }
+
 }

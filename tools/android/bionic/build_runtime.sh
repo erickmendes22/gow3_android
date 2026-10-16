@@ -41,3 +41,5 @@ python3 tools/android/bionic/verify_bionic.py --ndk "$ndk" --api "$api" --root "
 args=()
 if [[ -n ${GOW3_BIONIC_DRIVER_ZIP:-} ]]; then args=(--archive "$GOW3_BIONIC_DRIVER_ZIP"); fi
 python3 tools/android/bionic/stage_driver.py "${args[@]}" --output "$out/drivers/gen8"
+
+python3 tools/android/bionic/stage_driver.py --manifest tools/android/bionic/driver-adreno7xx.json --output "$out/drivers/adreno7xx"

@@ -60,6 +60,13 @@ internal object LaunchParams {
                 LaunchOption("300", R.string.fps_size_300)), defaultValue = "100",
         ),
         LaunchParam(
+            key = "android_fullscreen", labelRes = R.string.param_android_fullscreen,
+            groupRes = R.string.param_group_display,
+            options = listOf(LaunchOption("0", R.string.param_option_off),
+                LaunchOption("1", R.string.param_option_on)), defaultValue = "0",
+            descriptionRes = R.string.param_desc_android_fullscreen,
+        ),
+        LaunchParam(
             key = "render_resolution", labelRes = R.string.param_render_resolution,
             groupRes = R.string.param_group_display,
             options = listOf(
@@ -88,16 +95,6 @@ internal object LaunchParams {
                 LaunchOption("8", R.string.param_option_8x),
                 LaunchOption("16", R.string.param_option_16x)),
             defaultValue = "0", descriptionRes = R.string.param_desc_anisotropy,
-        ),
-        LaunchParam(
-            key = "disable_dynamic_shadows", labelRes = R.string.param_shadows,
-            groupRes = R.string.param_group_display,
-            options = listOf(
-                LaunchOption("0", R.string.param_option_off),
-                LaunchOption("1", R.string.param_option_on),
-            ),
-            defaultValue = "0",
-            descriptionRes = R.string.param_desc_shadows,
         ),
         LaunchParam(
             key = "fps_limit", labelRes = R.string.param_fps_limit, groupRes = R.string.param_group_performance,
@@ -145,14 +142,6 @@ internal object LaunchParams {
         ),
         LaunchParam(
             key = "skip_network_choice", labelRes = R.string.param_offline_start, groupRes = R.string.param_group_startup,
-            options = listOf(
-                LaunchOption("0", R.string.param_option_off),
-                LaunchOption("1", R.string.param_option_on),
-            ),
-            defaultValue = "1",
-        ),
-        LaunchParam(
-            key = "skip_intro", labelRes = R.string.param_skip_intros, groupRes = R.string.param_group_startup,
             options = listOf(
                 LaunchOption("0", R.string.param_option_off),
                 LaunchOption("1", R.string.param_option_on),

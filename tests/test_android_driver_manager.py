@@ -66,7 +66,7 @@ class Harness {
   GpuDriverManager.configureEnvironment(context,env);
   assert env.get("GOW3_BIONIC_DRIVER").equals("custom");
   assert GpuDriverManager.selected(context).equals("custom:"+id);
-  for (String mode:new String[]{"system","gen8","auto"}) {
+  for (String mode:new String[]{"system","gen8","adreno7xx","auto"}) {
    env.put("GOW3_VULKAN_DRIVER","old");
    GpuDriverManager.select(context,mode); GpuDriverManager.configureEnvironment(context,env);
    assert env.get("GOW3_BIONIC_DRIVER").equals(mode);

@@ -47,6 +47,7 @@
  * session and the transaction id; a callback of an older session or transaction does not touch
  * S.inflight.
  */
+#include "geometry.h"
 #include <android/hardware_buffer.h>
 #include <android/log.h>
 #include <android/native_window.h>
@@ -123,6 +124,7 @@ typedef struct {
 static struct {
     pthread_mutex_t lock;
     int started;
+    int fullscreen;
     int server_fd;
     char path[108];
     pthread_t thread;
@@ -268,9 +270,8 @@ static void show_frame(uint32_t generation, uint32_t index, uint64_t frame, uint
                        int acquire_fd) {
     int w = ANativeWindow_getWidth(S.window), h = ANativeWindow_getHeight(S.window);
     if (w <= 0 || h <= 0) { w = (int)width; h = (int)height; }
-    /* Fit the buffer into the window keeping its aspect. */
-    int dw = w, dh = (int)((int64_t)w * height / (width ? width : 1));
-    if (dh > h) { dh = h; dw = (int)((int64_t)h * width / (height ? height : 1)); }
+    int dw, dh;
+    gow3_display_size(w, h, width, height, S.fullscreen, &dw, &dh);
     ARect src = {0, 0, (int32_t)width, (int32_t)height};
     ARect dst = {(w - dw) / 2, (h - dh) / 2, (w - dw) / 2 + dw, (h - dh) / 2 + dh};
     DoneCtx* ctx = malloc(sizeof *ctx);
@@ -523,6 +524,15 @@ static void* server_thread(void* unused) {
 }
 
 /* ---- JNI ---- */
+
+JNIEXPORT void JNICALL Java_ro_cobrabm_fexdroid_Gow3Present_nativeSetFullscreen(
+        JNIEnv* env, jclass cls, jboolean enabled) {
+    (void)env; (void)cls;
+    pthread_mutex_lock(&S.lock);
+    S.fullscreen = enabled != 0;
+    pthread_mutex_unlock(&S.lock);
+}
+
 
 JNIEXPORT jstring JNICALL Java_ro_cobrabm_fexdroid_Gow3Present_nativeStart(JNIEnv* env, jclass cls,
         jstring jpath) {

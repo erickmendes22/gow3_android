@@ -43,10 +43,12 @@ def validate_payload(payload, expected_hash):
         if (identity.get('schema'),identity.get('runtime_backend'),identity.get('application_id')) != (
                 1,'bionic','com.gow3.android.bionic'):
             raise ValueError('Wrong Bionic runtime identity')
-        spec = identity['driver']
-        driver = archive.extractfile('gow3port/arm64/drivers/gen8/'+spec['library']).read()
-        if hashlib.sha256(driver).hexdigest() != spec['library_sha256']:
-            raise ValueError('Bundled driver differs from the exact pinned build')
+        for key, directory in [('driver', 'gen8'), ('adreno7xx_driver', 'adreno7xx')]:
+            spec = identity[key]
+            driver = archive.extractfile('gow3port/arm64/drivers/'+directory+'/'+spec['library']).read()
+            if hashlib.sha256(driver).hexdigest() != spec['library_sha256']:
+                raise ValueError('Bundled driver differs from the exact pinned build: '+directory)
+
 
 
 def main():

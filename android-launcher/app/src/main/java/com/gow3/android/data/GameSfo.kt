@@ -102,4 +102,20 @@ internal object GameSfo {
         if (!title.isNullOrEmpty()) return title
         return null
     }
+    /** Console language ids: 7 = Portuguese, 17 = Brazilian Portuguese. */
+    @JvmStatic
+    fun portugueseLanguage(gameDirectory: String?, updateDirectory: String?): String {
+        val base = gameDirectory?.let { read(File(it, "sce_sys/param.sfo")) }
+        val update = updateDirectory?.let { read(File(it, "sce_sys/param.sfo")) }
+        val values = if (base != null && update?.get("TITLE_ID") == base["TITLE_ID"])
+            update else base
+        val supported = values?.get("SUPPORTED_LANGUAGES")?.toLongOrNull()
+        if (supported != null) {
+            if (supported and (1L shl 7) != 0L) return "7"
+            if (supported and (1L shl 17) != 0L) return "17"
+        }
+        // The European GoW III release contains Portuguese (Portugal) assets.
+        return if (values?.get("TITLE_ID") == "CUSA01715") "7" else "17"
+    }
+
 }

@@ -120,6 +120,25 @@ def derive(game, config, state_path, env):
             updates['GOW3_SHADOWS_STATUS'] = ('disabled-patch-selected'
                 if 'Disable Dynamic Shadows' in names else
                 'unsupported-eboot' if shadow_requested else 'enabled')
+            if android_port:
+                # Only explicit Android toggles affect their own named patches.
+                # Keep mandatory fixes and Home resolution/FPS selection intact.
+                optional = {
+                    'skip_intro': 'Skip Intro',
+                    'patch_skip_video': 'Skip Any Video With X Button',
+                    'patch_disable_ssao': 'Disable SSAO',
+                    'patch_disable_motion_blur': 'Disable Motion Blur',
+                    'patch_disable_dof': 'Disable Depth of Field',
+                    'patch_disable_bloom': 'Disable Bloom',
+                    'patch_disable_soft_particles': 'Disable Soft Particles',
+                }
+                for key, patch in optional.items():
+                    if key not in ini:
+                        continue
+                    if ini[key] == '1' and patch not in names:
+                        names.append(patch)
+                    elif ini[key] != '1':
+                        names = [name for name in names if name != patch]
             dmem, vblank = patch_requirements(profile[1], names, profile[2])
             # The retail pool plus the patches' extra DMEM must fit the device (design: gate
             # values by device/runtime capability and fail with a clear log, not an OOM kill).

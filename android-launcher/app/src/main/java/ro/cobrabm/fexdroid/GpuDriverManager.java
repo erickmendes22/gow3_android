@@ -21,7 +21,7 @@ public final class GpuDriverManager {
     public static void select(Context context,String value) throws IOException {
         if (!supported(context)) throw new IOException("Custom drivers require the Bionic runtime");
         if (value.startsWith("custom:")) DriverArchive.read(root(context),value.substring(7),Build.VERSION.SDK_INT);
-        else if (!Arrays.asList("auto","gen8","system").contains(value)) throw new IOException("Invalid driver selection");
+        else if (!Arrays.asList("auto","gen8","adreno7xx","system").contains(value)) throw new IOException("Invalid driver selection");
         if (!context.getSharedPreferences("gow3",Context.MODE_PRIVATE).edit().putString("gpu_driver",value).commit())
             throw new IOException("Cannot save driver selection");
     }
@@ -65,7 +65,7 @@ public final class GpuDriverManager {
             environment.put("GOW3_BIONIC_DRIVER","custom");
             environment.put("GOW3_CUSTOM_VULKAN_DRIVER",driver.library.getAbsolutePath());
         } else {
-            if (!Arrays.asList("auto","gen8","system").contains(selection)) throw new IOException("Invalid driver selection");
+            if (!Arrays.asList("auto","gen8","adreno7xx","system").contains(selection)) throw new IOException("Invalid driver selection");
             environment.put("GOW3_BIONIC_DRIVER",selection);
         }
     }

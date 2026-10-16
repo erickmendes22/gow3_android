@@ -197,7 +197,7 @@
     <string name="param_option_8x">8×</string>
     <string name="param_option_16x">16×</string>
     <string name="gpu_driver_title">DRIVER VULKAN</string>
-    <string name="gpu_driver_auto">Automático (incluído no Adreno Gen8; sistema nos demais)</string>
+    <string name="gpu_driver_auto">Automático (R6 no Adreno 7xx; V37 no 8xx; sistema nos demais)</string>
     <string name="gpu_driver_system">Driver do sistema</string>
     <string name="gpu_driver_bundled">Turnip Gen8 V37 patched incluído</string>
     <string name="gpu_driver_import">Importar ZIP do driver</string>
@@ -208,4 +208,21 @@
     <string name="gpu_driver_wrong_abi">Este driver não é uma biblioteca Android ARM64. Drivers de Windows e Linux não são compatíveis.</string>
     <string name="gpu_driver_newer_android">Este driver exige uma versão mais recente do Android.</string>
     <string name="gpu_driver_missing">Driver selecionado indisponível. Importe-o novamente ou escolha outro driver.</string>
+    <string name="nav_mods">PATCHES</string>
+    <string name="param_android_fullscreen">Tela cheia</string>
+    <string name="param_desc_android_fullscreen">Preenche a tela do celular. Desativado mantém a proporção original 16:9.</string>
+    <string name="patch_next_launch">As alterações são aplicadas ao iniciar o jogo. Resolução e FPS continuam no Início.</string>
+    <string name="patch_automatic">Gerenciado automaticamente pelas correções e pela resolução selecionada.</string>
+    <string name="patch_skip_intro">Pular introdução</string>
+    <string name="patch_skip_video">Pular vídeos com o botão X</string>
+    <string name="patch_texture_fix">Correção de texturas corrompidas</string>
+    <string name="patch_black_screen">Correção de tela preta ao iniciar</string>
+    <string name="patch_ssao">Desativar SSAO</string>
+    <string name="patch_blur">Desativar Motion Blur</string>
+    <string name="patch_dof">Desativar profundidade de campo</string>
+    <string name="patch_bloom">Desativar Bloom</string>
+    <string name="patch_particles">Desativar partículas suaves</string>
+    <string name="patch_save_failed">Não foi possível salvar os patches.</string>
+    <string name="patch_effect_note">Os patches opcionais de efeitos exigem um executável 01.02 compatível.</string>
+    <string name="gpu_driver_adreno7xx">Turnip 26.3 R6 (Adreno 7xx)</string>
 </resources>

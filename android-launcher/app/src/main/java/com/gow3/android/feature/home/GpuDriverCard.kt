@@ -52,6 +52,7 @@ internal fun GpuDriverCard() {
         "auto" to stringResource(R.string.gpu_driver_auto),
         "system" to stringResource(R.string.gpu_driver_system),
         "gen8" to stringResource(R.string.gpu_driver_bundled),
+        "adreno7xx" to stringResource(R.string.gpu_driver_adreno7xx),
     ) + installed.map { "custom:${it.id}" to "${it.name} (${it.id.take(8)})" }
     val label = choices.firstOrNull { it.first == selected }?.second
         ?: stringResource(R.string.gpu_driver_missing)

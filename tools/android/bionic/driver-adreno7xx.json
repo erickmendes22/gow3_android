@@ -1,0 +1,22 @@
+{
+  "id": "turnip-26.3-r6",
+  "name": "Turnip v26.3.0-R6",
+  "author": "StevenMXZ",
+  "family": "adreno-7xx",
+  "archive": "Turnip_v26.3.0-R6.zip",
+  "url": "https://github.com/StevenMXZ/Adreno-Tools-Drivers/releases/download/v37/Turnip_v26.3.0-R6.zip",
+  "archive_sha256": "5fa2305eb9eff64d9347a670e6ca5ef7c518f60e9e782a4db7ee5588c9852d81",
+  "library": "libvulkan_freedreno.so",
+  "library_sha256": "4fd2fd30311af301ae5564139bc24cc727390d4dc3c90a20192c25ec91287c59",
+  "entry": "HMI",
+  "min_api": 28,
+  "source": "https://github.com/StevenMXZ/Adreno-Tools-Drivers/releases/tag/v37",
+  "default_chip_id_patterns": [
+    "0x07??????",
+    "0x43020[01]00",
+    "0x43030b00",
+    "0x43050a01",
+    "0x43050b00",
+    "0x43051401"
+  ]
+}
