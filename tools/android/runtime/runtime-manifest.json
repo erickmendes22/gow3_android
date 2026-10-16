@@ -146,14 +146,6 @@
       "type": "shared-library"
     },
     {
-      "path": "gow3port/arm64/lsfg/liblsfg-vk.so",
-      "type": "shared-library"
-    },
-    {
-      "path": "gow3port/arm64/lsfg/VkLayer_LS_frame_generation.json",
-      "type": "data"
-    },
-    {
       "path": "gow3port/run-gow3.sh",
       "type": "executable"
     },
