@@ -31,10 +31,8 @@ SOURCE = Path(os.environ.get(
 NATIVE = ROOT / 'out/arm64/bundle'
 TURNIP = ROOT / 'out/arm64/turnip'
 TURNIP_GEN8 = ROOT / 'out/arm64/turnip-gen8'
-LSFG = ROOT / 'out/arm64/lsfg'  # build_lsfg.sh: the lsfg-vk 1.0 layer with our Turnip patches
 LOCAL_TURNIP = ROOT / '.local-deps/android/turnip'
 LOCAL_TURNIP_GEN8 = ROOT / '.local-deps/android/turnip-gen8'
-LOCAL_LSFG = ROOT / '.local-deps/android/lsfg'
 # The rootfs's Turnip, replaced by TURNIP's (rootfs-relative path: file there).
 TURNIP_FILES = {
     'usr/lib/aarch64-linux-gnu/libvulkan_freedreno.so': 'libvulkan_freedreno.so',
@@ -211,7 +209,6 @@ def main():
     debug = args.profile == 'debug'
     turnip = LOCAL_TURNIP if debug else TURNIP
     turnip_gen8 = LOCAL_TURNIP_GEN8 if debug else TURNIP_GEN8
-    lsfg = LOCAL_LSFG if debug else LSFG
     OUT = ROOT / ('out/debug' if debug else 'out/release')
     manifest_path = ROOT / ('tools/android/debug/runtime-manifest.json' if debug
                             else 'tools/android/runtime/runtime-manifest.json')
@@ -230,10 +227,6 @@ def main():
                    if not turnip_input(turnip, name).is_file())
     missing.extend('Gen8 Turnip: ' + name for name in TURNIP_GEN8_FILES.values()
                    if not turnip_input(turnip_gen8, name).is_file())
-    if not (lsfg / 'liblsfg-vk.so').is_file():
-        missing.append('LSFG: liblsfg-vk.so (prepare .local-deps/android/lsfg or run build_lsfg.sh)')
-    if not (lsfg / 'VkLayer_LS_frame_generation.json').is_file():
-        missing.append('LSFG: VkLayer_LS_frame_generation.json (prepare .local-deps/android/lsfg or run build_lsfg.sh)')
     if missing:
         raise SystemExit('Missing Android runtime inputs:\n  ' + '\n  '.join(missing))
     OUT.mkdir(exist_ok=True)
@@ -290,7 +283,6 @@ def main():
             tar.addfile(info)
         for directory in ('bin', 'lib', 'patch-parts'):
             tar.add(NATIVE / directory, arcname='gow3port/arm64/' + directory)
-        tar.add(lsfg, arcname='gow3port/arm64/lsfg', filter=owned_by_root)
         # The runtime scripts import one another (and patches.py/launch_env.py are
         # invoked directly by run-gow3.sh). Keep the whole script directory in the
         # payload so adding a helper cannot silently produce an incomplete APK.
