@@ -78,6 +78,7 @@ fi
 rootfs=/data/user/0/com.gow3.android/files/rootfs
 deps=$PWD/.local-deps/android
 sysroot=$deps/mesa-sysroot
+export GOW3_PKG_CONFIG_SYSROOT=$sysroot
 src=$deps/src/mesa${suffix/_/-}
 build=$PWD/out/arm64/turnip${suffix/_/-}-build
 out=$PWD/out/arm64/turnip${suffix/_/-}
@@ -152,7 +153,7 @@ c_ld = 'lld'
 cpp_ld = 'lld'
 ar = 'llvm-ar'
 strip = 'llvm-strip'
-pkg-config = 'pkg-config'
+pkg-config = '$PWD/tools/android/build/target-pkg-config.sh'
 [built-in options]
 c_args = ['-O2']
 cpp_args = ['-O2']
@@ -175,6 +176,10 @@ meson setup "$build" "$src" --cross-file "$cross" --prefix="$rootfs/usr" \
     -Dzstd=enabled -Dexpat=enabled -Dvulkan-layers= -Dtools= -Dbuild-tests=false \
     > "$build.log" 2>&1 || { tail -40 "$build.log" >&2; exit 1; }
 end_stage "configured $(grep -cE '^\[[0-9]+/[0-9]+\]' "$build.log" || true) targets"
+if [[ ${GOW3_CONFIGURE_ONLY:-0} == 1 ]]; then
+    echo "Turnip $variant configuration passed"
+    exit 0
+fi
 begin "ninja (Turnip cross-compile)"
 ninja -C "$build" >> "$build.log" 2>&1 || { tail -40 "$build.log" >&2; exit 1; }
 end_stage "compiled"

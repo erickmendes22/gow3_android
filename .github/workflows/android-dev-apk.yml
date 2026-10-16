@@ -72,10 +72,7 @@ jobs:
 
       - name: Validate Android bundle and patch contracts before native build
         run: |
-          python3 -m unittest discover -s tests -p 'test_android_bundle_game_free.py' -v
-          python3 -m unittest discover -s tests -p 'test_android_requested_features.py' -v
-          python3 -m unittest discover -s tests -p 'test_android_graphics_preflight.py' -v
-          python3 -m unittest discover -s tests -p 'test_android_cross_link_isolation.py' -v
+          python3 -m unittest discover -s tests -p 'test_android_*.py' -v
           python3 -m unittest discover -s tests -p 'test_launch_env.py' -v
 
       - name: Restore Android SDK package cache
@@ -182,6 +179,15 @@ jobs:
         shell: bash -el {0}
         run: bash tools/android/build/preflight_turnip_link.sh
 
+      - name: Configure both Turnip variants and LSFG before native builds
+        shell: bash -el {0}
+        env:
+          GOW3_CONFIGURE_ONLY: '1'
+        run: |
+          bash tools/android/build/build_turnip.sh main
+          bash tools/android/build/build_turnip.sh gen8
+          bash tools/android/build/build_lsfg.sh
+
       - name: Validate launcher compilation before native runtime
         run: bash android-launcher/gradlew -p android-launcher :app:compileReleaseJavaWithJavac --no-daemon --max-workers=2
 
@@ -249,3 +255,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload build diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-diagnostics-${{ github.sha }}
+          path: |
+            out/arm64/*-build.log
+            out/arm64/*-build/meson-logs/meson-log.txt
+            out/arm64/*-build/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: ignore
+          retention-days: 7

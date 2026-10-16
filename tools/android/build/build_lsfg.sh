@@ -44,8 +44,13 @@ for patch in "${patches[@]}"; do
     git -C "$src" apply --whitespace=nowarn "$PWD/$patch"
 done
 rm -rf "$build" "$out"
+mkdir -p "$(dirname "$build")"
 cmake -S "$src" -B "$build" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$PWD/tools/android/build/aarch64-toolchain.cmake" \
     -DCMAKE_BUILD_TYPE=Release > "$build.log" 2>&1 || { tail -30 "$build.log" >&2; exit 1; }
+if [[ ${GOW3_CONFIGURE_ONLY:-0} == 1 ]]; then
+    echo 'LSFG ARM64 configuration passed'
+    exit 0
+fi
 ninja -C "$build" lsfg-vk >> "$build.log" 2>&1 || { grep -v '^\[' "$build.log" | tail -40 >&2; exit 1; }
 mkdir -p "$out"
 llvm-strip --strip-debug -o "$out/liblsfg-vk.so" "$build/liblsfg-vk.so"

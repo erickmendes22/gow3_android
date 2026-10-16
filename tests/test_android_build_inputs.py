@@ -1,5 +1,7 @@
 import json
-import subprocess
+import sys
+import tempfile
+from unittest.mock import patch
 import unittest
 from pathlib import Path
 
@@ -55,11 +57,17 @@ class AndroidBuildInputTests(unittest.TestCase):
         self.assertEqual(manifest['port_arch_root'], 'gow3port/arm64')
 
     def test_release_assembler_reports_all_missing_generated_inputs(self):
-        result = subprocess.run(
-            ['python3', 'tools/android/build_release_runtime.py'],
-            cwd=ROOT, capture_output=True, text=True)
-        self.assertNotEqual(result.returncode, 0)
-        output = result.stdout + result.stderr
+        from tools.android.runtime import build_release_runtime as builder
+        # A clean input tree, regardless of artifacts left by a previous build.
+        with tempfile.TemporaryDirectory() as temporary:
+            empty = Path(temporary)
+            with patch.multiple(builder, SOURCE=empty / 'rootfs', NATIVE=empty / 'native',
+                                TURNIP=empty / 'main', TURNIP_GEN8=empty / 'gen8',
+                                LSFG=empty / 'lsfg', OUT=empty / 'out'), \
+                    patch.object(sys, 'argv', ['build_release_runtime.py']):
+                with self.assertRaises(SystemExit) as raised:
+                    builder.main()
+        output = str(raised.exception)
         self.assertIn('Missing Android runtime inputs:', output)
         self.assertIn('Gen8 Turnip:', output)
         self.assertIn('LSFG:', output)
