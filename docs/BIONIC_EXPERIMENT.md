@@ -160,6 +160,12 @@ O carregador `gpu/shim/vk_driver_loader.{cpp,h}` foi adaptado, preservando a arq
 do Bloodborne Android, commit `2e4726530b04f76e513e232d272d386e9973c73b`:
 https://github.com/ducvd89/Bloodborne-Android/blob/2e4726530b04f76e513e232d272d386e9973c73b/gpu/shim/vk_driver_loader.cpp
 
+O carregamento ImGui sem WSI em `gpu/shim/gow3_imgui_vulkan_loader.h` adapta o
+tratamento de `gpu/shim/bbport_overlay.cpp` do mesmo commit. A adaptação aceita somente
+as sete funções de helpers de superfície/swapchain não usados pela apresentação AHB;
+funções de renderização ausentes continuam sendo erro de inicialização. O teste executa
+o carregador Vulkan real do ImGui com um driver sem WSI para reproduzir a falha anterior.
+
 O ABI HAL segue AOSP hardware/libhardware (Apache-2.0), descrito nos comentários do carregador.
 Isto não é uma integração de `libadrenotools`: utiliza diretamente drivers Android compatíveis
 com o formato de pacote AdrenoTools. A futura integração dessa biblioteca é uma opção separada.

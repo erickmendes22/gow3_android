@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "gow3_overlay.h"
 #include "gow3_overlay_position.h"
+#include "gow3_imgui_vulkan_loader.h"
 #include "gow3_pad_input.h"
 
 #include <algorithm>
@@ -12,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <stdexcept>
 #include <vector>
 
 #ifndef __ANDROID__
@@ -873,13 +875,22 @@ void Init(const Vulkan::Instance& instance, vk::Format format, u32 image_count) 
                                    int(gow3_font_ttf_end - gow3_font_ttf), 18.0f, &font_config);
 
     const vk::Instance vk_instance = instance.GetInstance();
-    ImGui_ImplVulkan_LoadFunctions(
+    const bool functions_loaded = ImGui_ImplVulkan_LoadFunctions(
         instance.ApiVersion(),
         [](const char* name, void* user) {
-            return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(
-                *static_cast<const vk::Instance*>(user), name);
+#ifdef __ANDROID__
+            constexpr bool ahb = true;
+#else
+            constexpr bool ahb = false;
+#endif
+            return ResolveImGuiFunction(VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
+                *static_cast<const vk::Instance*>(user), name, ahb);
         },
         const_cast<vk::Instance*>(&vk_instance));
+    if (!functions_loaded) {
+        ImGui::DestroyContext();
+        throw std::runtime_error("Overlay Vulkan function loading failed");
+    }
 
     const VkFormat color_format = static_cast<VkFormat>(format);
     ImGui_ImplVulkan_InitInfo info{};

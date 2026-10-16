@@ -94,7 +94,38 @@ public final class GameActivity extends Activity {
         immersive();
     }
 
-    private boolean bionicRuntime() { return new File(BASE,"run-bionic.sh").isFile(); }
+    private boolean bionicRuntime() { return "com.gow3.android.bionic".equals(getPackageName()); }
+
+    private boolean runtimeReady;
+
+    /** Installation must finish before choosing presentation or starting native bridges. */
+    private void startRuntime(SurfaceHolder holder) {
+        if (destroyed || !holder.getSurface().isValid()) return;
+        if (runtimeReady) {
+            if (bionicRuntime()) startBionic(holder);
+            else if (shmid>=0) attach(holder);
+            else if (!startingX) { startingX=true; worker.execute(() -> startX(holder)); }
+            return;
+        }
+        if (startingX) return;
+        startingX=true;
+        worker.execute(() -> {
+            try {
+                boolean installed=RuntimeInstaller.ensure(GameActivity.this, new File(FILES),
+                    message -> main.post(() -> status.setText(UiText.get(GameActivity.this, message))));
+                android.util.Log.i("God of War III","runtime installed="+installed);
+                main.post(() -> {
+                    startingX=false;
+                    if (destroyed) return;
+                    runtimeReady=true;
+                    startRuntime(surface.getHolder());
+                });
+            } catch (Exception ex) {
+                main.post(() -> startingX=false);
+                error(ex.toString());
+            }
+        });
+    }
 
     private void startBionic(SurfaceHolder holder) {
         if (destroyed || !holder.getSurface().isValid()) return;
@@ -142,15 +173,10 @@ public final class GameActivity extends Activity {
         screen.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> fitSurface(r-l,b-t));
         surface.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override public void surfaceCreated(SurfaceHolder h) {
-                if (bionicRuntime() && hasGame()) startBionic(h);
-                else if (shmid>=0) attach(h);
-                else if (!hasGame()) {
-                    // MainActivity owns the first-run game-folder check. Reaching this state means
-                    // the launcher was bypassed or the selected folder was removed while away.
+                if (!hasGame()) {
                     pendingHolder=h;
                     error("Game folder is unavailable. Return to the launcher and choose it again.");
-                }
-                else if (!startingX) { startingX=true; worker.execute(() -> startX(h)); }
+                } else startRuntime(h);
             }
             @Override public void surfaceChanged(SurfaceHolder h,int format,int w,int height) {}
             @Override public void surfaceDestroyed(SurfaceHolder h) { if (!bionicRuntime()) DisplayBridge.stop(); }
@@ -277,6 +303,7 @@ public final class GameActivity extends Activity {
 
     private void restartGame() {
         closeDrawer(); status.setText(UiText.get(this, "Restarting God of War III…")); status.setVisibility(View.VISIBLE);
+        if (!runtimeReady) { startPending(); return; }
         worker.execute(() -> { stopGame(); startGame(); });
     }
 
@@ -510,8 +537,6 @@ public final class GameActivity extends Activity {
     }
     private void startX(SurfaceHolder holder) {
         try {
-            boolean installed=RuntimeInstaller.ensure(this, new File(FILES), message -> main.post(() -> status.setText(UiText.get(this, message))));
-            android.util.Log.i("God of War III","runtime installed="+installed);
             if (audio!=null) audio.start();
             if (audio==null || !audio.awaitReady(5000))
                 throw new java.io.IOException("Android audio bridge did not become ready; see logcat for details.");
@@ -639,10 +664,7 @@ public final class GameActivity extends Activity {
     private void startPending() {
         SurfaceHolder h=pendingHolder!=null ? pendingHolder : surface.getHolder();
         pendingHolder=null;
-        if (bionicRuntime()) { startBionic(h); return; }
-        if (h.getSurface()!=null && h.getSurface().isValid() && !startingX && shmid<0) {
-            startingX=true; worker.execute(() -> startX(h));
-        }
+        startRuntime(h);
     }
 
     private void pollFrames() {
