@@ -274,7 +274,7 @@ bool ResolutionNeedsRestart() {
 }
 
 void Save() {
-    // 启动器的补丁选择、LSFG 和手柄配置不属于此菜单，保存时按整行保留。
+    // 启动器的补丁选择和手柄配置不属于此菜单，保存时按整行保留。
     // 从当前磁盘读取，避免用启动时的缓存覆盖启动器后来保存的选择。
     std::string retained, line;
     errno = 0;
