@@ -31,6 +31,7 @@ import com.gow3.android.ui.components.LauncherColors
 
 private const val AUTHOR = "erickmendes22 — Daedalus Emulator"
 private const val BASE_URL = "https://github.com/zFitness/gow3_android"
+private const val BIONIC_BASE_URL = "https://github.com/ducvd89/Bloodborne-Android"
 private const val YOUTUBE_URL = "https://www.youtube.com/@daedalusemulator"
 
 /** Fork authorship, upstream credits and the fork maintainer's channel. */
@@ -62,6 +63,9 @@ internal fun ContactCard() {
             ContactRow(context.getString(R.string.contact_author_label), AUTHOR)
             ContactRow(context.getString(R.string.contact_base_label), "zFitness/gow3_android", context.getString(R.string.contact_open)) {
                 openUrl(context, BASE_URL)
+            }
+            ContactRow(context.getString(R.string.contact_bionic_label), "ducvd89/Bloodborne-Android", context.getString(R.string.contact_open)) {
+                openUrl(context, BIONIC_BASE_URL)
             }
             ContactRow(context.getString(R.string.contact_youtube_label), "@daedalusemulator", context.getString(R.string.contact_open)) {
                 if (!openUrl(context, YOUTUBE_URL)) {

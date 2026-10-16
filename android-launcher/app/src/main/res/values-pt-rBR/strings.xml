@@ -84,7 +84,7 @@
     <string name="frame_gen_footer">Os arquivos importados ficam na pasta privada do aplicativo e são usados na próxima abertura do jogo. A importação funciona sem a Steam.</string>
     <string name="about_title">God of War III — Daedalus Fork</string>
     <string name="about_version_fmt">Versão %1$s</string>
-    <string name="about_description">Fork Daedalus do projeto Android de God of War III Remastered, com modificações de erickmendes22. Créditos da base: zFitness e colaboradores.</string>
+    <string name="about_description">Fork Daedalus de God of War III Remastered para Android, mantido por erickmendes22. Usa um runtime Android/Bionic. Projeto base: zFitness e colaboradores.</string>
     <string name="about_third_party_licenses">Licenças de terceiros</string>
     <string name="language_setting">Idioma</string>
     <string name="language_follow_system">Seguir o sistema</string>
@@ -227,4 +227,5 @@
     <string name="gpu_driver_adreno7xx">Turnip 26.3 R6 (Adreno 7xx)</string>
     <string name="param_expand_video_arena">Aumentar arena de vídeo</string>
     <string name="param_desc_expand_video_arena">Aumenta a arena de vídeo do jogo independentemente da resolução. Desativado mantém a arena original e pode causar erros de textura ou falhas, especialmente em resoluções maiores. Requer reiniciar.</string>
+    <string name="contact_bionic_label">Runtime Android/Bionic</string>
 </resources>

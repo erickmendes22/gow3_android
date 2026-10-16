@@ -397,7 +397,7 @@ public final class GameActivity extends Activity {
         //  所以直接把这一行置灰不可点，并说明去 Home 页导入，而不是让它"看着能开却不生效"。
         boolean dllPresent=hasFrameGenDll();
         setRowEnabled(losslessItem,dllPresent && !bionicRuntime());
-        setDetail(losslessItem,bionicRuntime() ? (UiText.portuguese(this) ? "Indisponível no runtime Bionic experimental" : "Unavailable in the experimental Bionic runtime") : !dllPresent ? "Import Lossless.dll on the Home page first"
+        setDetail(losslessItem,bionicRuntime() ? (UiText.portuguese(this) ? "Indisponível no runtime Bionic" : "Unavailable in the Bionic runtime") : !dllPresent ? "Import Lossless.dll on the Home page first"
             : lsfgOn ? lsfg+"× frames · flow "
             +(setting("lsfg_flow_scale")==null ? "1.0" : setting("lsfg_flow_scale")) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");

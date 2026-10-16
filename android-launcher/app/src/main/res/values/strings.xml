@@ -107,7 +107,7 @@
     <!-- About 页 -->
     <string name="about_title">God of War III — Daedalus Fork</string>
     <string name="about_version_fmt">Version %1$s</string>
-    <string name="about_description">Daedalus fork of the God of War III Remastered Android project, with modifications by erickmendes22. Base project credits: zFitness and contributors.</string>
+    <string name="about_description">Daedalus fork of God of War III Remastered for Android, maintained by erickmendes22. Uses an Android/Bionic runtime. Base project: zFitness and contributors.</string>
     <string name="about_third_party_licenses">Third-party licenses</string>
     <string name="language_setting">Language</string>
     <string name="language_follow_system">Follow system</string>
@@ -264,4 +264,5 @@
     <string name="gpu_driver_adreno7xx">Turnip 26.3 R6 (Adreno 7xx)</string>
     <string name="param_expand_video_arena">Expand video arena</string>
     <string name="param_desc_expand_video_arena">Increases the game video arena independently of resolution. OFF keeps the original arena and may cause texture errors or crashes, especially at higher resolutions. Requires restart.</string>
+    <string name="contact_bionic_label">Android/Bionic runtime</string>
 </resources>

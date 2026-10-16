@@ -1,4 +1,4 @@
-name: Bionic APK (experimental)
+name: Daedalus Fork Bionic APK
 
 on:
   push:
@@ -46,7 +46,7 @@ jobs:
           python -m compileall -q tools/android/bionic scripts
           "$ANDROID_HOME/build-tools/$GOW3_BUILD_TOOLS/aapt2" compile --dir android-launcher/app/src/main/res -o "$RUNNER_TEMP/resources.zip"
       - name: Check launcher compilation before building native runtime
-        run: bash android-launcher/gradlew -p android-launcher :app:compileReleaseJavaWithJavac -Pgow3Bionic=true --no-daemon --max-workers=2
+        run: bash android-launcher/gradlew -p android-launcher :app:compileReleaseJavaWithJavac :app:testReleaseUnitTest --tests com.gow3.android.GameSfoTest -Pgow3Bionic=true --no-daemon --max-workers=2
       - name: Build Android Python for existing patch validators
         run: GOW3_NDK="$ANDROID_HOME/ndk/29.0.14206865" bash tools/android/bionic/build_python.sh
       - uses: mamba-org/setup-micromamba@v2
@@ -83,10 +83,10 @@ jobs:
           bash tools/android/bionic/build_apk.sh --package-only
       - uses: actions/upload-artifact@v4
         with:
-          name: Daedalus-Fork-Bionic-Experimental-arm64
+          name: Daedalus-Fork-Bionic-arm64
           path: |
-            out/release/God-of-War-III-*-Bionic-Experimental.apk
-            out/release/God-of-War-III-*-Bionic-Experimental.apk.sha256
+            out/release/God-of-War-III-Daedalus-Fork-v*-bionic-arm64.apk
+            out/release/God-of-War-III-Daedalus-Fork-v*-bionic-arm64.apk.sha256
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: failure()

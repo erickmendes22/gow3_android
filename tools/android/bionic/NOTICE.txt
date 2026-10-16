@@ -1,5 +1,5 @@
-Daedalus Fork — experimental Android/Bionic runtime
-Source and build recipes: https://github.com/erickmendes22/gow3_android_daedalus_fork/tree/experimental-bionic
+Daedalus Fork — Android/Bionic runtime — 2.1.6-daedalus.4-bionic
+Source and build recipes: https://github.com/erickmendes22/gow3_android_daedalus_fork/tree/android
 
 GoW III runtime: zFitness/gow3_android, Daedalus Fork and upstream contributors.
 GPL-2.0; see LICENSE-Gow3.txt and the repository's third-party sources/notices.

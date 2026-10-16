@@ -143,4 +143,30 @@ class GameSfoTest {
         } finally { game.deleteRecursively() }
     }
 
+    @Test
+    fun `regional Portuguese prefers Brazil for US and Portugal for CUSA01725`() {
+        val game = java.nio.file.Files.createTempDirectory("gow3-regional-language").toFile()
+        val update = java.nio.file.Files.createTempDirectory("gow3-regional-update").toFile()
+        val sfo = File(game, "sce_sys/param.sfo")
+        val updateSfo = File(update, "sce_sys/param.sfo")
+        sfo.parentFile.mkdirs()
+        updateSfo.parentFile.mkdirs()
+        try {
+            for ((title, expected) in listOf("CUSA01623" to "17", "CUSA01725" to "7", "CUSA01715" to "7")) {
+                sfo.writeBytes(sfoBytes("TITLE_ID" to title))
+                assertEquals(expected, GameSfo.portugueseLanguage(game.path, null))
+                sfo.writeBytes(sfoBytes("TITLE_ID" to title, "SUPPORTED_LANGUAGES" to "131200"))
+                assertEquals(expected, GameSfo.portugueseLanguage(game.path, null))
+                updateSfo.writeBytes(sfoBytes("TITLE_ID" to title))
+                assertEquals(expected, GameSfo.portugueseLanguage(game.path, update.path))
+            }
+            sfo.writeBytes(sfoBytes("TITLE_ID" to "CUSA01623", "SUPPORTED_LANGUAGES" to "131072"))
+            updateSfo.writeBytes(sfoBytes("TITLE_ID" to "CUSA01725", "SUPPORTED_LANGUAGES" to "128"))
+            assertEquals("17", GameSfo.portugueseLanguage(game.path, update.path))
+            sfo.writeBytes(sfoBytes("TITLE_ID" to "CUSA01725", "SUPPORTED_LANGUAGES" to "128"))
+            updateSfo.writeBytes(sfoBytes("TITLE_ID" to "CUSA01725"))
+            assertEquals("7", GameSfo.portugueseLanguage(game.path, update.path))
+        } finally { game.deleteRecursively(); update.deleteRecursively() }
+    }
+
 }

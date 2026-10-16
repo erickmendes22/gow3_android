@@ -6,7 +6,7 @@ sdk=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}
 : "${sdk:?Set ANDROID_HOME or ANDROID_SDK_ROOT}"
 bt="$sdk/build-tools/${GOW3_BUILD_TOOLS:-35.0.0}"
 unsigned="$root/android-launcher/app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk"
-apk="$root/out/release/God-of-War-III-2.1.6-android3-Daedalus-Fork-Bionic-Experimental.apk"
+apk="$root/out/release/God-of-War-III-Daedalus-Fork-v2.1.6-daedalus.4-bionic-arm64.apk"
 key="$root/.local-deps/android/bionic-development.keystore"
 mkdir -p "$(dirname "$key")" "$(dirname "$apk")"
 # Experimental testing only. A release must use the project's controlled signing key.
@@ -20,4 +20,4 @@ fi
 "$bt/apksigner" verify --verbose "$apk"
 python3 tools/android/bionic/validate_apk.py "$apk" --aapt "$bt/aapt"
 (cd out/release; sha256sum "$(basename "$apk")" > "$(basename "$apk").sha256")
-echo "Bionic experimental APK: $apk"
+echo "Daedalus Fork Bionic APK: $apk"

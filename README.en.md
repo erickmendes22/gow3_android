@@ -2,7 +2,9 @@
 
 Daedalus Fork maintained by erickmendes22. Based on the Android work by zFitness and the upstream contributors.
 
-**Version: 2.1.6-android3** · [YouTube: @daedalusemulator](https://www.youtube.com/@daedalusemulator) · [Base: zFitness/gow3_android](https://github.com/zFitness/gow3_android)
+**Version: 2.1.6-daedalus.4-bionic** · [YouTube: @daedalusemulator](https://www.youtube.com/@daedalusemulator) · [Base: zFitness/gow3_android](https://github.com/zFitness/gow3_android)
+
+This release uses the native **Android/Bionic** runtime (Android 11 or later).
 
 
 [Português (Brasil)](README.md) | **English**
@@ -78,6 +80,8 @@ More docs: [Mods](docs/MODS.md), [Upscaler & frame generation](docs/upscaler.md)
 [Parallel GPU work](docs/parallel_gpu.md) and the [Roadmap](docs/gow3/ROADMAP.md).
 
 ## Acknowledgments
+
+- **ducvd89 / Bloodborne-Android**: [Android/Bionic runtime infrastructure](https://github.com/ducvd89/Bloodborne-Android), adapted for the Vulkan HAL loader, AHardwareBuffer presentation, native preparation and dependency builds. Detailed attribution: [Bionic notices](tools/android/bionic/NOTICE.txt).
 
 This project forks R-V-L's Linux port, which in turn derives from FelipePrado0's original
 project:

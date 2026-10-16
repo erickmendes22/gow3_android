@@ -107,15 +107,24 @@ internal object GameSfo {
     fun portugueseLanguage(gameDirectory: String?, updateDirectory: String?): String {
         val base = gameDirectory?.let { read(File(it, "sce_sys/param.sfo")) }
         val update = updateDirectory?.let { read(File(it, "sce_sys/param.sfo")) }
-        val values = if (base != null && update?.get("TITLE_ID") == base["TITLE_ID"])
-            update else base
+        val baseTitle = base?.get("TITLE_ID")?.trim()
+        // Updates may omit SUPPORTED_LANGUAGES. Inherit the base metadata, and never
+        // let an update belonging to another title change this game's language.
+        val values = if (base != null && update != null && !baseTitle.isNullOrEmpty() &&
+            update["TITLE_ID"]?.trim() == baseTitle)
+            base + update else base
         val supported = values?.get("SUPPORTED_LANGUAGES")?.toLongOrNull()
-        if (supported != null) {
-            if (supported and (1L shl 7) != 0L) return "7"
-            if (supported and (1L shl 17) != 0L) return "17"
+        val preferred = when (values?.get("TITLE_ID")?.trim()?.uppercase(java.util.Locale.ROOT)) {
+            "CUSA01623" -> 17 // Brazilian Portuguese
+            "CUSA01715", "CUSA01725" -> 7 // Portuguese (Portugal)
+            else -> if (supported != null && supported and (1L shl 7) != 0L) 7 else 17
         }
-        // The European GoW III release contains Portuguese (Portugal) assets.
-        return if (values?.get("TITLE_ID") == "CUSA01715") "7" else "17"
+        if (supported != null) {
+            if (supported and (1L shl preferred) != 0L) return preferred.toString()
+            val alternative = if (preferred == 17) 7 else 17
+            if (supported and (1L shl alternative) != 0L) return alternative.toString()
+        }
+        return preferred.toString()
     }
 
 }
