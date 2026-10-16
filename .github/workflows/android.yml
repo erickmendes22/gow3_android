@@ -122,7 +122,7 @@ jobs:
             .local-deps/android/m2
             .local-deps/android/steam-libs
             ~/.cache/ccache
-          key: android-${{ runner.os }}-${{ hashFiles('tools/android/**', 'tools/android/mesa-patches/**', 'tools/android/lsfg-patches/**', 'cpu/**', 'gpu/CMakeLists.txt', 'gpu/third_party/**', 'ci/**') }}
+          key: android-${{ runner.os }}-${{ hashFiles('tools/android/**', 'tools/android/mesa-patches/**', 'cpu/**', 'gpu/CMakeLists.txt', 'gpu/third_party/**', 'ci/**') }}
           restore-keys: android-${{ runner.os }}-
 
       - name: Restore fexdroid APK cache
@@ -196,11 +196,10 @@ jobs:
             --device-libs "$RUNNER_TEMP/device-libs.txt" \
             --sysroot .local-deps/android/arm64-sysroot
 
-      - name: Build Turnip and LSFG variants
+      - name: Build Turnip variants
         run: |
           bash tools/android/build/build_turnip.sh main
           bash tools/android/build/build_turnip.sh gen8
-          bash tools/android/build/build_lsfg.sh
 
       - name: Build, sign, and validate release APK
         shell: bash
