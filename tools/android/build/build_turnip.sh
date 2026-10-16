@@ -96,8 +96,14 @@ rm -f "$sysroot/usr/lib/aarch64-linux-gnu/pkgconfig/xcb-keysyms.pc"
 
 # Mesa's build tools (meson, mako) in a local virtual environment, not the host's Python.
 venv=$deps/mesa-venv
-if [[ ! -x $venv/bin/meson ]]; then
+# A restored venv may have an executable Meson whose shebang points to an old
+# checkout (e.g. after renaming the repository), or a removed Python interpreter.
+# Test execution/imports, not just its executable bit, before trusting the cache.
+if ! "$venv/bin/python" -c 'import mesonbuild.mesonmain, mako, yaml, packaging' >/dev/null 2>&1 ||
+   ! "$venv/bin/meson" --version >/dev/null 2>&1; then
     command -v python3 >/dev/null || die 'python3 is required to create the Mesa build environment'
+    echo "Recreating missing or unusable Mesa Python environment: $venv"
+    rm -rf -- "$venv"
     python3 -m venv "$venv"
     "$venv/bin/python" -m pip install -q meson mako pyyaml packaging
 fi
