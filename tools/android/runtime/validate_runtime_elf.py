@@ -113,7 +113,9 @@ def validate_tree(root, expected_loader, reject=(), explicit_paths=(), allow_no_
     results = []
     explicit_paths = set(explicit_paths)
     allow_no_interp = set(allow_no_interp)
-    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+    # Absolute Debian symlinks refer to the device root, not the build host.
+    # Inspect each real file once; archive validation checks the packaged links.
+    for path in sorted(p for p in root.rglob("*") if not p.is_symlink() and p.is_file()):
         try:
             info = inspect(path)
         except ElfError as error:

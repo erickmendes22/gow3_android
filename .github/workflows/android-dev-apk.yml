@@ -175,6 +175,17 @@ jobs:
             libxcb-dri3-dev libxcb-present-dev libxcb-sync-dev libxcb-shm0-dev libxshmfence-dev \
             libx11-dev libxrandr-dev libdrm-dev
 
+      - name: Validate migrated runtime ELF before native builds
+        run: |
+          python3 - <<'PY'
+          from tools.android.runtime.build_release_runtime import SOURCE, RUNTIME_LOADER, EXPLICIT_LOADER_ENTRYPOINTS
+          from tools.android.runtime.validate_runtime_elf import validate_tree
+          records = validate_tree(SOURCE, RUNTIME_LOADER,
+                                  reject=('com.gp.android', '/Users/', '/home/'),
+                                  explicit_paths=EXPLICIT_LOADER_ENTRYPOINTS)
+          print(f'Validated {len(records)} runtime ELF files')
+          PY
+
       - name: Preflight ARM64 linker and libatomic before native builds
         shell: bash -el {0}
         run: bash tools/android/build/preflight_turnip_link.sh
