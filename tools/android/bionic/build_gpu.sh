@@ -9,6 +9,9 @@ root=$PWD
 prefix=$root/.local-deps/android/bionic-prefix
 headers=${GOW3_BIONIC_HEADERS:-$root/.local-deps/root/usr}
 out=$root/out/bionic
+build=${GOW3_BIONIC_GPU_BUILD:-$out/gpu}
+atomic=$("$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android$api-clang" -print-file-name=libatomic.a)
+[[ -f $atomic ]] || { echo 'NDK ARM64 libatomic.a is missing' >&2; exit 1; }
 [[ -f $prefix/.done-ffmpeg ]] || { echo 'Run build_deps.sh first' >&2; exit 1; }
 unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH CMAKE_PREFIX_PATH
 export PATH="$headers/bin:$PATH"
@@ -21,13 +24,18 @@ for patch in gpu/patches/fsr-vulkan/*.patch; do
     fi
 done
 # Let CMake discover include/vma as well as include; discard the old forced cache path.
-cmake -S gpu -B "$out/gpu" -G Ninja \
+mkdir -p "$build/.cmake/api/v1/query"
+touch "$build/.cmake/api/v1/query/codemodel-v2"
+cmake -S gpu -B "$build" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$ndk/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM="android-$api" -DANDROID_STL=c++_shared \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo -DGOW3_PGO=off -DGOW3_LTO=OFF \
-    "-DCMAKE_FIND_ROOT_PATH=$prefix;$headers" -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
+    -DCMAKE_FIND_ROOT_PATH="$prefix" -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -Dpkgcfg_lib_FFMPEG_atomic:FILEPATH="$atomic" \
     -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH "-DCMAKE_PREFIX_PATH=$prefix;$headers" \
     -UVMA_INCLUDE_DIR
-cmake --build "$out/gpu" --target gow3gpu --parallel "${GOW3_JOBS:-2}"
+python3 tools/android/bionic/audit_link.py --build "$build" --prefix "$prefix" --ndk "$ndk"
+if [[ ${1:-} == --configure-only ]]; then exit 0; fi
+cmake --build "$build" --target gow3gpu --parallel "${GOW3_JOBS:-2}"
 mkdir -p "$out/lib"
-cp "$out/gpu/libgow3gpu.so" "$out/lib/"
+cp "$build/libgow3gpu.so" "$out/lib/"

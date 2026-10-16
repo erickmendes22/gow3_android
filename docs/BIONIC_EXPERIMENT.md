@@ -135,6 +135,14 @@ executável do jogo/PKG e layouts glibc. O APK contém apenas runtime e ferramen
 
 ## Verificação e limites
 
+- A configuração da GPU é auditada antes da compilação da CPU/GPU. Headers do host podem
+  ser usados, mas bibliotecas importadas e caminhos de busca devem pertencer ao NDK ou ao
+  prefixo ARM64. O modelo de link do CMake e a arquitetura dos arquivos são verificados.
+- `libatomic` vem do compilador Android; o prefixo do host não participa da busca por
+  bibliotecas. A descoberta de VMA aceita `include` e `include/vma`, sem forçar um caminho
+  no cache. O teste com configuração limpa inclui uma `libatomic` x86_64 como regressão.
+- A verificação final exige Python/PKG e os módulos usados pelos validadores de patches;
+  o workflow separa dependências, runtime, Python, PKG e empacotamento/assinatura.
 - Testes Android existentes e preparação nativa comparada com a implementação Python.
 - A comparação inclui ELF decodificado e sua recuperação quando falta no cache.
 - Componentes CPU, GPU, preparação, probe, receptor, Python e PKG compilados com NDK r29.

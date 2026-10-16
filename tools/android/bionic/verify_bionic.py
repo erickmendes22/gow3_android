@@ -11,6 +11,7 @@ def main():
     p.add_argument('--ndk', type=Path, required=True)
     p.add_argument('--api', type=int, default=30)
     p.add_argument('--root', type=Path, default=Path('out/bionic'))
+    p.add_argument('--complete', action='store_true', help='Require Python, PKG and patch-validator modules too')
     args = p.parse_args()
     llvm = args.ndk/'toolchains/llvm/prebuilt/linux-x86_64'
     system = llvm/f'sysroot/usr/lib/aarch64-linux-android/{args.api}'
@@ -22,6 +23,16 @@ def main():
     extra = [args.root/'bin/orbis-pkg-util', args.root/'python/bin/python3.13']
     extra += list((args.root/'python/lib').glob('libpython*.so'))
     extra += list((args.root/'python/lib/python3.13/lib-dynload').glob('*.so'))
+    if args.complete:
+        required = [args.root/'bin/orbis-pkg-util', args.root/'python/bin/python3.13',
+                    args.root/'python/lib/libpython3.13.so',
+                    args.root/'python/lib/python3.13/encodings/__init__.py',
+                    args.root/'python/lib/python3.13/xml/etree/ElementTree.py']
+        for path in required:
+            if not path.is_file(): raise SystemExit(f'Incomplete Bionic runtime: {path}')
+        for name in ['_struct','_sha2','_json','pyexpat','zlib','binascii']:
+            if not list((args.root/'python/lib/python3.13/lib-dynload').glob(name+'.*.so')):
+                raise SystemExit(f'Missing Python module needed by patch/config validators: {name}')
     files += [f for f in extra if f.is_file()]
     nm = str(llvm/'bin/llvm-nm')
     readelf = str(llvm/'bin/llvm-readelf')

@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 180
     env:
       GOW3_JOBS: '2'
-      GOW3_BUILD_TOOLS: '35.0.0'
+      GOW3_BUILD_TOOLS: '36.0.0'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,7 +33,7 @@ jobs:
           java-version: '25'
       - uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-37.0 build-tools;35.0.0 ndk;29.0.14206865'
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;29.0.14206865'
       - uses: dtolnay/rust-toolchain@1.90.0
         with:
           targets: aarch64-linux-android
@@ -43,7 +43,7 @@ jobs:
           bash tools/android/bionic/build_prepare.sh host
           python -m unittest discover -s tests -p 'test_bionic_*.py'
           python -m compileall -q tools/android/bionic scripts
-          "$ANDROID_HOME/build-tools/35.0.0/aapt2" compile --dir android-launcher/app/src/main/res -o "$RUNNER_TEMP/resources.zip"
+          "$ANDROID_HOME/build-tools/$GOW3_BUILD_TOOLS/aapt2" compile --dir android-launcher/app/src/main/res -o "$RUNNER_TEMP/resources.zip"
       - name: Check launcher compilation before building native runtime
         run: bash android-launcher/gradlew -p android-launcher :app:compileReleaseJavaWithJavac -Pgow3Bionic=true --no-daemon --max-workers=2
       - uses: mamba-org/setup-micromamba@v2
@@ -57,11 +57,27 @@ jobs:
           bash ci/setup-deps.sh "$CONDA_PREFIX"
           echo "GOW3_BIONIC_HEADERS=$CONDA_PREFIX" >> "$GITHUB_ENV"
           echo "GOW3_NDK=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
-      - name: Build, package, sign and validate experimental APK
+      - name: Build Android dependencies and audit GPU configuration before compilation
+        shell: bash -el {0}
+        run: |
+          bash tools/android/bionic/build_deps.sh
+          bash tools/android/bionic/build_gpu.sh --configure-only
+      - name: Build and validate CPU, GPU and native runtime
+        shell: bash -el {0}
+        run: bash tools/android/bionic/build_runtime.sh
+      - name: Build Android Python for existing patch validators
+        shell: bash -el {0}
+        run: bash tools/android/bionic/build_python.sh
+      - name: Build Android PKG extractor
         shell: bash -el {0}
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          bash tools/android/bionic/build_apk.sh
+          bash tools/android/bionic/build_pkg.sh
+      - name: Package, sign and validate experimental APK
+        shell: bash -el {0}
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          bash tools/android/bionic/build_apk.sh --package-only
       - uses: actions/upload-artifact@v4
         with:
           name: Daedalus-Fork-Bionic-Experimental-arm64
@@ -75,5 +91,7 @@ jobs:
           name: Bionic-build-diagnostics
           path: |
             .local-deps/android/bionic-build/**/*.log
+            out/bionic/gpu/CMakeFiles/CMakeConfigureLog.yaml
+            out/bionic/gpu/.cmake/api/v1/reply/target-gow3gpu-*.json
             android-launcher/app/build/outputs/logs/
           if-no-files-found: ignore
