@@ -58,16 +58,13 @@ public final class GameActivity extends Activity {
     private LinearLayout drawerItems;
     private TextView status;
     private View resume;
-    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem, swapFaceItem;
+    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, controllerItem, swapFaceItem;
     private TouchControllerOverlay controllerOverlay;
     private PadBridge pad;
     private AudioBridge audio;
     private volatile Process xvfb, game;
     private volatile int shmid=-1;
     private volatile boolean destroyed;
-    /** run-gow3.sh 报告 LSFG 运行时失败并自动回退后置位：刷新率要退回「无 LSFG」的目标，避免
-     *  停在 LSFG 倍率对应的高刷新率上空跑（4.1 复评）。 */
-    private volatile boolean lsfgFallbackOff;
     private boolean drawerOpen, displayOnly, startingX, hadError, swipeConsumed;
     private float touchX, touchY;
     private boolean edgeGesture, imeOpen, imePolling;
@@ -261,16 +258,6 @@ public final class GameActivity extends Activity {
             closeDrawer();
             new SettingsDialog(this,new File(BASE,"gow3.ini"),this::restartGame).show();
         });
-        // Tuning only. Supplying Lossless.dll is the launcher Home page's job (com.gow3.android);
-        // the drawer's row reports the multiplier, never where the DLL came from. LSFG 是唯一帧生成
-        // 路径，FSR 3.1 帧生成未接通，不要在这里再加 FSR 帧生成入口。
-        losslessItem=menuItem("ic_frames","Lossless Scaling","",() -> {
-            closeDrawer();
-            new SettingsDialog(this,new File(BASE,"gow3.ini"),this::restartGame)
-                // 运行中改倍率时 layer 会热更新 toml，但设备显示模式不会自动跟着变：让对话框在
-                // 生效后回调这里重选 display mode（4.3 复评）。
-                .showLossless(() -> { Process p=game; return p!=null && p.isAlive(); }, this::pickRefreshRate);
-        });
 
         section("Controls");
         controllerItem=menuItem("ic_gamepad","On-screen controller","",() -> {
@@ -390,16 +377,6 @@ public final class GameActivity extends Activity {
         // 其余（键缺失、旧版遗留的 40/45）运行时 ParseFpsLimit 都当 0，所以回退显示 30。
         setDetail(graphicsItem,upscaler+" · "+("0".equals(limit) ? "no FPS limit"
             : (limit==null || !limit.matches("30|60|120|240") ? "30" : limit)+" FPS limit"));
-        String lsfg=setting("lsfg_multiplier");
-        boolean lsfgOn="2".equals(lsfg) || "3".equals(lsfg) || "4".equals(lsfg);
-        // 没导入 Lossless.dll 就开不了插帧：lsfg-vk 只加载玩家自带的 DLL，run-gow3.sh 的
-        //  preflight 找不到它时会静默不开 layer（只剩 30 FPS），玩家看不出是自己漏了导入。
-        //  所以直接把这一行置灰不可点，并说明去 Home 页导入，而不是让它"看着能开却不生效"。
-        boolean dllPresent=hasFrameGenDll();
-        setRowEnabled(losslessItem,dllPresent);
-        setDetail(losslessItem,!dllPresent ? "Import Lossless.dll on the Home page first"
-            : lsfgOn ? lsfg+"× frames · flow "
-            +(setting("lsfg_flow_scale")==null ? "1.0" : setting("lsfg_flow_scale")) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
         setDetail(swapFaceItem,getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false) ? "On" : "Off");
     }
@@ -681,13 +658,6 @@ public final class GameActivity extends Activity {
     private void pollFrames() {
         if (destroyed) return;
         if (!hadError && (bionicRuntime() ? Gow3Present.framesIfLoaded() : DisplayBridge.directFrames())>0) status.setVisibility(View.GONE);
-        // run-gow3.sh 在 LSFG 运行时失败、自动回退到普通 Vulkan 时会写这个标记：这时刷新率要退回
-        // 「无 LSFG」的目标，否则会停在 LSFG 倍率对应的高刷上空跑（4.1 复评）。
-        boolean fallbackMarker=new File(BASE,"lsfg-fallback.marker").isFile();
-        if ((!lsfgFallbackOff && fallbackMarker) || (bionicRuntime() && lsfgFallbackOff != fallbackMarker)) {
-            lsfgFallbackOff=fallbackMarker;
-            pickRefreshRate();
-        }
         main.postDelayed(this::pollFrames,1000);
     }
 
@@ -760,37 +730,8 @@ public final class GameActivity extends Activity {
         } catch (Exception ignored) {}
         return value;
     }
-    /** Frame generation (Lossless Scaling only) presents 2-4 frames per game frame. Lossless
-     *  Scaling presents them back to back and FIFO spaces them, evenly only when the display runs at
-     *  FPS limit x frames: that mode when the display has it (30x2: 60 Hz, 30x4, 30x3, 60x2: 120 Hz),
-     *  else the fastest one (at the system's 60 Hz generated frames were dropped). Without frame
-     *  generation, the system's choice. FSR 3.1 frame generation is not wired on this tree
-     *  (shadps4 has no GOW3_FRAME_GEN consumer), so the multiplier is LSFG-only. */
-    /** LSFG 是否**真的**会在本次启动启用——与 run-gow3.sh 的 preflight 用同一套规则：倍率 2-4、
-     *  运行时的 layer（manifest + liblsfg-vk.so）都在、玩家的 Lossless.dll 在两处查找位置之一。
-     *  刷新率必须依此判断，而不是只看 gow3.ini 的 lsfg_multiplier（4.2 复评）。 */
-    private boolean lsfgLaunchable() {
-        String lsfg=setting("lsfg_multiplier");
-        if (!"2".equals(lsfg) && !"3".equals(lsfg) && !"4".equals(lsfg)) return false;
-        if (bionicRuntime()) return new File(BASE,"arm64/lib/liblsfg-gow3.so").isFile() && hasFrameGenDll();
-        if (!new File(BASE,"arm64/lsfg/VkLayer_LS_frame_generation.json").isFile()) return false;
-        if (!new File(BASE,"arm64/lsfg/liblsfg-vk.so").isFile()) return false;
-        return hasFrameGenDll();
-    }
-    /** 玩家是否已经导入 Lossless.dll——只是给菜单项/刷新率用的只读闸门，不导入、不删除、
-     *  也不持有 DLL 状态（那些都在 Home 页的 LosslessDllManager 里）。查找顺序与运行时一致：
-     *  游戏目录旁的同名副本优先，其次应用私有的 gow3port 副本（LosslessDllManager.appCopy()
-     *  写入的位置），和 run-gow3.sh 的 preflight 是同一套规则。这里不查第三个位置，因为
-     *  run-gow3.sh 也不查。 */
-    private boolean hasFrameGenDll() {
-        File parent=gameDir!=null ? new File(gameDir).getParentFile() : null;
-        if (parent!=null && new File(parent,"Lossless.dll").isFile()) return true;
-        return new File(BASE,"Lossless.dll").isFile();
-    }
     private void pickRefreshRate() {
-        String lsfg=setting("lsfg_multiplier");
-        boolean lsfgOn=lsfgLaunchable() && !lsfgFallbackOff;
-        int frames=lsfgOn ? Integer.parseInt(lsfg) : 1;
+        int frames=1;
         String limit=setting("fps_limit"); // 同 SettingsDialog.FPS_VALUES / 运行时 FPS_LIMITS
         final float target=frames*("30".equals(limit) || "60".equals(limit) || "120".equals(limit)
             || "240".equals(limit) ? Integer.parseInt(limit) : "0".equals(limit) ? 1000 : 30);
@@ -812,9 +753,6 @@ public final class GameActivity extends Activity {
     private void startGame() {
         if (destroyed) return;
         hadError=false;
-        // 清掉上一轮的回退标记，并重置「LSFG 已被回退关闭」状态；刷新率按当前 launchability 选。
-        lsfgFallbackOff=false;
-        new File(BASE,"lsfg-fallback.marker").delete();
         pickRefreshRate();
         new File(BASE,"ime.request").delete(); new File(BASE,"ime.request.result").delete();
         try {
