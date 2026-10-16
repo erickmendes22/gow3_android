@@ -20,13 +20,14 @@ for patch in gpu/patches/fsr-vulkan/*.patch; do
         git -C gpu/third_party/fsr-vulkan apply "$root/$patch"
     fi
 done
+# Let CMake discover include/vma as well as include; discard the old forced cache path.
 cmake -S gpu -B "$out/gpu" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$ndk/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM="android-$api" -DANDROID_STL=c++_shared \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo -DGOW3_PGO=off -DGOW3_LTO=OFF \
     "-DCMAKE_FIND_ROOT_PATH=$prefix;$headers" -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
     -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH "-DCMAKE_PREFIX_PATH=$prefix;$headers" \
-    -DVMA_INCLUDE_DIR="$headers/include"
+    -UVMA_INCLUDE_DIR
 cmake --build "$out/gpu" --target gow3gpu --parallel "${GOW3_JOBS:-2}"
 mkdir -p "$out/lib"
 cp "$out/gpu/libgow3gpu.so" "$out/lib/"
