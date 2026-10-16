@@ -9,6 +9,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Environment
+import android.os.Build
+import android.provider.Settings
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -25,7 +27,8 @@ internal class GameFolderManager(private val activity: Activity) {
         const val REQUEST_GAME_FOLDER = 1001
         const val REQUEST_UPDATE_FOLDER = 1007
         const val REQUEST_STORAGE = 1002
-        private val SERIALS = arrayOf("CUSA01740", "CUSA00900", "CUSA00207", "CUSA00208", "CUSA00299",
+        const val REQUEST_ALL_FILES_FOLDER = 1013
+        private val SERIALS = arrayOf("CUSA01715", "CUSA01740", "CUSA00900", "CUSA00207", "CUSA00208", "CUSA00299",
             "CUSA01363", "CUSA03179", "CUSA03014", "CUSA03023")
     }
 
@@ -42,7 +45,9 @@ internal class GameFolderManager(private val activity: Activity) {
     private fun prefs() = activity.getSharedPreferences("gow3", Activity.MODE_PRIVATE)
 
     fun hasGameFolder(): Boolean {
-        if (activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) return false
+        // App-installed PKGs are stored under externalFilesDir and do not need the
+        // legacy READ_EXTERNAL_STORAGE permission. SAF-selected folders retain
+        // their own permission checks when the picker is opened.
         val path = prefs().getString("game_dir", null) ?: return false
         return isGame(File(path))
     }
@@ -73,9 +78,42 @@ internal class GameFolderManager(private val activity: Activity) {
     }
 
     private fun chooseFolder(kind: Kind) {
-        if (activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+        // This app targets API 28 and uses legacy storage even on newer phones.
+        // Keep the runtime permission dialog used by the working launcher.
+        // All-files settings are only needed if the app later targets scoped storage.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            activity.applicationInfo.targetSdkVersion >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                pendingFolderKind = kind
+                AlertDialog.Builder(activity)
+                    .setTitle("Acesso à pasta do jogo")
+                    .setMessage("Para executar o jogo de uma pasta escolhida, " +
+                        "autorize o acesso aos arquivos deste aplicativo. " +
+                        "O jogo não será copiado.")
+                    .setPositiveButton("Permitir") { _, _ ->
+                        try {
+                            activity.startActivityForResult(
+                                Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                    Uri.parse("package:${activity.packageName}")),
+                                REQUEST_ALL_FILES_FOLDER)
+                        } catch (e: Exception) {
+                            pendingFolderKind = null
+                            AlertDialog.Builder(activity)
+                                .setMessage("Não foi possível abrir a permissão: ${e.message}")
+                                .setPositiveButton("OK", null).show()
+                        }
+                    }
+                    .setNegativeButton("Cancelar") { _, _ -> pendingFolderKind = null }
+                    .show()
+            } else {
+                showFolderDialog(kind)
+            }
+        } else if (activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED) {
             pendingFolderKind = kind
-            activity.requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE), REQUEST_STORAGE)
+            activity.requestPermissions(
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE), REQUEST_STORAGE)
         } else {
             showFolderDialog(kind)
         }
@@ -98,13 +136,28 @@ internal class GameFolderManager(private val activity: Activity) {
     }
 
     fun onFolderResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQUEST_ALL_FILES_FOLDER) {
+            val pending = pendingFolderKind
+            pendingFolderKind = null
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                Environment.isExternalStorageManager()) {
+                showFolderDialog(pending ?: Kind.GAME)
+            } else {
+                AlertDialog.Builder(activity)
+                    .setMessage("Acesso aos arquivos não autorizado. " +
+                        "Você ainda pode instalar um PKG ou escolher a pasta depois.")
+                    .setPositiveButton("OK", null).show()
+            }
+            return
+        }
         val kind = when (requestCode) {
             REQUEST_GAME_FOLDER -> Kind.GAME
             REQUEST_UPDATE_FOLDER -> Kind.UPDATE
             else -> return
         }
         if (resultCode != Activity.RESULT_OK || data?.data == null) {
-            if (kind == Kind.GAME) ensureGameFolder()
+            // Cancelling folder selection must not reopen the picker forever:
+            // the Home page still offers direct PKG installation.
             return
         }
         var dir = folderOf(data.data!!)

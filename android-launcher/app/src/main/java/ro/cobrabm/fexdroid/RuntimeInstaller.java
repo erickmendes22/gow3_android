@@ -14,7 +14,7 @@ import java.security.MessageDigest;
 import java.util.function.Consumer;
 
 /** Installs the signed APK's Linux runtime transactionally in this app's private data directory. */
-final class RuntimeInstaller {
+public final class RuntimeInstaller {
     private static final String LOADER = "rootfs/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1";
 
     private static void deleteTree(File root) throws Exception {
@@ -63,6 +63,23 @@ final class RuntimeInstaller {
     }
 
     private static void validateRuntime(File root) throws Exception {
+        if (path(root,"gow3port/run-bionic.sh").isFile()) {
+            for (String relative : new String[]{"gow3port/run-bionic.sh", "gow3port/arm64/bin/gow3-probe",
+                    "gow3port/arm64/bin/gow3-prepare", "gow3port/arm64/bin/kgsl-chip-id",
+                    "gow3port/arm64/bin/orbis-pkg-util", "gow3port/arm64/python/bin/python3.13"}) requireExecutable(root,relative);
+            for (String relative : new String[]{"gow3port/arm64/lib/libgow3cpu.so", "gow3port/arm64/lib/libgow3gpu.so",
+                    "gow3port/arm64/lib/libgow3present.so", "gow3port/arm64/lib/libc++_shared.so",
+                    "gow3port/arm64/python/lib/libpython3.13.so", "gow3port/arm64/drivers/gen8/libvulkan_freedreno.so",
+                    "runtime-manifest.json"})
+                if (!path(root,relative).isFile()) throw new IllegalStateException("Incomplete Bionic runtime: "+relative);
+            String identity = new String(Files.readAllBytes(path(root,"runtime-manifest.json").toPath()),
+                    StandardCharsets.UTF_8);
+            if (!identity.contains("\"schema\": 1") || !identity.contains("\"runtime_backend\": \"bionic\"") ||
+                    !identity.contains("\"application_id\": \"com.gow3.android.bionic\"") ||
+                    !identity.contains("\"java_package\": \"ro.cobrabm.fexdroid\""))
+                throw new IllegalStateException("Incompatible Bionic runtime identity");
+            requireDirectory(root,"home/gow3port"); return;
+        }
         requireExecutable(root, "rootfs/bin/sh");
         requireExecutable(root, "rootfs/usr/bin/Xvfb");
         requireExecutable(root, "rootfs/usr/libexec/fxshmd");
@@ -70,6 +87,7 @@ final class RuntimeInstaller {
         requireExecutable(root, "rootfs/usr/bin/python3.13");
         requireExecutable(root, "gow3port/arm64/bin/gow3-probe");
         requireExecutable(root, "gow3port/arm64/bin/kgsl-chip-id");
+        requireExecutable(root, "gow3port/arm64/bin/orbis-pkg-util");
         requireExecutable(root, LOADER);
         requireDirectory(root, "home/gow3port");
         if (path(root, "bbport/rootfs").exists() || path(root, "gow3port/rootfs").exists())
@@ -94,6 +112,67 @@ final class RuntimeInstaller {
         if (!source.renameTo(target)) throw new IllegalStateException("Cannot stage old " + label);
     }
 
+    private static void preserveUserData(File files, File stage) throws Exception {
+        // Home can save settings/import saves before the first game launch.
+        // Runtime upgrades replace gow3port, so carry user-owned data into the
+        // validated stage before promotion; the old copy remains for rollback.
+        for (String relative : new String[]{"gow3port/gow3.ini", "gow3port/user", "gow3port/Lossless.dll"}) {
+            java.nio.file.Path source = new File(files, relative).toPath();
+            java.nio.file.Path target = new File(stage, relative).toPath();
+            if (!Files.exists(source, java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
+            Files.walkFileTree(source, new SimpleFileVisitor<java.nio.file.Path>() {
+                @Override public FileVisitResult preVisitDirectory(java.nio.file.Path dir, BasicFileAttributes attrs)
+                        throws java.io.IOException {
+                    Files.createDirectories(target.resolve(source.relativize(dir)));
+                    return FileVisitResult.CONTINUE;
+                }
+                @Override public FileVisitResult visitFile(java.nio.file.Path file, BasicFileAttributes attrs)
+                        throws java.io.IOException {
+                    java.nio.file.Path destination = target.resolve(source.relativize(file));
+                    Files.createDirectories(destination.getParent());
+                    Files.copy(file, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                            java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+    }
+
+    /** Fill only missing keys; never reset user settings during a runtime upgrade. */
+    private static void completeConfig(File root) throws Exception {
+        File defaults = path(root, "gow3port/gow3.default.ini");
+        File config = path(root, "gow3port/gow3.ini");
+        if (!defaults.isFile()) throw new IllegalStateException("Runtime archive is incomplete: default settings");
+        String original = config.isFile()
+                ? new String(Files.readAllBytes(config.toPath()), StandardCharsets.UTF_8) : "";
+        java.util.Set<String> keys = new java.util.HashSet<>();
+        for (String line : original.split("\\r?\\n")) {
+            String trimmed = line.trim();
+            int equals = trimmed.indexOf('=');
+            if (!trimmed.startsWith("#") && equals > 0)
+                keys.add(trimmed.substring(0, equals).trim());
+        }
+        StringBuilder merged = new StringBuilder(original);
+        for (String line : Files.readAllLines(defaults.toPath(), StandardCharsets.UTF_8)) {
+            String trimmed = line.trim();
+            int equals = trimmed.indexOf('=');
+            if (trimmed.startsWith("#") || equals <= 0) continue;
+            if (keys.add(trimmed.substring(0, equals).trim())) {
+                if (merged.length() > 0 && merged.charAt(merged.length() - 1) != '\n') merged.append('\n');
+                merged.append(line).append('\n');
+            }
+        }
+        if (merged.toString().equals(original)) return;
+        File temporary = new File(config.getPath() + ".defaults.tmp");
+        try {
+            Files.write(temporary.toPath(), merged.toString().getBytes(StandardCharsets.UTF_8));
+            Files.move(temporary.toPath(), config.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(temporary.toPath());
+        }
+    }
+
     private static void promote(File files, File stage, String expected) throws Exception {
         File previous = new File(files, ".runtime-previous");
         deleteTree(previous);
@@ -113,9 +192,10 @@ final class RuntimeInstaller {
             if (port.exists()) { renameRequired(port, oldPort, "gow3port"); movedPort = true; }
             if (home.exists()) { renameRequired(home, oldHome, "home"); movedHome = true; }
             if (manifest.exists()) { renameRequired(manifest, oldManifest, "manifest"); movedManifest = true; }
-            if (!new File(stage, "rootfs").renameTo(root))
-                throw new IllegalStateException("Cannot promote runtime rootfs");
-            installedRoot = true;
+            if (new File(stage,"rootfs").exists()) {
+                if (!new File(stage,"rootfs").renameTo(root)) throw new IllegalStateException("Cannot promote runtime rootfs");
+                installedRoot = true;
+            }
             if (!new File(stage, "gow3port").renameTo(port))
                 throw new IllegalStateException("Cannot promote gow3port");
             installedPort = true;
@@ -144,12 +224,12 @@ final class RuntimeInstaller {
         }
     }
 
-    static boolean ensure(Context context, File files, Consumer<String> status) throws Exception {
+    public static synchronized boolean ensure(Context context, File files, Consumer<String> status) throws Exception {
         String expected;
         try (InputStream in = context.getAssets().open("runtime.sha256")) {
             expected = new String(readAll(in), StandardCharsets.US_ASCII).trim();
         } catch (java.io.FileNotFoundException missing) {
-            try { validateRuntime(files); return false; }
+            try { validateRuntime(files); completeConfig(files); return false; }
             catch (Exception incomplete) {
                 throw new IllegalStateException("This APK does not contain a complete runtime", missing);
             }
@@ -157,7 +237,7 @@ final class RuntimeInstaller {
         if (!expected.matches("[0-9a-f]{64}")) throw new IllegalStateException("Invalid runtime digest");
         File marker = new File(files, ".runtime.sha256");
         if (marker.isFile() && expected.equals(new String(Files.readAllBytes(marker.toPath()), StandardCharsets.US_ASCII).trim())) {
-            try { validateRuntime(files); return false; }
+            try { validateRuntime(files); completeConfig(files); return false; }
             catch (Exception ignored) { /* stale marker: reinstall from the signed asset */ }
         }
 
@@ -185,6 +265,8 @@ final class RuntimeInstaller {
                 throw new IllegalStateException("Runtime extraction failed: " +
                         new String(log, 0, Math.min(log.length, 2048), StandardCharsets.UTF_8));
             validateRuntime(stage);
+            preserveUserData(files, stage);
+            completeConfig(stage);
             promote(files, stage, expected);
             return true;
         } finally {

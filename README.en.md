@@ -2,7 +2,7 @@
 
 Daedalus Fork maintained by erickmendes22. Based on the Android work by zFitness and the upstream contributors.
 
-**Version: 2.1.6-android2** · [YouTube: @daedalusemulator](https://www.youtube.com/@daedalusemulator) · [Base: zFitness/gow3_android](https://github.com/zFitness/gow3_android)
+**Version: 2.1.6-android3** · [YouTube: @daedalusemulator](https://www.youtube.com/@daedalusemulator) · [Base: zFitness/gow3_android](https://github.com/zFitness/gow3_android)
 
 
 [Português (Brasil)](README.md) | **English**

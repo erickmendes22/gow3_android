@@ -266,9 +266,20 @@ void Rasterizer::PrepareRenderState(const GraphicsPipeline* pipeline) {
     }
     // gow3: the G-buffer pass (5+ color targets) holds the scene depth, and its constants the
     // main camera (shadow passes bind the same layout with the light's camera).
-    gbuffer_draw = camera_motion->Enabled() && std::popcount(key.mrt_mask) >= 5 && db_desc.first;
-    if (gbuffer_draw) {
-        camera_motion->OnGBufferPass(db_desc.first);
+    // CUSA01715: all recorded scene draws use <=2 MRTs, unlike Bloodborne.
+    // Retain depth only from guest-size forward draws, never shadow targets.
+    gbuffer_draw = false;
+    if (camera_motion->Enabled() && db_desc.first && cb_descs[0].first &&
+        std::popcount(key.mrt_mask) >= 1) {
+        const auto& depth = texture_cache.GetImage(db_desc.first);
+        const auto& color = texture_cache.GetImage(cb_descs[0].first);
+        const auto guest = scene_targets->GuestSize();
+        if (depth.info.size.width == guest.width &&
+            depth.info.size.height == guest.height &&
+            color.info.size.width == guest.width &&
+            color.info.size.height == guest.height) {
+            camera_motion->OnGBufferPass(db_desc.first);
+        }
     }
     if (upscaler->Enabled() && cb_descs[0].first) {
         upscaler->OnColorTarget(cb_descs[0].first);
@@ -386,8 +397,12 @@ bool Rasterizer::DrawPipeWanted() {
     if (env && env[0]) {
         return env[0] == '1';
     }
-    // Stage B spins while draws flow. Measured ahead with 16 threads (+19%) and with 4 cores /
-    // 8 threads (taskset, Steam Deck-like: +18%).
+    // BACHATA 025's ordinary Vulkan draw path does not require the GoW3
+    // speculative draw pipeline. The port's draw-pipe speedup was measured
+    // on desktop cores, not a heterogeneous 8-core Android SoC. Prefer the
+    // deterministic direct path for Android; GOW3_DRAW_PIPE=1 (handled above)
+    // enables the existing path for matched-scene A/B measurement.
+    if (std::getenv("GOW3_ANDROID_PORT")) return false;
     return Gow3Threads::Available() >= 8;
 }
 
@@ -964,6 +979,9 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
     if (camera_motion->Enabled() && regs.color_buffers[0] &&
         FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address())) {
         scene_started = false;
+        // Previous color attachment is the completed frame, before the
+        // guest's display-copy draw. Depth is cleared by OnDisplayPass.
+        upscaler->OnDisplayBoundary(cb_descs[0].first);
         camera_motion->OnDisplayPass(cb_descs[0].first);
         if (upscaler->OnFrameStart()) {
             object_motion->InvalidateHistory();
@@ -985,7 +1003,9 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
         const auto& viewport = Regs().viewports[0];
         upscaler->OnDraw(pipeline->GetStage(Shader::SwStage::Vertex).pgm_hash,
                          cb_descs[0].first, db_desc.first,
-                         UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2));
+                         UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2,
+                                                      scene_targets->GuestSize().width,
+                                                      scene_targets->GuestSize().height));
     }
     const PreparedDraw* draw_prepared = bind_prepared;
     // gow3: vertex and index buffers are resolved while the helper binds textures (their
@@ -1214,7 +1234,9 @@ void Rasterizer::DrawIndirectRecord(const GraphicsPipeline* pipeline, bool is_in
         const auto& viewport = Regs().viewports[0];
         upscaler->OnDraw(pipeline->GetStage(Shader::SwStage::Vertex).pgm_hash,
                          cb_descs[0].first, db_desc.first,
-                         UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2));
+                         UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2,
+                                                      scene_targets->GuestSize().width,
+                                                      scene_targets->GuestSize().height));
     }
     if (!BindResources(pipeline)) {
         return;
@@ -2070,14 +2092,24 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
         const RingBinding* ring = num_ring_stages ? FindRingBinding(stage, buffer_index) : nullptr;
         if (ring) {
             // Copied by the GPU command thread into the constant ring (read-only).
-            if (FrameCapture::Active() && memory->IsValidGpuMapping(ring->address, 0)) {
+            // ring->address 只是 guest 地址标签；实际可读数据位于 constant ring 的 host 副本。
+            if (FrameCapture::Active()) {
                 FrameCapture::Buffer(stage.pgm_hash, buffer_index, ring->address,
-                                     reinterpret_cast<const void*>(ring->address), ring->size);
+                                     constant_ring->Data(ring->offset), ring->size);
             }
             if (!desc.IsSpecial()) {
-                if (ring->size == 864 && gbuffer_draw &&
-                    memory->IsValidGpuMapping(ring->address, 0)) {
-                    camera_motion->OnConstants(reinterpret_cast<const float*>(ring->address));
+                // CUSA01715 uses a forward renderer: gbuffer_draw is never
+                // true.  Inspect camera candidates from its scene vertex
+                // constants too; OnConstants still validates the signature.
+                const bool android_scene_camera =
+                    std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") &&
+                    upscaler && upscaler->Enabled() &&
+                    camera_motion->Depth() && stage.sw_stage == Shader::SwStage::Vertex;
+                if (ring->size >= 64 && ring->size <= 4096 &&
+                    (gbuffer_draw || android_scene_camera) &&
+                    ring->address && memory->IsValidGpuMapping(ring->address, ring->size)) {
+                    camera_motion->OnConstants(reinterpret_cast<const float*>(ring->address),
+                                               ring->size / sizeof(float));
                 }
                 push_data.AddOffset(binding.buffer, 0);
             }
@@ -2136,9 +2168,15 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
         } else {
             const auto vsharp =
                 prepared ? prepared->buffer_sharps[buffer_index] : desc.GetSharp(stage);
-            if (vsharp.GetSize() == 864 && gbuffer_draw &&
-                memory->IsValidGpuMapping(vsharp.base_address, 0)) {
-                camera_motion->OnConstants(reinterpret_cast<const float*>(vsharp.base_address));
+            const bool android_scene_camera =
+                std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") &&
+                    upscaler && upscaler->Enabled() &&
+                camera_motion->Depth() && stage.sw_stage == Shader::SwStage::Vertex;
+            if (vsharp.GetSize() >= 64 && vsharp.GetSize() <= 4096 &&
+                (gbuffer_draw || android_scene_camera) && vsharp.base_address &&
+                memory->IsValidGpuMapping(vsharp.base_address, vsharp.GetSize())) {
+                camera_motion->OnConstants(reinterpret_cast<const float*>(vsharp.base_address),
+                                           vsharp.GetSize() / sizeof(float));
             }
             // Object motion research: the vertex shader buffers of G-buffer draws.
             if (FrameCapture::Active() && gbuffer_draw && stage.sw_stage == Shader::SwStage::Vertex &&
@@ -2722,8 +2760,30 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
     std::pair<vk::ImageView, vk::ImageLayout> original_color{};
     const auto& regs = Regs();
     const auto& key = pipeline->GetGraphicsKey();
-    if (std::popcount(key.mrt_mask & 0x7f) >= 5 && db_desc.first &&
-        scene_targets->EligibleScene(texture_cache.GetImage(db_desc.first))) scene_started = true;
+    if (std::popcount(key.mrt_mask & 0x7f) >= 5 && db_desc.first) {
+        const auto& depth = texture_cache.GetImage(db_desc.first);
+        // The 720p eboot patch changes guest allocations, but checking the
+        // actual G-buffer is essential: a wrong patch/address or an aligned
+        // image must not masquerade as a real 640x360 proxy draw.
+        if (cb_descs[0].first) {
+            const auto& primary = texture_cache.GetImage(cb_descs[0].first);
+            if (primary.info.size.width == depth.info.size.width &&
+                primary.info.size.height == depth.info.size.height) {
+                scene_targets->ObserveGuestScene(depth.info.size.width,
+                                                 depth.info.size.height);
+            }
+        }
+        const bool eligible = scene_targets->EligibleScene(depth);
+        if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) {
+            static unsigned gbuffer_traces = 0;
+            if (gbuffer_traces++ < 4) {
+                std::printf("GOW3_GBUFFER_INPUT size=%ux%u eligible=%d depth_format=%u mrt=%u\n",
+                            depth.info.size.width, depth.info.size.height, int(eligible),
+                            unsigned(depth.info.pixel_format), unsigned(std::popcount(key.mrt_mask & 0x7f)));
+            }
+        }
+        if (eligible) scene_started = true;
+    }
     // A proxy attachment cannot represent MSAA or a feedback loop that reads the
     // same image through the guest's native descriptor during this draw.
     bool reduced = scene_started && upscaler->RasterScaling() && key.num_samples == 1;
@@ -2780,6 +2840,20 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
                                depth.info.size.height, scene_targets->Eligible(depth));
         }
         std::printf("Scene pass: reduced %d %s\n", reduced, why.c_str());
+    }
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) {
+        static u32 inspected = 0, accepted = 0;
+        if (inspected < 1024) {
+            ++inspected;
+            accepted += unsigned(reduced);
+            if (inspected == 128 || inspected == 512 || inspected == 1024) {
+                const auto actual = scene_targets->GuestSize();
+                const auto raster = scene_targets->Size();
+                std::printf("GOW3_SCENE_ACTUAL passes=%u reduced=%u guest=%ux%u raster=%ux%u scene_started=%d scaling=%d\n",
+                            inspected, accepted, actual.width, actual.height, raster.width,
+                            raster.height, int(scene_started), int(upscaler->RasterScaling()));
+            }
+        }
     }
     push_data.scene_size = reduced ? SceneResolution::Pack(scene_targets->Size()) : 0;
     if (Gow3Stats::enabled) {
@@ -2988,12 +3062,16 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
             // again. The final display copy still uses the guest render-size coordinates.
             const auto& viewport = regs.viewports[0];
             const bool native_coordinates = redirect.native_ui &&
-                (UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2) ||
+                (UiComposition::NativeViewport(viewport.xscale * 2, viewport.yscale * 2,
+                                                      scene_targets->GuestSize().width,
+                                                      scene_targets->GuestSize().height) ||
                  (regs.IsClipDisabled() && !regs.viewport_control.xscale_enable &&
                   !regs.viewport_control.yscale_enable));
             target_scale = UiComposition::Scale(guest_extent.first, guest_extent.second,
-                                                redirect.width, redirect.height,
-                                                native_coordinates);
+                                                 redirect.width, redirect.height,
+                                                 native_coordinates,
+                                                 scene_targets->GuestSize().width,
+                                                 scene_targets->GuestSize().height);
         }
     }
 
@@ -3007,7 +3085,9 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
         const auto proxy = pass_size.value_or(size);
         state.width = proxy.width;
         state.height = proxy.height;
-        target_scale = {float(size.width) / 1920.0f, float(size.height) / 1080.0f};
+        const auto guest = scene_targets->GuestSize();
+        target_scale = {float(size.width) / float(guest.width),
+                        float(size.height) / float(guest.height)};
     }
     if (FrameCapture::Active()) {
         std::array<const VideoCore::ImageInfo*, AmdGpu::NUM_COLOR_BUFFERS> colors{};

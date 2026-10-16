@@ -148,4 +148,51 @@
         </PatchList>
         <Target Name="frame_index" Address="0x018ba600" Pattern="8b 05 ?? ?? ?? ?? 89 05 ?? ?? ?? ?? 44 89 35 ?? ?? ?? ?? c6 05 ?? ?? ?? ?? 01" At="15" Ref="1" Tail="0"/>
     </Metadata>
+    <!-- Opt-in from effect_dynamic_shadows=0. SHA-gated in launch_env.py:
+         CUSA01715 01.02 eboot 6e72330e9092e5164049b865e5568f2d450904001a73fe0a2f4b39194c195b3c.
+         The game's no-shadow-job path was located in the supplied RT17 patch; do
+         not try this absolute-address patch on another executable revision. -->
+    <Metadata Title="God of War III Remastered" Name="Disable Dynamic Shadows"
+        Note="Turns off the dynamic shadow jobs. Experimental; only the verified CUSA01715 1.02 executable."
+        Author="erickmendes22" PatchVer="1.0" AppVer="01.02" AppElf="eboot.bin" isEnabled="false">
+        <PatchList>
+            <Line Type="bytes" Address="0x005b739b" Value="eb32" Pattern="83 bb 80 01 00 00 00 74 32 4c 8d 7d a8" At="7"/>
+        </PatchList>
+    </Metadata>
+<Metadata Title="God of War III Remastered" Name="Disable SSAO" Note="Optional effect patch; original-byte and executable-profile checks are required at launch." Author="erickmendes22" PatchVer="1.0" AppVer="01.02" AppElf="eboot.bin" isEnabled="false" Validation="signature-gated">
+        <PatchList>
+            <Line Type="bytes" Address="0x60b188" Value="e9{rel:ssao_end:0}90" Pattern="48 8b 01 48 89 45 d0 48 85 f6 0f 85 ?? ?? ?? ?? 66 c7 85 a4 fd ff ff 00 00" At="10" />
+        </PatchList>
+        <Target Name="ssao_end" Address="0x60bfb7" Pattern="48 8b 01 48 89 45 d0 48 85 f6 0f 85 ?? ?? ?? ?? 66 c7 85 a4 fd ff ff 00 00" At="12" Ref="1" Tail="0" />
+    </Metadata>
+
+<Metadata Title="God of War III Remastered" Name="Disable Motion Blur" Note="Optional effect patch; original-byte and executable-profile checks are required at launch." Author="erickmendes22" PatchVer="1.0" AppVer="01.02" AppElf="eboot.bin" isEnabled="false" Validation="signature-gated">
+        <PatchList>
+            <Line Type="bytes" Address="0x4f1130" Value="c5f857c09090" Pattern="4c 8d 6b d0 c4 c1 7a 10 47 0c c5 fa 11 45 d4" At="4" />
+            <Line Type="bytes" Address="0x4f1180" Value="c5f857c09090" Pattern="c4 c1 7a 10 47 0c c5 fa 11 83 a4 01 00 00 48 8b 1b" At="0" />
+        </PatchList>
+    </Metadata>
+
+<Metadata Title="God of War III Remastered" Name="Disable Depth of Field" Note="Optional effect patch; original-byte and executable-profile checks are required at launch." Author="erickmendes22" PatchVer="1.0" AppVer="01.02" AppElf="eboot.bin" isEnabled="false" Validation="signature-gated">
+        <PatchList>
+            <Line Type="bytes" Address="0x5673bd" Value="c5f857c09090" Pattern="c5 fa 10 6d e4 c4 c1 7a 10 47 48 c4 c1 7a 10 4f 44" At="5" />
+            <Line Type="bytes" Address="0x5673cf" Value="c5e057db9090" Pattern="c4 c1 7a 10 4f 44 c4 c1 7a 10 57 3c c4 c1 7a 10 5f 40 c5 da 58 e4" At="12" />
+        </PatchList>
+    </Metadata>
+
+<Metadata Title="God of War III Remastered" Name="Disable Bloom" Note="Optional effect patch; original-byte and executable-profile checks are required at launch." Author="erickmendes22" PatchVer="1.0" AppVer="01.02" AppElf="eboot.bin" isEnabled="false" Validation="signature-gated">
+        <PatchList>
+            <Line Type="bytes" Address="0x47f3a3" Value="c5e857d2909090909090" Pattern="c4 c1 7a 10 94 24 80 04 00 00 c4 c1 7a 10 9c 24 84 04 00 00" At="0" />
+            <Line Type="bytes" Address="0x47f3ad" Value="c5e057db909090909090" Pattern="c4 c1 7a 10 94 24 80 04 00 00 c4 c1 7a 10 9c 24 84 04 00 00" At="10" />
+            <Line Type="bytes" Address="0x4971d2" Value="c5f057c99090909090" Pattern="c4 c1 7a 10 8f 80 04 00 00 c4 c1 7a 10 97 84 04 00 00" At="0" />
+            <Line Type="bytes" Address="0x4971db" Value="c5e857d29090909090" Pattern="c4 c1 7a 10 8f 80 04 00 00 c4 c1 7a 10 97 84 04 00 00" At="9" />
+        </PatchList>
+    </Metadata>
+
+<Metadata Title="God of War III Remastered" Name="Disable Soft Particles" Note="Optional effect patch; original-byte and executable-profile checks are required at launch." Author="erickmendes22" PatchVer="1.0" AppVer="01.02" AppElf="eboot.bin" isEnabled="false" Validation="signature-gated">
+        <PatchList>
+            <Line Type="bytes" Address="0x59d9af" Value="b00090" Pattern="c5 f8 57 c0 c5 f8 2e 00 0f 95 c0 eb 06 31 c0 eb 02 31 c0 45 84 ed" At="8" />
+        </PatchList>
+    </Metadata>
+
 </Patch>

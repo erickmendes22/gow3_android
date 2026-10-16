@@ -1,7 +1,5 @@
 import json
-import sys
-import tempfile
-from unittest.mock import patch
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -11,6 +9,33 @@ ANDROID = ROOT / 'tools/android'
 
 
 class AndroidBuildInputTests(unittest.TestCase):
+    def test_critical_android_scripts_keep_executable_git_modes(self):
+        """Reject 100644 regressions before compiling FEX, Turnip and LSFG.
+
+        tar.add() preserves the tracked source mode for run-gow3.sh.
+        The last APK CI compiled every native component, then failed because
+        the launch script had silently changed from 100755 to 100644.
+        """
+        paths = (
+            "tools/android/device/run-gow3.sh",
+            "tools/android/build/build_arm64.sh",
+            "tools/android/build/build_turnip.sh",
+            "tools/android/build/build_lsfg.sh",
+            "tools/android/apk/build_release_apk.sh",
+            "android-launcher/gradlew",
+        )
+        for relative in paths:
+            with self.subTest(path=relative):
+                file = ROOT / relative
+                self.assertTrue(file.is_file(), relative)
+                self.assertTrue(file.stat().st_mode & 0o111,
+                                f"{relative} is not executable on disk")
+                status = subprocess.check_output(
+                    ["git", "ls-files", "--stage", "--", relative],
+                    cwd=ROOT, text=True).strip()
+                self.assertTrue(status.startswith("100755 "),
+                                f"{relative} must be tracked as git mode 100755, got {status!r}")
+
     def test_bridge_provenance_matches_allow_list(self):
         provenance = json.loads((ANDROID / 'bridges/provenance.json').read_text())
         self.assertEqual(provenance['abi'], 'arm64-v8a')
@@ -57,17 +82,11 @@ class AndroidBuildInputTests(unittest.TestCase):
         self.assertEqual(manifest['port_arch_root'], 'gow3port/arm64')
 
     def test_release_assembler_reports_all_missing_generated_inputs(self):
-        from tools.android.runtime import build_release_runtime as builder
-        # A clean input tree, regardless of artifacts left by a previous build.
-        with tempfile.TemporaryDirectory() as temporary:
-            empty = Path(temporary)
-            with patch.multiple(builder, SOURCE=empty / 'rootfs', NATIVE=empty / 'native',
-                                TURNIP=empty / 'main', TURNIP_GEN8=empty / 'gen8',
-                                LSFG=empty / 'lsfg', OUT=empty / 'out'), \
-                    patch.object(sys, 'argv', ['build_release_runtime.py']):
-                with self.assertRaises(SystemExit) as raised:
-                    builder.main()
-        output = str(raised.exception)
+        result = subprocess.run(
+            ['python3', 'tools/android/build_release_runtime.py'],
+            cwd=ROOT, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        output = result.stdout + result.stderr
         self.assertIn('Missing Android runtime inputs:', output)
         self.assertIn('Gen8 Turnip:', output)
         self.assertIn('LSFG:', output)

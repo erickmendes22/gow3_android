@@ -20,7 +20,9 @@
 #include <chrono>
 #include <thread>
 #include <vector>
+#ifndef __ANDROID__
 #include <SDL3/SDL.h>
+#endif
 #include "../gow3gpu.h"
 #include "common/elf_info.h"
 #include "common/logging/log.h"
@@ -132,7 +134,14 @@ void MemoryManager::CopySparseMemory(VAddr source, u8* dest, u64 size) {
 }
 bool MemoryManager::TryWriteBacking(void* address, const void* data, u64 size) {
     Gow3WriteLog::Note(reinterpret_cast<uintptr_t>(address), data, size, Gow3WriteLog::Backing);
-    return runtime_memory_write_backing(reinterpret_cast<uintptr_t>(address), data, size) != 0;
+    const bool written = runtime_memory_write_backing(reinterpret_cast<uintptr_t>(address), data, size) != 0;
+    // The write skipped page tracking: textures over it must reload (#138).
+    // ponytail: fence and label writes (<= 8 bytes) never hold texels, so they are left out;
+    // every one would send all texture bindings through the locked path.
+    if (written && rasterizer && size > 8) {
+        rasterizer->GetTextureCache().NoteBackingWrite(reinterpret_cast<VAddr>(address), size);
+    }
+    return written;
 }
 void AddressSpace::Protect(VAddr virtual_addr, u64 size, MemoryPermission perms) {
     Gow3Stats::Timer timer{Gow3Stats::t_protect};
@@ -182,8 +191,13 @@ bool g_window_ready;
 
 u32 Gow3DisplayRefreshHz() {
     static const u32 hz = [] {
+#ifdef __ANDROID__
+        const char* display_hz = std::getenv("GOW3_DISPLAY_HZ");
+        const u32 rate = display_hz ? u32(std::max(1, std::atoi(display_hz))) : 60;
+#else
         const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
         const u32 rate = mode && mode->refresh_rate > 0 ? u32(mode->refresh_rate + 0.5f) : 60;
+#endif
         std::printf("GPU: vblank follows the display refresh rate, %u Hz\n", rate);
         return std::max<u32>(rate, 60);
     }();
@@ -246,7 +260,7 @@ extern "C" int gow3gpu_init(const Gow3GpuConfig* config) {
         }
         g_window_cv.notify_all();
         while (window->PollEvents()) {
-            SDL_Delay(2);
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
         LOG_INFO(Frontend, "Window closed by user");
         std::fflush(stdout);
@@ -369,6 +383,14 @@ extern "C" int gow3gpu_choice_begin(const char* title, const char* const* items,
 
 extern "C" int gow3gpu_choice_poll(void) {
     return Gow3Overlay::PollChoice();
+}
+
+extern "C" void gow3gpu_choice_cancel(void) {
+    Gow3Overlay::CancelChoice();
+}
+
+extern "C" void gow3gpu_pad_publish(uint32_t buttons) {
+    Gow3Overlay::PublishPad(buttons);
 }
 
 extern "C" int gow3gpu_text_input_poll(char* out, uint64_t size) {

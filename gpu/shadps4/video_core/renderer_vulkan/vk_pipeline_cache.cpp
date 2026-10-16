@@ -396,16 +396,35 @@ PipelineCache::PipelineCache(const Instance& instance_, Scheduler& scheduler_,
     // gow3: the compiler threads always exist; the in-game menu switches async compilation live
     // (Gow3Settings::async_shaders, GOW3_ASYNC_SHADERS at start).
     {
-        const auto count = std::clamp(Gow3Threads::Available() / 2, 1u, 6u);
-        const auto capture_count = std::min(2u, std::max(1u, Gow3Threads::Available() / 4));
+        // Android ARM64 (unlike the desktop benchmark rig) has heterogeneous
+        // CPU cores. A full 4+2 compiler/capture pool plus the draw workers and
+        // FEX can preempt the game's GPU command thread. Keep two compilation
+        // workers and one capture worker by default, without losing async
+        // compilation. For A/B measurements, GOW3_GPU_COMPILER_WORKERS=1..6
+        // restores/reduces the pool; the original desktop policy is unchanged.
+        const bool android_port = std::getenv("GOW3_ANDROID_PORT") != nullptr;
+        auto count = android_port ? 2u : std::clamp(Gow3Threads::Available() / 2, 1u, 6u);
+        const auto capture_count = android_port ? 1u :
+            std::min(2u, std::max(1u, Gow3Threads::Available() / 4));
+        if (const char* requested = std::getenv("GOW3_GPU_COMPILER_WORKERS")) {
+            char* end = nullptr;
+            const auto parsed = std::strtoul(requested, &end, 10);
+            if (end && *end == '\0' && parsed >= 1 && parsed <= 6)
+                count = static_cast<unsigned>(parsed);
+        }
+        std::printf("GOW3_GPU_CPU_BUDGET compile=%u capture=%u android=%d\n",
+                    count, capture_count, int(android_port));
         for (unsigned i = 0; i < count; ++i) {
             auto [result, worker_cache] = instance.GetDevice().createPipelineCacheUnique({});
             ASSERT_MSG(result == vk::Result::eSuccess, "Failed to create compiler pipeline cache");
             worker_pipeline_caches.push_back(std::move(worker_cache));
         }
-        capture_compiler = std::make_unique<AsyncCompiler>(capture_count, 8, [](unsigned index) {
+        capture_compiler = std::make_unique<AsyncCompiler>(capture_count, 8, [android_port](unsigned index) {
             Common::SetCurrentThreadName(("gow3:ShaderCapture" + std::to_string(index)).c_str());
-            Common::SetCurrentThreadPriority(Common::ThreadPriority::High);
+            // Capture is speculative background work; do not give it higher
+            // priority than the game or Vulkan command processor on Android.
+            Common::SetCurrentThreadPriority(android_port ?
+                Common::ThreadPriority::Low : Common::ThreadPriority::High);
         });
         compiler = std::make_unique<AsyncCompiler>(count, 64, [](unsigned index) {
             Common::SetCurrentThreadName(("gow3:ShaderCompile" + std::to_string(index)).c_str());

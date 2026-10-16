@@ -94,6 +94,8 @@ public:
     /// A pass's first color target: the last render-size RGBA8 target before the UI is the
     /// game's finished frame.
     void OnColorTarget(VideoCore::ImageId color);
+    /// Final image boundary of CUSA01715's one/two MRT forward renderer.
+    void OnDisplayBoundary(VideoCore::ImageId color);
 
     struct Target {
         vk::ImageView view;
@@ -149,7 +151,11 @@ private:
     /// A target of the patched render size: the game allocates it with aligned dimensions
     /// (a 1916x1078 scene in 1916x1080 targets).
     [[nodiscard]] bool RenderTarget(u32 w, u32 h) const {
-        if (!scaled_session) return w == 1920 && h == 1080;
+        // Android 720p PS4 output is valid for post-scene UI composition.
+        // Rejecting anything but desktop 1080p prevented all scaled FSR passes.
+        if (!scaled_session)
+            return (w == 1920 && h == 1080) ||
+                   (w == target_width && h == target_height);
         return w >= render_width && h >= render_height && w < render_width + 8 &&
                h < render_height + 8;
     }
@@ -189,6 +195,7 @@ private:
     int applied_preset = -1;
     int applied_upscaler = -1;
     bool dispatched_last_frame = false;
+    bool completed_temporal_frame = false;
     bool last_active = false, last_jitter = false;
 
 

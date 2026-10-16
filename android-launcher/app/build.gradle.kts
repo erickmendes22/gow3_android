@@ -12,6 +12,8 @@ plugins {
 val steamLibs = rootProject.file("../.local-deps/android/steam-libs")
 val steamAvailable = steamLibs.resolve("jars.txt").isFile
 
+val bionicRuntime = providers.gradleProperty("gow3Bionic").orNull == "true"
+
 android {
     namespace = "com.gow3.android"
     compileSdk {
@@ -22,8 +24,15 @@ android {
         applicationId = "com.gow3.android"
         minSdk = 28
         targetSdk = 28
-        versionCode = 1
-        versionName = "0.5.2-kotlin"
+        versionCode = 2010603
+        versionName = "2.1.6-android3"
+        manifestPlaceholders["appLabel"] = "@string/app_name"
+        if (bionicRuntime) {
+            applicationId = "com.gow3.android.bionic"
+            minSdk = 30
+            versionName = "2.1.6-android3-bionic-experimental"
+            manifestPlaceholders["appLabel"] = "God of War III — Daedalus Fork (Bionic)"
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -63,6 +72,7 @@ android {
     sourceSets {
         getByName("main") {
             jniLibs.srcDir("../../tools/android/bridges")
+            if (bionicRuntime) jniLibs.srcDir("../../out/bionic/apk-jni")
             // Steam real implementation vs. no-Steam fallback, gated on the fetched libraries.
             java.srcDir(if (steamAvailable) "src/steam/java" else "src/steamStub/java")
             if (steamAvailable) {

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Gow3Launcher</string>
+    <string name="app_name">God of War III — Daedalus Fork</string>
 
     <!-- 品牌与关键动作按钮：双语同值，不翻译 -->
     <string name="title_god_of_war_iii">GOD OF WAR III</string>
@@ -35,8 +35,30 @@
     <string name="dialog_ok">OK</string>
 
     <!-- 启动参数：参数名 -->
-    <string name="param_upscaler">Upscaler</string>
     <string name="param_resolution">Resolution</string>
+    <string name="param_render_resolution">Render resolution</string>
+    <string name="param_render_resolution_desc">Sets the rendering resolution. Takes effect on the next launch.</string>
+    <string name="param_resolution_original">1080p</string>
+    <string name="param_resolution_480">480p</string>
+    <string name="param_resolution_720">720p</string>
+    <string name="param_resolution_800">800p</string>
+    <string name="param_resolution_1440">1440p</string>
+    <string name="param_resolution_1800">1800p</string>
+    <string name="param_resolution_4k">4K</string>
+    <string name="param_resolution_240">240p</string>
+    <string name="param_resolution_360">360p</string>
+    <string name="param_resolution_424">424p</string>
+    <string name="param_resolution_540">540p</string>
+    
+    
+    
+    
+    
+    <string name="param_option_quality">Quality</string>
+    <string name="param_option_performance">Performance</string>
+    <string name="param_option_ultra_performance">Ultra Performance</string>
+    <string name="param_shadows">Disable dynamic shadows</string>
+    <string name="param_desc_shadows">ON disables dynamic shadows by applying the verified CUSA01715 v1.02 patch after restart. OFF keeps original shadows.</string>
     <string name="param_fps_limit">FPS limit</string>
     <string name="param_engine_fps">Engine FPS</string>
     <string name="param_vsync">VSync</string>
@@ -47,7 +69,6 @@
 
     <!-- 启动参数：选项名 -->
     <string name="param_option_off_720p">Off (render at 1280×720)</string>
-    <string name="param_option_fsr31">FSR 3.1</string>
     <string name="param_option_native">Native</string>
     <string name="param_option_480p">480p</string>
     <string name="param_option_720p">720p</string>
@@ -67,7 +88,6 @@
     <string name="param_option_frames_2">2</string>
 
     <!-- 启动参数：说明 -->
-    <string name="param_desc_upscaler">Renders the game at a lower internal resolution and then uses FSR 3.1 to scale the image up to your screen, so you get more performance while keeping a sharp picture. Off renders at a fixed 1280×720.</string>
     <string name="param_desc_engine_fps">How fast the game engine itself updates the game world, separate from the display. 60 is the game\'s original speed; higher values make motion smoother but use more power.</string>
     <string name="param_desc_vsync">Syncs the game\'s frames with your screen\'s refresh rate to stop visual tearing. Leave it ON unless you see tearing or stutter.</string>
     <string name="param_desc_frames_queued">How many frames the game prepares ahead of what the screen shows. Lower numbers cut input lag; higher numbers can improve smoothness on weaker hardware.</string>
@@ -85,9 +105,9 @@
     <string name="frame_gen_footer">Imported files stay in the app\'s private folder and take effect the next time the game starts. IMPORT .DLL also works when Steam is unavailable.</string>
 
     <!-- About 页 -->
-    <string name="about_title">God of War III for Android</string>
+    <string name="about_title">God of War III — Daedalus Fork</string>
     <string name="about_version_fmt">Version %1$s</string>
-    <string name="about_description">A community launcher bringing the God of War III Remastered experience to Android via emulation.</string>
+    <string name="about_description">Daedalus fork of the God of War III Remastered Android project, with modifications by erickmendes22. Base project credits: zFitness and contributors.</string>
     <string name="about_third_party_licenses">Third-party licenses</string>
     <string name="language_setting">Language</string>
     <string name="language_follow_system">Follow system</string>
@@ -113,7 +133,7 @@
 
     <!-- 联系卡片 -->
     <string name="contact_title">AUTHOR &amp; SUPPORT</string>
-    <string name="contact_author_label">Author</string>
+    <string name="contact_author_label">Fork and modifications</string>
     <string name="contact_qq_label">QQ group</string>
     <string name="contact_telegram_label">Telegram</string>
     <string name="contact_open">OPEN</string>
@@ -183,4 +203,63 @@
     <string name="folder_choose_update">CHOOSE UPDATE FOLDER</string>
     <string name="folder_choose_game">CHOOSE GAME FOLDER</string>
     <string name="no_folder_picker_fmt">No folder picker: %1$s</string>
+    <string name="language_pt">Português (Brasil)</string>
+    <string name="pkg_install">Install PKG</string>
+    <string name="pkg_update">Install update PKG</string>
+    <string name="setup_title">Set up God of War III</string>
+    <string name="setup_message">How would you like to add the game? Install a PKG directly into a chosen folder, or select an extracted game folder.</string>
+    <string name="setup_folder">Select folder</string>
+    <string name="param_group_fps">FPS HUD</string>
+    <string name="param_show_fps">Show FPS</string>
+    <string name="param_fps_position">FPS HUD position</string>
+    <string name="param_fps_size">FPS HUD size</string>
+    <string name="fps_top_left">Top left</string>
+    <string name="fps_top_center">Top center</string>
+    <string name="fps_top_right">Top right</string>
+    <string name="fps_size_50" formatted="false">50%</string>
+    <string name="fps_size_75" formatted="false">75%</string>
+    <string name="fps_size_100" formatted="false">100%</string>
+    <string name="fps_size_125" formatted="false">125%</string>
+    <string name="fps_size_150" formatted="false">150%</string>
+    <string name="fps_size_200" formatted="false">200%</string>
+    <string name="fps_size_250" formatted="false">250%</string>
+    <string name="fps_size_300" formatted="false">300%</string>
+    <string name="contact_base_label">Base project</string>
+    <string name="contact_youtube_label">YouTube</string>
+    <string name="param_anisotropy">Anisotropic filtering</string>
+    <string name="param_option_game_default">Game default</string>
+    <string name="param_desc_anisotropy">Sharpens textures viewed at an angle. May reduce performance. Applied after restart.</string>
+    <string name="param_option_2x">2×</string>
+    <string name="param_option_4x">4×</string>
+    <string name="param_option_8x">8×</string>
+    <string name="param_option_16x">16×</string>
+    <string name="gpu_driver_title">VULKAN DRIVER</string>
+    <string name="gpu_driver_auto">Automatic (R6 on Adreno 7xx; V37 on 8xx; system otherwise)</string>
+    <string name="gpu_driver_system">System driver</string>
+    <string name="gpu_driver_bundled">Bundled Turnip Gen8 V37 patched</string>
+    <string name="gpu_driver_import">Import driver ZIP</string>
+    <string name="gpu_driver_importing">Importing driver…</string>
+    <string name="gpu_driver_hint">Import an Android ARM64 AdrenoTools driver ZIP. Imported drivers are selected automatically. Changes apply the next time the game starts.</string>
+    <string name="gpu_driver_error">Driver selection failed</string>
+    <string name="gpu_driver_invalid">Could not import or select this driver. Choose a valid Android AdrenoTools ZIP containing meta.json and its driver library.</string>
+    <string name="gpu_driver_wrong_abi">This driver is not an Android ARM64 shared library. Windows and Linux drivers are not supported.</string>
+    <string name="gpu_driver_newer_android">This driver requires a newer Android version.</string>
+    <string name="gpu_driver_missing">Selected driver unavailable. Import it again or choose another driver.</string>
+    <string name="nav_mods">PATCHES</string>
+    <string name="param_android_fullscreen">Fullscreen</string>
+    <string name="param_desc_android_fullscreen">Fill the phone screen. Off keeps the original 16:9 aspect ratio.</string>
+    <string name="patch_next_launch">Changes apply on the next game launch. Resolution and FPS stay on Home.</string>
+    <string name="patch_automatic">Managed automatically with the existing fixes and resolution settings.</string>
+    <string name="patch_skip_intro">Skip Intro</string>
+    <string name="patch_skip_video">Skip Any Video With X Button</string>
+    <string name="patch_texture_fix">Texture corruption fix</string>
+    <string name="patch_black_screen">Startup black screen fix</string>
+    <string name="patch_ssao">Disable SSAO</string>
+    <string name="patch_blur">Disable Motion Blur</string>
+    <string name="patch_dof">Disable Depth of Field</string>
+    <string name="patch_bloom">Disable Bloom</string>
+    <string name="patch_particles">Disable Soft Particles</string>
+    <string name="patch_save_failed">Could not save patch settings.</string>
+    <string name="patch_effect_note">Optional effect patches require a supported 01.02 executable.</string>
+    <string name="gpu_driver_adreno7xx">Turnip 26.3 R6 (Adreno 7xx)</string>
 </resources>

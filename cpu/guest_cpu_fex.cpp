@@ -301,6 +301,21 @@ void guest_cpu_init(void* (*map)(size_t size, int prot)) {
     FEX::Config::LoadConfig("bb-probe", environ);
     FEXCore::Config::ReloadMetaLayer();
     FEXCore::Config::Set(FEXCore::Config::CONFIG_IS64BIT_MODE, "1");
+    // The launcher ships gow3-fex-compatible.json, but this embedded
+    // FEXCore entrypoint loads the bb-probe profile. Set the L1 policy
+    // explicitly before CreateNewContext instead of assuming the JSON was
+    // applied. DynamicL1Cache saves memory but, per FEX's option metadata,
+    // can cause JIT cache resizing stutters. This device-oriented profile
+    // keeps a fixed L1 unless GOW3_FEX_DYNAMIC_L1=1 is explicitly selected.
+    // Preserve FEX's default TSO barriers for guest threading correctness.
+    const bool dynamic_l1 = [] {
+        const char* value = std::getenv("GOW3_FEX_DYNAMIC_L1");
+        return value && value[0] == '1';
+    }();
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_DYNAMICL1CACHE,
+                         dynamic_l1 ? "1" : "0");
+    std::printf("GOW3_FEX_CACHE dynamic_l1=%d disk_cache=unchanged tso=unchanged\n",
+                int(dynamic_l1));
     const auto features = FEX::FetchHostFeatures();
     wide_xmm = features.SupportsAVX && features.SupportsSVE256;
     ctx = FEXCore::Context::Context::CreateNewContext(features).release();

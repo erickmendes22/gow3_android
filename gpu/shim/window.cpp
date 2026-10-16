@@ -1,3 +1,4 @@
+#ifndef __ANDROID__
 // gow3: SDL3 window for the Vulkan swapchain (X11 or Wayland).
 #include <cstdio>
 #include <cstdlib>
@@ -7,6 +8,7 @@
 #include "common/logging/log.h"
 #include "sdl_window.h"
 #include "gow3_overlay.h"
+#include "gow3_pad_input.h"
 #include "gow3_graphics.h"
 #include "gow3_settings.h"
 
@@ -14,7 +16,12 @@ namespace Frontend {
 
 WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}, height{height_} {
     // Gamepads are sampled by runtime_pad.c; their events are pumped here with the window's.
-    if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
+    // 在 Android app 里(GOW3_ANDROID_INPUT=1)所有手柄都由 PadBridge 交给 runtime_pad.c
+    // (GOW3_PAD_FILE),SDL 找不到任何手柄:它每秒的热插拔扫描会加载 libudev,而 app 沙箱拒绝
+    // 该操作,于是每秒刷出一串 SELinux denial,ColorOS 上会被当成攻击行为上报。
+    const char* android_input = std::getenv("GOW3_ANDROID_INPUT");
+    const bool sdl_pads = !(android_input && android_input[0] == '1');
+    if (!SDL_InitSubSystem(SDL_INIT_VIDEO | (sdl_pads ? SDL_INIT_GAMEPAD : 0))) {
         UNREACHABLE_MSG("Failed to initialize SDL video: {}", SDL_GetError());
     }
     SDL_PropertiesID props = SDL_CreateProperties();
@@ -196,6 +203,19 @@ bool WindowSDL::PollEvents() {
             break;
         }
     }
+    // Android 的屏幕手柄不产生 SDL 事件,文本框在这里消费 runtime_pad.c 发布的边沿:
+    // Cross 确认、Circle 取消,与上面 SDL 手柄分支的语义相同。桌面没有 pad 文件,边沿恒为 0。
+    if (text_active) {
+        int move = 0, finish = 0;
+        Gow3Pad::Map(Gow3Overlay::PadEdges(), move, finish);
+        if (finish) {
+            std::scoped_lock lock{text_mutex};
+            text_state = finish;
+            text_active = false;
+            SDL_StopTextInput(window);
+            UpdateTextTitle();
+        }
+    }
     UpdateCursor();
     return is_open;
 }
@@ -215,3 +235,5 @@ void WindowSDL::UpdateCursor() {
 }
 
 } // namespace Frontend
+
+#endif

@@ -15,8 +15,13 @@ die() { echo "build_turnip: $*" >&2; exit 1; }
 step=0; total=6; _t0=0
 begin()    { step=$((step + 1)); _t0=$(date +%s); printf '\n==> [%d/%d] %s\n' "$step" "$total" "$*"; }
 end_stage(){ local sec=$(( $(date +%s) - _t0 )); printf '    %s (%dm%02ds)\n' "$*" "$((sec / 60))" "$((sec % 60))"; }
-# Avoid contaminating target linker with Micromamba host x86-64 libraries.
-source tools/android/build/clean_cross_env.sh
+# The activated conda environment supplies host tools (glslangValidator, meson), but
+# its x86-64 compiler/linker flags must never be passed to the ARM64 cross compiler.
+# In CI this otherwise adds -L$CONDA_PREFIX/lib to clang and ld.lld selects the
+# host libgcc_s.so.1, making Meson's libatomic probe fail before any Turnip build.
+# Keep PATH intact so the host tools remain executable.
+unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH CMAKE_PREFIX_PATH PKG_CONFIG_PATH
+
 if [[ -n ${GOW3_LLVM_PREFIX:-} && -d $GOW3_LLVM_PREFIX/bin ]]; then
     export PATH="$GOW3_LLVM_PREFIX/bin:$PATH"
 fi
@@ -38,9 +43,6 @@ fi
 command -v git >/dev/null || die 'git is required'
 command -v clang >/dev/null || die 'clang is required'
 command -v clang++ >/dev/null || die 'clang++ is required'
-# Mesa's meson.build requires a host glslangValidator to generate shaders.
-command -v glslangValidator >/dev/null || die 'glslangValidator is required (activate the host glslang environment)'
-glslangValidator --version >/dev/null 2>&1 || die 'glslangValidator is present but not executable'
 for tool in llvm-ar llvm-strip; do
     command -v "$tool" >/dev/null || die "$tool is required"
 done
@@ -78,7 +80,6 @@ fi
 rootfs=/data/user/0/com.gow3.android/files/rootfs
 deps=$PWD/.local-deps/android
 sysroot=$deps/mesa-sysroot
-export GOW3_PKG_CONFIG_SYSROOT=$sysroot
 src=$deps/src/mesa${suffix/_/-}
 build=$PWD/out/arm64/turnip${suffix/_/-}-build
 out=$PWD/out/arm64/turnip${suffix/_/-}
@@ -95,8 +96,14 @@ rm -f "$sysroot/usr/lib/aarch64-linux-gnu/pkgconfig/xcb-keysyms.pc"
 
 # Mesa's build tools (meson, mako) in a local virtual environment, not the host's Python.
 venv=$deps/mesa-venv
-if [[ ! -x $venv/bin/meson ]]; then
+# A restored venv may have an executable Meson whose shebang points to an old
+# checkout (e.g. after renaming the repository), or a removed Python interpreter.
+# Test execution/imports, not just its executable bit, before trusting the cache.
+if ! "$venv/bin/python" -c 'import mesonbuild.mesonmain, mako, yaml, packaging' >/dev/null 2>&1 ||
+   ! "$venv/bin/meson" --version >/dev/null 2>&1; then
     command -v python3 >/dev/null || die 'python3 is required to create the Mesa build environment'
+    echo "Recreating missing or unusable Mesa Python environment: $venv"
+    rm -rf -- "$venv"
     python3 -m venv "$venv"
     "$venv/bin/python" -m pip install -q meson mako pyyaml packaging
 fi
@@ -153,7 +160,7 @@ c_ld = 'lld'
 cpp_ld = 'lld'
 ar = 'llvm-ar'
 strip = 'llvm-strip'
-pkg-config = '$PWD/tools/android/build/target-pkg-config.sh'
+pkg-config = 'pkg-config'
 [built-in options]
 c_args = ['-O2']
 cpp_args = ['-O2']
@@ -173,13 +180,10 @@ meson setup "$build" "$src" --cross-file "$cross" --prefix="$rootfs/usr" \
     -Dplatforms=x11 -Dvulkan-drivers=freedreno -Dfreedreno-kmds=kgsl -Dgallium-drivers= \
     -Dopengl=false -Degl=disabled -Dgles1=disabled -Dgles2=disabled -Dglx=disabled -Dgbm=disabled \
     -Dllvm=disabled -Dvalgrind=disabled -Dlibunwind=disabled -Dlmsensors=disabled \
+    -Dspirv-tools=disabled \
     -Dzstd=enabled -Dexpat=enabled -Dvulkan-layers= -Dtools= -Dbuild-tests=false \
     > "$build.log" 2>&1 || { tail -40 "$build.log" >&2; exit 1; }
 end_stage "configured $(grep -cE '^\[[0-9]+/[0-9]+\]' "$build.log" || true) targets"
-if [[ ${GOW3_CONFIGURE_ONLY:-0} == 1 ]]; then
-    echo "Turnip $variant configuration passed"
-    exit 0
-fi
 begin "ninja (Turnip cross-compile)"
 ninja -C "$build" >> "$build.log" 2>&1 || { tail -40 "$build.log" >&2; exit 1; }
 end_stage "compiled"

@@ -76,7 +76,7 @@ internal fun AboutScreen(
 
     ScreenColumn {
         Text(stringResource(R.string.about_title), color = LauncherColors.textPrimary, fontFamily = FontFamily.Serif, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text(stringResource(R.string.about_version_fmt, "1.2.4"), color = LauncherColors.gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.about_version_fmt, context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""), color = LauncherColors.gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         Text(stringResource(R.string.about_description), color = LauncherColors.textMuted, fontSize = 13.sp, lineHeight = 19.sp)
         Spacer(Modifier.height(8.dp))
         ContactCard()
@@ -140,13 +140,12 @@ internal fun AboutScreen(
 
 /** 语言 / Language 设置：跟随系统 / 简体中文 / English，切换后由调用方持久化并重建。 */
 @Composable
-private fun LanguageSetting(onChange: (String) -> Unit) {
+internal fun LanguageSetting(onChange: (String) -> Unit) {
     val context = LocalContext.current
     val current = LanguageManager.read(context)
     val options = listOf(
-        R.string.language_follow_system to LanguageManager.FOLLOW_SYSTEM,
-        R.string.language_zh to LanguageManager.ZH,
         R.string.language_en to LanguageManager.EN,
+        R.string.language_pt to LanguageManager.PT,
     )
     Column(
         modifier = Modifier

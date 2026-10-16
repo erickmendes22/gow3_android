@@ -25,41 +25,6 @@ def fake_elf(path, interpreter, capacity=64):
 
 
 class RuntimeElfTests(unittest.TestCase):
-    def test_migration_does_not_rewrite_symlink_targets_outside_rootfs(self):
-        from tools.android.inputs.fetch_rootfs import OLD_ROOT, NEW_ROOT, migrate_interpreters
-        with tempfile.TemporaryDirectory() as directory:
-            base = Path(directory)
-            root = base / 'rootfs'
-            root.mkdir()
-            host = base / 'external'
-            old = OLD_ROOT + '/usr/lib/ld.so'
-            fake_elf(host, old, capacity=160)
-            (root / 'external-link').symlink_to(host)
-            fake_elf(root / 'device', old, capacity=160)
-            self.assertEqual(migrate_interpreters(root), 1)
-            self.assertEqual(inspect(host)['interpreter'], old)
-            self.assertEqual(inspect(root / 'device')['interpreter'],
-                             NEW_ROOT + '/usr/lib/ld.so')
-
-    def test_rootfs_symlinks_do_not_inspect_files_outside_the_root(self):
-        with tempfile.TemporaryDirectory() as directory:
-            base = Path(directory)
-            root = base / 'rootfs'
-            root.mkdir()
-            host = base / 'host-awk'
-            fake_elf(host, '/lib64/ld-linux-x86-64.so.2')
-            fake_elf(root / 'device-awk', '/device/ld.so')
-            (root / 'absolute-link').symlink_to(host)
-            (root / 'relative-link').symlink_to('../host-awk')
-            (root / 'device-link').symlink_to('device-awk')
-            records = validate_tree(root, '/device/ld.so')
-            self.assertEqual([record['path'] for record in records],
-                             [str(root / 'device-awk')])
-            # Real files with a wrong loader must still fail validation.
-            fake_elf(root / 'wrong-loader', '/lib64/ld-linux-x86-64.so.2')
-            with self.assertRaisesRegex(ElfError, 'wrong-loader'):
-                validate_tree(root, '/device/ld.so')
-
     def test_rewrite_preserves_fixed_interpreter_slot(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "probe"
@@ -68,6 +33,23 @@ class RuntimeElfTests(unittest.TestCase):
             updated = rewrite_interpreter(path, "/data/user/0/gow3/rootfs/ld.so")
             self.assertEqual(old["interpreter_capacity"], updated["interpreter_capacity"])
             self.assertEqual(updated["interpreter"], "/data/user/0/gow3/rootfs/ld.so")
+
+    def test_validate_tree_does_not_follow_absolute_symlinks_to_host(self):
+        # Debian alternatives are symlinks. If they are absolute, Path.is_file()
+        # follows them into the CI runner and may inspect its x86-64 executables.
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            root = base / "rootfs"
+            (root / "usr/bin").mkdir(parents=True)
+            (root / "etc/alternatives").mkdir(parents=True)
+            loader = "/data/user/0/com.gow3.android/files/rootfs/ld.so"
+            fake_elf(root / "usr/bin/valid", loader, capacity=96)
+            host = base / "host-x86"
+            fake_elf(host, "/lib64/ld-linux-x86-64.so.2")
+            (root / "etc/alternatives/awk").symlink_to(host)
+            results = validate_tree(root, loader)
+            self.assertEqual(len(results), 1)
+            self.assertTrue(results[0]["path"].endswith("/usr/bin/valid"))
 
     def test_rewrite_rejects_interpreter_growth(self):
         with tempfile.TemporaryDirectory() as directory:

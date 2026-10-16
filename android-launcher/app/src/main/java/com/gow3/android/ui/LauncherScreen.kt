@@ -52,6 +52,11 @@ internal fun LauncherScreen(
     onGetFromSteam: ((Boolean, String) -> Unit) -> Unit,
     onChooseGameFolder: () -> Unit,
     onChooseUpdateFolder: () -> Unit,
+    onInstallBasePkg: () -> Unit,
+    onInstallUpdatePkg: () -> Unit,
+    pkgInstallBusy: Boolean,
+    pkgInstallMessage: String?,
+    pkgGeneration: Int,
     saves: SaveManager,
     logs: LogManager,
     onChangeLanguage: (String) -> Unit,
@@ -80,7 +85,7 @@ internal fun LauncherScreen(
                     .background(Brush.radialGradient(listOf(LauncherColors.backgroundTop.copy(alpha = 0.55f), LauncherColors.backgroundBottom.copy(alpha = 0.85f)), radius = 950f)),
             )
             when (tab) {
-                LauncherTab.HOME -> HomeScreen(onStartGame, losslessDlls, onGetFromSteam, onChooseGameFolder, onChooseUpdateFolder)
+                LauncherTab.HOME -> HomeScreen(onStartGame, losslessDlls, onGetFromSteam, onChooseGameFolder, onChooseUpdateFolder, onInstallBasePkg, onInstallUpdatePkg, pkgInstallBusy, pkgInstallMessage, pkgGeneration, onChangeLanguage)
                 LauncherTab.MODS -> ModsScreen()
                 LauncherTab.ABOUT -> AboutScreen(saves, logs, onChangeLanguage)
             }
@@ -108,7 +113,7 @@ private fun BottomNavigation(selectedTab: LauncherTab, onTabSelected: (LauncherT
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             NavItem(LauncherTab.HOME, selectedTab == LauncherTab.HOME, stringResource(R.string.nav_home), "⌂", onTabSelected)
-//        NavItem(LauncherTab.MODS, selectedTab == LauncherTab.MODS, "MOD & PATCH", "⚙", onTabSelected)
+            NavItem(LauncherTab.MODS, selectedTab == LauncherTab.MODS, stringResource(R.string.nav_mods), "⚙", onTabSelected)
             NavItem(LauncherTab.ABOUT, selectedTab == LauncherTab.ABOUT, stringResource(R.string.nav_about), "ⓘ", onTabSelected)
         }
     }

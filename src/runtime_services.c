@@ -17,6 +17,7 @@
 #include <ws2tcpip.h>
 #else
 #include <arpa/inet.h>
+#include <unistd.h>
 #endif
 
 #define USER_ID 1
@@ -263,7 +264,24 @@ static struct {
     void *user_data;
     char dirs[32][32];
     int dir_count, has_new, choosing;
+    int64_t shown_at;  /* GOW3_SAVE_LIST_TIMEOUT 秒内没有任何输入就当取消 */
 } save_dialog;
+static int64_t now_seconds(void) {
+    struct timespec ts;
+#ifdef _WIN32
+    return (int64_t)time(NULL);
+#else
+    clock_gettime(CLOCK_MONOTONIC,&ts);
+    return (int64_t)ts.tv_sec;
+#endif
+}
+/* 存档列表没有超时就会被无限期地等下去:采样 pad 文件的是游戏线程(scePadReadState),一旦游戏
+ * 在这里不再轮询,屏幕上的一切输入都到不了列表。默认 300 秒,足够慢到不会打断正常的犹豫。 */
+static int64_t save_list_timeout(void) {
+    const char *env = getenv("GOW3_SAVE_LIST_TIMEOUT");
+    int64_t seconds = env && *env ? atoll(env) : 300;
+    return seconds > 0 ? seconds : 300;
+}
 static char save_labels[33][200], save_icons[33][720];
 static void save_label(char *out, size_t size, const char *dir) {
     unsigned char param[RUNTIME_SAVE_PARAM_SIZE];
@@ -313,12 +331,21 @@ static ABI int32_t save_open(const unsigned char *p) {
     }
     printf("Runtime: SaveDataDialog list (%s): %d entries shown\n",title,n);
     save_dialog.choosing=1;
+    save_dialog.shown_at=now_seconds();
     dialogs[2].status=DIALOG_RUNNING;
     return 0;
 }
 static ABI int32_t save_status(void) {
     if (save_dialog.choosing) {
         int choice=gow3gpu_choice_poll();
+        if (choice==-1 && now_seconds()-save_dialog.shown_at>=save_list_timeout()) {
+            /* 没有任何输入源能到达列表(见 save_list_timeout)。关掉列表再当作取消交还控制权,
+             * 否则它会继续绘制并继续扣住游戏的输入。 */
+            printf("Runtime: SaveDataDialog list: timed out after %lld s with no input, cancelling\n",
+                   (long long)save_list_timeout());
+            gow3gpu_choice_cancel();
+            choice=-2;
+        }
         if (choice!=-1) {
             save_dialog.choosing=0;
             dialogs[2].status=DIALOG_FINISHED;
@@ -390,6 +417,45 @@ static void utf8_to_utf16(const char *in, uint16_t *out, uint32_t max) {
     }
     out[n<max ? n : max]=0;
 }
+/* GOW3_IME_FILE (Android 前端):对话框由 app 用触摸键盘显示。请求文件每行依次写最大长度
+ * (UTF-16 单元)、标题和当前文本;app 在 <GOW3_IME_FILE>.result 里回 "ok" 或 "cancel",
+ * 下一行是文本。两个文件都先整体写到临时名再 rename,任何一侧都不会读到半个文件。
+ * 移植自 Bloodborne-Android/src/runtime_services.c。 */
+static int ime_uses_bridge;
+static const char *ime_bridge(void) {
+    const char *path=getenv("GOW3_IME_FILE");
+    return path && *path ? path : NULL;
+}
+static void one_line(char *text) { for (char *p=text; *p; ++p) if (*p=='\n' || *p=='\r') *p=' '; }
+static int ime_bridge_request(const char *path, const char *initial, const char *title, uint32_t max_length) {
+    char result[600], temporary[600];
+    snprintf(result,sizeof(result),"%s.result",path);
+    snprintf(temporary,sizeof(temporary),"%s.tmp",path);
+    unlink(result); /* 上一个被放弃的对话框留下的应答 */
+    char first[512], prompt[256];
+    snprintf(first,sizeof(first),"%s",initial); snprintf(prompt,sizeof(prompt),"%s",title);
+    one_line(first); one_line(prompt);
+    FILE *f=fopen(temporary,"w");
+    if (!f) return 0;
+    fprintf(f,"%u\n%s\n%s\n",max_length,prompt,first);
+    if (fclose(f) || rename(temporary,path)) { unlink(temporary); return 0; }
+    return 1;
+}
+/* 0:还没有应答;1:已确认(文本已写入);2:已取消。 */
+static int ime_bridge_poll(const char *path, char *text, size_t size) {
+    char result[600];
+    snprintf(result,sizeof(result),"%s.result",path);
+    FILE *f=fopen(result,"r");
+    if (!f) return 0;
+    char status[16]="";
+    text[0]=0;
+    if (!fgets(status,sizeof(status),f)) status[0]=0;
+    if (!fgets(text,(int)size,f)) text[0]=0;
+    fclose(f);
+    unlink(result);
+    text[strcspn(text,"\r\n")]=0;
+    return strncmp(status,"ok",2) ? 2 : 1;
+}
 static void ime_complete(int end_status, const char *text) {
     if (!end_status && ime.buffer && ime.max_length) utf8_to_utf16(text,ime.buffer,ime.max_length);
     ime.end_status=end_status; ime.finished=1; ime.running=0;
@@ -406,10 +472,16 @@ static ABI int32_t ime_init(const ImeParam *param, const void *extended) {
     utf16_to_utf8(param->title,128,prompt,sizeof(prompt));
     const char *preset=getenv("GOW3_IME_TEXT");
     if (preset) { ime_complete(0,preset); return 0; }
-    /* An empty field starts with the player name (launcher) or "Hunter": a controller alone
-     * can accept it (the port has no on-screen keyboard). */
+    ime_uses_bridge=0;
+    /* 命中文件桥就直接返回:Android 上不要落到 SDL 文本输入,那条路收不到 EditText 的内容。 */
+    if (ime_bridge() && ime_bridge_request(ime_bridge(),initial,prompt[0] ? prompt : "Text",param->max_length)) {
+        ime_uses_bridge=1;
+        printf("Runtime: ImeDialog opened: the app shows the touch keyboard\n");
+        return 0;
+    }
+    /* 空字段先填玩家名(launcher 提供)或 "Kratos":光靠手柄也能确认(移植版没有屏幕键盘)。 */
     const char *name=getenv("GOW3_USER_NAME");
-    const char *start=initial[0] ? initial : name && *name ? name : "Hunter";
+    const char *start=initial[0] ? initial : name && *name ? name : "Kratos";
     if (!gow3gpu_text_input_begin(start,prompt[0] ? prompt : "Text")) ime_complete(0,start);
     else printf("Runtime: ImeDialog opened: shown on screen; keyboard Enter or Cross accepts, Esc or Circle cancels\n");
     return 0;
@@ -417,7 +489,8 @@ static ABI int32_t ime_init(const ImeParam *param, const void *extended) {
 static ABI int32_t ime_status(void) {
     if (ime.running) {
         char text[512];
-        int state=gow3gpu_text_input_poll(text,sizeof(text));
+        int state=ime_uses_bridge ? ime_bridge_poll(ime_bridge(),text,sizeof(text))
+                               : gow3gpu_text_input_poll(text,sizeof(text));
         if (state) ime_complete(state==1 ? 0 : 1,text);
     }
     return ime.running ? 1 : ime.finished ? 2 : 0; /* Running / Finished / None */

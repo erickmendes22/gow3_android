@@ -19,13 +19,18 @@ import threading
 import tarfile
 import time
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-# Overridable: use a mainland mirror by default; override with --mirror or
-# GOW3_DEBIAN_MIRROR when another network has better access to Debian upstream.
-MIRROR = os.environ.get(
-    'GOW3_DEBIAN_MIRROR', 'https://mirrors.tuna.tsinghua.edu.cn/debian')
+# Use Debian's official CDN by default; the previous Tsinghua default responds
+# HTTP 403 from GitHub-hosted CI runners. Respect explicit mirror overrides.
+MIRROR = os.environ.get('GOW3_DEBIAN_MIRROR', 'https://deb.debian.org/debian')
+FALLBACK_MIRRORS = (
+    'https://deb.debian.org/debian',
+    'https://ftp.debian.org/debian',
+    'https://mirror.leaseweb.com/debian',
+)
 SUITE = 'trixie'
 # What the runtime, the GPU library and FEXCore link against (dependencies follow).
 WANTED = [
@@ -42,19 +47,44 @@ SKIP = re.compile(r'^(debconf|perl.*|dpkg|adduser|tzdata|sensible-utils|libc-bin
                   r'base-files|login|util-linux|mount)$')
 
 
-def fetch(url, attempts=8):
-    """Download with retries: a flaky link (TLS EOF, reset) must not abort a multi-file fetch."""
-    delay = 2
-    for attempt in range(1, attempts + 1):
-        try:
-            with urllib.request.urlopen(url, timeout=120) as response:
-                return response.read()
-        except Exception as error:  # noqa: BLE001 - transient network errors only
-            if attempt == attempts:
-                raise
-            print(f'  retry {attempt}/{attempts - 1} for {url.rsplit("/", 1)[-1]}: {error}', flush=True)
+def fetch(url, attempts=4):
+    """Fetch Debian files with fallback mirrors; SHA-256 verification remains in callers.
+
+    A denied mirror (403/404) must not burn minutes on identical requests.
+    Unrelated URLs are never rewritten, including custom user-provided sources.
+    """
+    mirror = MIRROR.rstrip('/')
+    suffix = url[len(mirror):] if url.startswith(mirror + '/') else None
+    candidates = [url]
+    if suffix is not None:
+        candidates += [base.rstrip('/') + suffix for base in FALLBACK_MIRRORS
+                       if base.rstrip('/') != mirror]
+    last_error = None
+    for candidate in dict.fromkeys(candidates):
+        delay = 2
+        for attempt in range(1, attempts + 1):
+            try:
+                request = urllib.request.Request(candidate, headers={
+                    'User-Agent': 'gow3-android-build/1.0 (Debian package mirror client)'})
+                with urllib.request.urlopen(request, timeout=120) as response:
+                    return response.read()
+            except urllib.error.HTTPError as error:
+                last_error = error
+                if error.code in (403, 404, 429):
+                    print(f'  mirror denied {url.rsplit("/", 1)[-1]}: HTTP {error.code}; trying next mirror',
+                          flush=True)
+                    break
+                if attempt == attempts:
+                    break
+                print(f'  retry {attempt}/{attempts - 1}: {error}', flush=True)
+            except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as error:
+                last_error = error
+                if attempt == attempts:
+                    break
+                print(f'  retry {attempt}/{attempts - 1}: {error}', flush=True)
             time.sleep(delay)
-            delay = min(delay * 2, 30)
+            delay = min(delay * 2, 20)
+    raise last_error if last_error is not None else RuntimeError('No Debian mirror available')
 
 
 def parse_packages(text):

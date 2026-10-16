@@ -14,6 +14,7 @@ import java.util.Set;
 /** Android gamepad events -> gow3port's atomic pad-state file, without /dev/input permissions. */
 final class PadBridge {
     private final File state;
+    private boolean swapFaceButtons;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Set<String> keys = new LinkedHashSet<>();
     private final Set<String> virtualKeys = new LinkedHashSet<>();
@@ -24,11 +25,14 @@ final class PadBridge {
 
     PadBridge(File state) { this.state=state; reset(); }
 
+    void setSwapFaceButtons(boolean enabled) { reset(); swapFaceButtons=enabled; }
+
     private String name(KeyEvent e) {
         // Thor's Linux scancodes were verified against its printed Nintendo positions.
         switch (e.getScanCode()) {
             case 304: return "cross"; case 305: return "circle";
-            case 307: return "square"; case 308: return "triangle";
+            case 307: return swapFaceButtons ? "triangle" : "square";
+            case 308: return swapFaceButtons ? "square" : "triangle";
             case 310: return "l1"; case 311: return "r1";
             case 312: return "l2"; case 313: return "r2";
             case 314: return "touchpad"; case 315: return "options";
@@ -37,8 +41,8 @@ final class PadBridge {
         switch (e.getKeyCode()) {
             case KeyEvent.KEYCODE_BUTTON_A: return "cross";
             case KeyEvent.KEYCODE_BUTTON_B: return "circle";
-            case KeyEvent.KEYCODE_BUTTON_X: return "square";
-            case KeyEvent.KEYCODE_BUTTON_Y: return "triangle";
+            case KeyEvent.KEYCODE_BUTTON_X: return swapFaceButtons ? "triangle" : "square";
+            case KeyEvent.KEYCODE_BUTTON_Y: return swapFaceButtons ? "square" : "triangle";
             case KeyEvent.KEYCODE_BUTTON_L1: return "l1";
             case KeyEvent.KEYCODE_BUTTON_R1: return "r1";
             case KeyEvent.KEYCODE_BUTTON_L2: return "l2";

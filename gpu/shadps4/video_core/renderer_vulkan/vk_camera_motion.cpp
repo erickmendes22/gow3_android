@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "video_core/renderer_vulkan/vk_camera_motion.h"
+#include "video_core/renderer_vulkan/gow3_camera_layout.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -161,6 +163,21 @@ float CameraMotion::Near() const noexcept {
     return -current.proj[3] / current.proj[2];
 }
 
+std::array<float, 2> CameraMotion::EstimatedMotion(u32 width, u32 height) const noexcept {
+    if (!Ready() || !width || !height) return {};
+    const auto reproject = Multiply(previous.view, current.inv_view);
+    const float scene_z = 10.0f; // fixed reference point in view space, not a guessed game camera
+    const float px = reproject[2] * scene_z + reproject[3];
+    const float py = reproject[6] * scene_z + reproject[7];
+    const float pz = reproject[10] * scene_z + reproject[11];
+    if (!std::isfinite(px) || !std::isfinite(py) ||
+        !std::isfinite(pz) || pz <= 0.001f) return {};
+    const float dx = px / pz * previous.proj[0] * float(width) * 0.5f;
+    const float dy = -py / pz * previous.proj[1] * float(height) * 0.5f;
+    if (!std::isfinite(dx) || !std::isfinite(dy)) return {};
+    return {dx, dy};
+}
+
 std::array<std::array<float, 4>, 3> CameraMotion::TaaDepthParameters() const noexcept {
     const auto transform = Multiply(previous.view, current.inv_view);
     return {current.proj, previous.proj,
@@ -218,26 +235,76 @@ void CameraMotion::RecordMotion(vk::CommandBuffer cmdbuf, vk::ImageView depth_vi
     cmdbuf.dispatch((width + 7) / 8, (height + 7) / 8, 1);
 }
 
-void CameraMotion::OnConstants(const float* data) {
-    // Scene constants: far plane 3000, 1/far, and the render size.
-    if (data[0] != 3000.0f || data[4] < 64.0f || data[5] < 64.0f ||
-        std::abs(data[1] * data[0] - 1.0f) > 1e-3f) {
+void CameraMotion::OnConstants(const float* data, size_t float_count) {
+    // Keep the old validated Bloodborne layout for the desktop/non-GoW3 path.
+    // The CUSA01715 path below deliberately does not inherit those offsets.
+    if (!std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) {
+        if (!data || float_count < 192 || frame_has_camera) return;
+        if (data[0] != 3000.0f || data[4] < 64.0f || data[5] < 64.0f ||
+            std::abs(data[1] * data[0] - 1.0f) > 1e-3f) return;
+        std::memcpy(current.view.data(), data + 8, 12 * sizeof(float));
+        std::memcpy(current.inv_view.data(), data + 180, 12 * sizeof(float));
+        current.proj = {data[52], data[57], data[62], data[63]};
+        current.valid = current.proj[0] != 0.0f && current.proj[1] != 0.0f;
+        render_size = {u32(data[4]), u32(data[5])};
+        frame_has_camera = current.valid;
         return;
     }
-    if (frame_has_camera) {
-        return; // the first one of a frame is the main camera
+    // GoW III CUSA01715 does not use Bloodborne's far=3000, offset+8/+180
+    // 864-byte signature. Inspect matrices actually bound by scene shaders.
+    // Only algebraically inverse rigid transforms and valid perspective
+    // projections are accepted; never synthesize a valid camera from zeros.
+    if (!depth_id || !data || float_count < 16 || float_count > 1024)
+        return;
+    if (frame_has_camera && frame_pose_votes >= 3) return;
+    // The forward renderer binds many constant buffers per draw. An exhaustive
+    // affine-pair search can consume the GPU command CPU thread, becoming more
+    // expensive than the FSR dispatch it is trying to enable. Cap expensive
+    // discovery to six blocks per frame while no verified layout is known.
+    // Retain this across present frames only for the current selected frame.
+    if (++frame_scanned_buffers > 6) return;
+
+    if (!have_projection) {
+        const auto lens = Gow3CameraLayout::FindProjection(data, float_count);
+        if (lens.valid) {
+            frame_projection = lens.projection;
+            have_projection = true;
+            if (!reported_camera)
+                std::printf("GOW3_CAMERA_LENS offset=%u sx=%g sy=%g z=%g dz=%g\n",
+                            lens.offset, frame_projection[0], frame_projection[1],
+                            frame_projection[2], frame_projection[3]);
+        }
     }
-    previous = current;
-    std::memcpy(current.view.data(), data + 8, 12 * sizeof(float));
-    std::memcpy(current.inv_view.data(), data + 180, 12 * sizeof(float));
-    current.proj = {data[52], data[57], data[62], data[63]};
-    current.valid = current.proj[0] != 0.0f && current.proj[1] != 0.0f;
-    const std::array<u32, 2> size{u32(data[4]), u32(data[5])};
-    if (size != render_size) {
-        std::printf("Camera motion: scene render size %ux%u\n", size[0], size[1]);
-        render_size = size;
+    if (!have_pose || frame_pose_votes < 3) {
+        const auto pose = Gow3CameraLayout::FindPose(data, float_count);
+        if (pose.valid) {
+            if (!have_pose) {
+                frame_view = pose.view;
+                frame_inverse = pose.inverse;
+                have_pose = true;
+                frame_pose_votes = 1;
+                if (!reported_camera)
+                    std::printf("GOW3_CAMERA_PAIR view_offset=%u inverse_offset=%u bytes=%zu\n",
+                                pose.view_offset, pose.inverse_offset,
+                                float_count * sizeof(float));
+            } else if (Gow3CameraLayout::SimilarPose(frame_view, pose.view) &&
+                       Gow3CameraLayout::SimilarPose(frame_inverse, pose.inverse)) {
+                ++frame_pose_votes; // a shared scene camera is bound to many draws
+            }
+        }
     }
-    frame_has_camera = true;
+    if (have_pose && have_projection && frame_pose_votes >= 2) {
+        current.view = frame_view;
+        current.inv_view = frame_inverse;
+        current.proj = frame_projection;
+        current.valid = true;
+        frame_has_camera = true;
+        if (!reported_camera) {
+            reported_camera = true;
+            std::printf("GOW3_CAMERA_VERIFIED pair=1 projection=1 votes=%u depth=%d\n",
+                        frame_pose_votes, int(bool(depth_id)));
+        }
+    }
 }
 
 void CameraMotion::OnGBufferPass(VideoCore::ImageId depth) {
@@ -245,11 +312,32 @@ void CameraMotion::OnGBufferPass(VideoCore::ImageId depth) {
 }
 
 void CameraMotion::OnDisplayPass(VideoCore::ImageId frame) {
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) {
+        static u32 camera_frames = 0;
+        const u32 frame_number = ++camera_frames;
+        // Include gameplay, not only the six loading-screen frames as before.
+        if (frame_number == 1 || frame_number == 600 || frame_number == 1800 ||
+            frame_number == 3600 || frame_number == 6000) {
+            std::printf("GOW3_FSR_CAMERA frame=%u captured=%d current=%d previous=%d depth=%d scene=%ux%u\n",
+                        frame_number, int(frame_has_camera), int(current.valid),
+                        int(previous.valid), int(bool(depth_id)),
+                        render_size[0], render_size[1]);
+        }
+    }
     if (debug_overlay && frame && depth_id && current.valid && previous.valid) {
         Overlay(frame);
     }
-    if (!frame_has_camera) InvalidateHistory();
+    // Freeze the just completed scene camera as the previous frame. The next
+    // scene must acquire its own transform before history may be reprojected.
+    if (frame_has_camera && current.valid) {
+        previous = current;
+    } else {
+        InvalidateHistory();
+    }
+    current.valid = false;
     frame_has_camera = false;
+    have_pose = have_projection = false;
+    frame_pose_votes = frame_scanned_buffers = 0;
     depth_id = {};
 }
 

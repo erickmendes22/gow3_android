@@ -231,23 +231,30 @@ void Scheduler::KickRecording(bool force) {
     if (!recording_threaded) {
         return;
     }
+    std::scoped_lock kick_lock{kick_mutex};
     // Callers kick where nobody holds the raw command buffer: deferral resumes.
     direct_mode = false;
     // Batches of tens of KiB keep the queue handoff cheap relative to the work it carries.
-    if (!force && full_chunks.empty() && record_chunk->Size() < 32 * 1024) {
+    if (!force && full_chunks.empty() && CurrentChunk().Size() < 32 * 1024) {
         return;
     }
-    if (full_chunks.empty() && record_chunk->Empty()) {
+    if (full_chunks.empty() && CurrentChunk().Empty()) {
         return;
     }
+    // Acquire the replacement before handing over the current chunk. This mirrors Bloodborne's
+    // issue #100 fix: record_chunk remains valid throughout the handover, including if another
+    // recording path is entered while the queue lock is held.
+    std::unique_ptr<RecordChunk> next_record =
+        CurrentChunk().Empty() ? nullptr : AcquireChunk();
     bool wake;
     {
         std::scoped_lock lk{recorder_mutex};
         for (auto& chunk : full_chunks) {
             recorder_queue.push_back(std::move(chunk));
         }
-        if (!record_chunk->Empty()) {
-            recorder_queue.push_back(std::move(record_chunk));
+        if (next_record) {
+            record_chunk.swap(next_record);
+            recorder_queue.push_back(std::move(next_record));
         }
         wake = recorder_sleeping;
         queued_chunks.store(recorder_queue.size(), std::memory_order_release);
@@ -256,9 +263,6 @@ void Scheduler::KickRecording(bool force) {
     // A busy recorder picks the new chunks up by itself: waking it is a syscall per draw.
     if (wake) {
         recorder_cv.notify_one();
-    }
-    if (!record_chunk) {
-        record_chunk = AcquireChunk();
     }
 }
 
@@ -413,6 +417,24 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
     std::scoped_lock lk{submit_mutex};
     const u64 signal_value = work_semaphore.NextTick();
 
+    // BACHATA ARM64's bounded timeline policy: do not issue
+    // vkGetSemaphoreCounterValue on every submit (a costly Turnip ioctl).
+    // Instead, at most eight submissions remain in flight. We block on an
+    // exact, already submitted GPU tick only if the producer outruns the GPU.
+    // Readback demand paths retain their own mandatory waits; no guest memory
+    // becomes visible until its matching timeline tick is complete.
+    constexpr u64 MaxAndroidInFlightSubmissions = 8;
+    // Cache the policy once: this is the hot path for thousands of submissions.
+    // GOW3_VK_POLL_EACH_SUBMIT=1 re-enables the old path for device A/B testing.
+    static const bool bounded_submit = [] {
+        const char* opt_out = std::getenv("GOW3_VK_POLL_EACH_SUBMIT");
+        return std::getenv("GOW3_ANDROID_PORT") != nullptr &&
+               !(opt_out && opt_out[0] == '1');
+    }();
+    if (bounded_submit && signal_value > MaxAndroidInFlightSubmissions) {
+        work_semaphore.Wait(signal_value - MaxAndroidInFlightSubmissions);
+    }
+
 #if TRACY_GPU_ENABLED
     auto* profiler_ctx = instance.GetProfilerContext();
     if (profiler_ctx) {
@@ -465,7 +487,12 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
     auto submit_result = instance.GetGraphicsQueue().submit(submit_info, info.fence);
     ASSERT_MSG(submit_result != vk::Result::eErrorDeviceLost, "Device lost during submit");
 
-    work_semaphore.Refresh();
+    // On Android, completion is cached and advanced by the bounded wait
+    // above, explicit guest readback waits, or the deferred-ops poller (which
+    // already throttles Refresh calls). Never refresh unconditionally here.
+    if (!bounded_submit) {
+        work_semaphore.Refresh();
+    }
     AllocateWorkerCommandBuffers();
 
     // Apply pending operations

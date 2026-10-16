@@ -60,6 +60,21 @@ typedef struct GuestThread {
 
 static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
 static ThreadAttr *attributes;
+static void *thread_object_alloc(size_t bytes) {
+#ifdef __ANDROID__
+    return runtime_low_map(bytes,PROT_READ|PROT_WRITE);
+#else
+    return calloc(1,bytes);
+#endif
+}
+static void thread_attr_free(void *p) {
+#ifdef __ANDROID__
+    munmap(p,16384); // runtime_low_map rounds these small objects to the guest page size.
+#else
+    free(p);
+#endif
+}
+
 static GuestThread *threads;
 static _Thread_local GuestThread *current;
 static _Thread_local int32_t guest_errno;
@@ -90,7 +105,12 @@ static void set_gs(void *base) {
 /* The guest TCB base goes through the boundary: on x86-64 hosts it is arch_prctl(ARCH_SET_GS)
  * (src/runtime_cpu.c); with the JIT the guest CPU owns how the guest sees GS. */
 static void set_gs(void *base) { guest_cpu_set_gs(base); }
+#ifdef __ANDROID__
+// Guest TCB/static TLS pointers must stay below 40 bits; Scudo addresses need not.
+#define tls_block_alloc(size) runtime_low_map(size,PROT_READ|PROT_WRITE)
+#else
 #define tls_block_alloc(size) aligned_alloc(64,size)
+#endif
 #endif
 /* Build TCB/static TLS for the calling host thread and point GS at it. */
 static void attach(GuestThread *t) {
@@ -110,7 +130,7 @@ static void attach(GuestThread *t) {
     current=t;
 }
 static GuestThread *new_thread(void) {
-    GuestThread *t=calloc(1,sizeof(*t));
+    GuestThread *t=thread_object_alloc(sizeof(*t));
     if (!t) return NULL;
     t->attr=(ThreadAttr){.magic=ATTR_MAGIC,.policy=1,.prio=DEFAULT_PRIO,.stack=DEFAULT_STACK,.affinity=0x7f};
     return t;
@@ -161,7 +181,7 @@ int32_t *runtime_errno(void) { return &guest_errno; }
 
 static ABI int32_t attr_init(ThreadAttr **out) {
     if (!out) return ERR(22);
-    ThreadAttr *a=calloc(1,sizeof(*a));
+    ThreadAttr *a=thread_object_alloc(sizeof(*a));
     if (!a) return ERR(12);
     *a=(ThreadAttr){.magic=ATTR_MAGIC,.policy=1,.prio=DEFAULT_PRIO,.inherit=4,.stack=DEFAULT_STACK,.guard=4096,.affinity=0x7f};
     pthread_mutex_lock(&lock); a->next=attributes; attributes=a; pthread_mutex_unlock(&lock);
@@ -175,7 +195,7 @@ static ABI int32_t attr_destroy(ThreadAttr **slot) {
     while (*link!=a) link=&(*link)->next;
     *link=a->next; a->magic=0;
     pthread_mutex_unlock(&lock);
-    free(a); *slot=NULL; return 0;
+    thread_attr_free(a); *slot=NULL; return 0;
 }
 static ABI int32_t attr_get(void *thread,ThreadAttr **out) {
     ThreadAttr *a=find_attr(out);

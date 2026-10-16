@@ -7,6 +7,7 @@
 #include <string>
 #include "gow3_perf_stats.h"
 #include "gow3_settings.h"
+#include "gow3_overlay_position.h"
 
 namespace P = Gow3PerfStats;
 
@@ -18,6 +19,10 @@ static std::string Read(const char* path) {
 }
 
 int main() {
+    assert(Gow3Overlay::Position(0).x == 0.0f);
+    assert(Gow3Overlay::Position(1).x == 1.0f);
+    assert(Gow3Overlay::Position(4).x == 0.5f && Gow3Overlay::Position(4).y == 0.0f);
+    assert(Gow3Overlay::Position(2).y == 1.0f && Gow3Overlay::Position(3).y == 1.0f);
     assert(P::CpuPercent(50, 100, 1) == 50.0f);
     assert(P::CpuPercent(400, 100, 8) == 50.0f);
     assert(P::CpuPercent(5000, 100, 4) == 100.0f);
@@ -63,15 +68,19 @@ int main() {
     assert(v.overlay_layout == 1 && v.menu_tab == 3);
     v.overlay_items = P::Fps | P::Ram;
     v.overlay_scale = 150;
+    v.overlay_corner = 4;
     v.overlay_opacity = 70;
     v.menu_tab = 1;
     Gow3Settings::Save();
     const std::string saved = Read(path);
     for (const char* line : {"overlay_fps=1\n", "overlay_frametime=0\n", "overlay_ram=1\n", "overlay_vram=0\n",
-                             "overlay_scale=150\n", "overlay_corner=2\n", "overlay_opacity=70\n",
+                             "overlay_scale=150\n", "overlay_corner=4\n", "overlay_opacity=70\n",
                              "overlay_layout=1\n", "menu_tab=1\n"}) {
         assert(saved.find(line) != std::string::npos);
     }
+    v.overlay_corner = 0;
+    Gow3Settings::Load();
+    assert(v.overlay_corner == 4); // top-center survives a save/reload
     {
         std::ofstream out(path);
         out << "overlay_corner=9\nmenu_tab=-1\noverlay_scale=10\n";

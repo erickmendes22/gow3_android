@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "gow3_overlay.h"
+#include "gow3_overlay_position.h"
+#include "gow3_imgui_vulkan_loader.h"
+#include "gow3_pad_input.h"
 
 #include <algorithm>
 #include <atomic>
@@ -10,9 +13,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <stdexcept>
 #include <vector>
 
+#ifndef __ANDROID__
 #include <SDL3/SDL.h>
+#endif
 #include "gow3_settings.h"
 #include "gow3_orbs.h"
 #include "gow3_actors.h"
@@ -77,11 +83,32 @@ std::string choice_title;
 std::vector<std::string> choice_items;
 int choice_index = 0;
 std::atomic<int> choice_result{-1}; // -1 open, -2 cancelled, else the chosen index
+// Android virtual buttons are written to GOW3_PAD_FILE instead of SDL events.
+unsigned choice_pad_held = 0;
+unsigned ChoicePadMask() {
+    static const char* path = std::getenv("GOW3_PAD_FILE");
+    if (!path || !*path) return 0;
+    FILE* file = std::fopen(path, "r");
+    if (!file) return 0;
+    unsigned mask = 0;
+    char word[64];
+    while (std::fscanf(file, "%63s", word) == 1) {
+        if (!std::strcmp(word, "up")) mask |= 1u;
+        else if (!std::strcmp(word, "down")) mask |= 2u;
+        else if (!std::strcmp(word, "cross")) mask |= 4u;
+        else if (!std::strcmp(word, "circle")) mask |= 8u;
+    }
+    std::fclose(file);
+    return mask;
+}
 // Save pictures: decoded by BeginChoice, made textures on the present thread (null = none).
 // Closed lists' textures wait in choice_retired until the backend has destroyed them.
 std::vector<Gow3Png::Image> choice_pictures;
 std::vector<ImTextureData*> choice_textures, choice_retired;
 std::atomic<bool> choice_retiring{false};
+// runtime_pad.c 发布的 pad 文件按键(Android 的屏幕手柄不产生任何 SDL 事件,存档列表只能靠它)。
+// 桌面的 SDL 文本框走 SDL 事件,Android 的文本输入走 app 自己的对话框,两者都不消费这个快照。
+std::atomic<u32> pad_published{0}, pad_seen{0};
 float base_scale = 1.0f;
 
 // Present rate for the FPS counter.
@@ -102,6 +129,7 @@ void SetOpen(bool value) {
     }
 }
 
+#ifndef __ANDROID__
 ImGuiKey KeyFromSdl(SDL_Keycode key) {
     switch (key) {
     case SDLK_TAB: return ImGuiKey_Tab;
@@ -154,6 +182,8 @@ float PixelDensity(SDL_WindowID id) {
     const float density = window ? SDL_GetWindowPixelDensity(window) : 1.0f;
     return density > 0.0f ? density : 1.0f;
 }
+
+#endif
 
 // Marks the settings dirty when a widget changed them.
 template <typename T>
@@ -280,7 +310,10 @@ const Vulkan::Instance* overlay_instance = nullptr; // for the overlay's measure
 std::string OverlayText() {
     namespace P = Gow3PerfStats;
     const auto& s = Gow3Settings::Get();
-    const unsigned items = s.overlay_items;
+    // Android presents direct game frames; hide the obsolete scaler status
+    // from the HUD even if an older gow3.ini still has the legacy bit set.
+    const unsigned items = s.overlay_items &
+        (std::getenv("GOW3_ANDROID_PORT") ? ~unsigned(P::Upscaler) : ~0u);
     if ((items & (P::Gpu | P::Cpu | P::Ram | P::Vram)) && overlay_instance) {
         P::Start(*overlay_instance);
     }
@@ -375,17 +408,26 @@ void ImageTab() {
     const bool rcas_blocked = s.rcas && !s.rcas_applied;
     ImGui::SeparatorText("Scaling and sharpening");
     if (BeginRows("##scaling")) {
-        CheckRow("Upscale with FSR 1", s.fsr1,
-                 "Enlarges a smaller game image to the window. For more FPS: Render resolution 720p + FSR 1.");
+        if (!std::getenv("GOW3_ANDROID_PORT"))
+            CheckRow("Upscale with FSR 1", s.fsr1,
+                     "Enlarges a smaller game image to the window.");
         ImGui::BeginDisabled(rcas_blocked);
         CheckRow("Sharpening (RCAS)", s.rcas,
                  rcas_blocked && downscaling ? "No effect: the game's image is larger than the window."
-                 : rcas_blocked              ? "Needs FSR 1: the game's image is smaller than the window."
+                 : rcas_blocked              ? "Unavailable at the current output size."
                                              : "Sharpens the final image.");
         ImGui::EndDisabled();
         ImGui::BeginDisabled(!s.rcas || rcas_blocked);
         SliderRow("Sharpening strength", s.rcas_strength, 0, 100, "%d%%", "How strong the sharpening is.");
         ImGui::EndDisabled();
+        ImGui::EndTable();
+    }
+    ImGui::SeparatorText("Textures (applied on restart)");
+    if (BeginRows("##textures")) {
+        static const char* const labels[] = {"Game default", "2x", "4x", "8x", "16x"};
+        ChoiceRow("Anisotropic filtering", s.anisotropy, labels, G::Anisotropies.data(),
+                  int(G::Anisotropies.size()),
+                  "Sharper floors and walls seen at an angle. Little cost on most GPUs.");
         ImGui::EndTable();
     }
     ImGui::SeparatorText("Information");
@@ -395,7 +437,8 @@ void ImageTab() {
         InfoRow("Game image", text);
         std::snprintf(text, sizeof(text), "%d x %d", ww, wh);
         InfoRow("Window", text);
-        InfoRow("FSR 1", !s.fsr1 ? "off" : upscaling ? "active" : "no effect (image not smaller than window)");
+        if (!std::getenv("GOW3_ANDROID_PORT"))
+            InfoRow("FSR 1", !s.fsr1 ? "off" : upscaling ? "active" : "no effect");
         InfoRow("Sharpening", s.rcas_applied ? "applied" : "not applied");
         ImGui::EndTable();
     }
@@ -427,7 +470,9 @@ void PerformanceTab() {
     }
     ImGui::SeparatorText("Applied on restart");
     if (BeginRows("##restart")) {
-        static const char* const resolution_labels[] = {"Native (1080p)", "480p", "720p", "1440p", "1800p", "4K"};
+        static const char* const resolution_labels[] = {
+            "240p", "360p", "424p", "480p", "540p", "720p",
+            "800p", "1080p", "1440p", "1800p", "4K"};
         ChoiceRow("Render resolution", s.render_resolution, resolution_labels, nullptr, int(G::Resolutions.size()),
                   "The resolution the game draws at. Higher is sharper and slower.");
         static const char* const engine_labels[] = {"60 (original)", "120", "240"};
@@ -455,6 +500,7 @@ void OverlayTab() {
         static const char* const names[] = {"FPS", "Frametime", "Upscaler", "GPU (name and use)", "CPU (game)",
                                             "RAM (game / total)", "VRAM (used / available)"};
         for (unsigned item = 0; item < 7; ++item) {
+            if (item == 2 && std::getenv("GOW3_ANDROID_PORT")) continue;
             const unsigned bit = 1u << item;
             bool on = (s.overlay_items & bit) != 0;
             if (ImGui::Checkbox(names[item], &on)) {
@@ -475,8 +521,8 @@ void OverlayTab() {
     ImGui::SeparatorText("Appearance");
     if (BeginRows("##appearance")) {
         SliderRow("Font size", s.overlay_scale, 50, 300, "%d%%", "Size of the overlay text.");
-        static const char* const corners[] = {"Top left", "Top right", "Bottom left", "Bottom right"};
-        ChoiceRow("Corner", s.overlay_corner, corners, nullptr, 4, "Where the overlay sits.");
+        static const char* const corners[] = {"Top left", "Top right", "Bottom left", "Bottom right", "Top center"};
+        ChoiceRow("Position", s.overlay_corner, corners, nullptr, 5, "Where the overlay sits.");
         SliderRow("Background opacity", s.overlay_opacity, 0, 100, "%d%%", "0% is no background.");
         static const char* const layouts[] = {"One line", "One item per line"};
         ChoiceRow("Layout", s.overlay_layout, layouts, nullptr, 2, "Items side by side or stacked.");
@@ -771,11 +817,10 @@ void FpsCounter() {
     }
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float pad = 12.0f * base_scale;
-    const int corner = s.overlay_corner;
-    const bool right = corner == 1 || corner == 3, bottom = corner >= 2;
-    ImGui::SetNextWindowPos(ImVec2(right ? viewport->WorkPos.x + viewport->WorkSize.x - pad : viewport->WorkPos.x + pad,
-                                   bottom ? viewport->WorkPos.y + viewport->WorkSize.y - pad : viewport->WorkPos.y + pad),
-                            ImGuiCond_Always, ImVec2(right ? 1.0f : 0.0f, bottom ? 1.0f : 0.0f));
+    const auto anchor = Gow3Overlay::Position(s.overlay_corner);
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + pad + (viewport->WorkSize.x - 2 * pad) * anchor.x,
+                                   viewport->WorkPos.y + pad + (viewport->WorkSize.y - 2 * pad) * anchor.y),
+                            ImGuiCond_Always, ImVec2(anchor.x, anchor.y));
     ImGui::SetNextWindowBgAlpha(s.overlay_opacity / 100.0f);
     ImGui::Begin("##fps", nullptr,
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
@@ -830,13 +875,22 @@ void Init(const Vulkan::Instance& instance, vk::Format format, u32 image_count) 
                                    int(gow3_font_ttf_end - gow3_font_ttf), 18.0f, &font_config);
 
     const vk::Instance vk_instance = instance.GetInstance();
-    ImGui_ImplVulkan_LoadFunctions(
+    const bool functions_loaded = ImGui_ImplVulkan_LoadFunctions(
         instance.ApiVersion(),
         [](const char* name, void* user) {
-            return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(
-                *static_cast<const vk::Instance*>(user), name);
+#ifdef __ANDROID__
+            constexpr bool ahb = true;
+#else
+            constexpr bool ahb = false;
+#endif
+            return ResolveImGuiFunction(VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
+                *static_cast<const vk::Instance*>(user), name, ahb);
         },
         const_cast<vk::Instance*>(&vk_instance));
+    if (!functions_loaded) {
+        ImGui::DestroyContext();
+        throw std::runtime_error("Overlay Vulkan function loading failed");
+    }
 
     const VkFormat color_format = static_cast<VkFormat>(format);
     ImGui_ImplVulkan_InitInfo info{};
@@ -866,6 +920,7 @@ void Init(const Vulkan::Instance& instance, vk::Format format, u32 image_count) 
     std::printf("Overlay: menu ready (Insert or R3+L2)\n");
 }
 
+#ifndef __ANDROID__
 void UpdateTextInput(SDL_Window* window) {
     bool want = false;
     {
@@ -880,6 +935,10 @@ void UpdateTextInput(SDL_Window* window) {
         }
     }
 }
+
+#else
+void UpdateTextInput(SDL_Window*) {}
+#endif
 
 // imgui_mutex held. The backend frees a texture some frames after its last use.
 void RetireChoiceTextures() {
@@ -922,8 +981,23 @@ void UpdateChoiceTextures() {
     choice_retiring = !choice_retired.empty();
 }
 
+// 施加列表动作的唯一入口,这样 SDL 事件和 pad 快照不会对同一个键各移动或各关闭一次。
+// finish:1 确认,2 取消。调用方持有 imgui_mutex。
+static void ApplyChoiceAction(int move, int finish) {
+    const int count = int(choice_items.size());
+    if (move && count) {
+        choice_index = (choice_index + move + count) % count;
+    }
+    if (finish) {
+        choice_result = finish == 1 && count ? choice_index : -2;
+        choice_active = false;
+        RetireChoiceTextures();
+    }
+}
+
 // The save list takes the keys and buttons that move and confirm; the rest stays with the game
 // (held neutral by CapturesInput).
+#ifndef __ANDROID__
 bool HandleChoiceEvent(const SDL_Event& event) {
     int move = 0, finish = 0; // finish: 1 accept, 2 cancel
     if (event.type == SDL_EVENT_KEY_DOWN) {
@@ -939,15 +1013,7 @@ bool HandleChoiceEvent(const SDL_Event& event) {
     } else {
         return event.type == SDL_EVENT_KEY_UP || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP;
     }
-    const int count = int(choice_items.size());
-    if (move && count) {
-        choice_index = (choice_index + move + count) % count;
-    }
-    if (finish) {
-        choice_result = finish == 1 && count ? choice_index : -2;
-        choice_active = false;
-        RetireChoiceTextures();
-    }
+    ApplyChoiceAction(move, finish);
     return true;
 }
 
@@ -1063,6 +1129,10 @@ bool HandleEvent(const SDL_Event& event) {
     }
 }
 
+#else
+bool HandleEvent(const SDL_Event&) { return false; }
+#endif
+
 // After "Apply and restart", the new options are kept once the game has shown about ten
 // seconds of frames after loading (run.py restores the previous ones otherwise).
 void ConfirmRestart() {
@@ -1098,6 +1168,32 @@ bool CapturesInput() {
     return menu_open || text_entry_active || choice_active;
 }
 
+void PublishPad(u32 buttons) { pad_published.store(buttons); }
+
+/* 自上次读取以来新出现的位:按下是边沿,不是 pad 文件里那种持续的电平。调用方负责让
+ * `pad_seen` 跟上,所以对话框弹出时仍被按住的键不会被当成一次新的按下。 */
+u32 PadEdges() {
+    return Gow3Pad::Edges(pad_published.load(), pad_seen);
+}
+
+void PollMenuShortcut() {
+    static const bool android_input = [] {
+        const char* value = std::getenv("GOW3_ANDROID_INPUT");
+        return value && value[0] == '1';
+    }();
+    if (!android_input) {
+        return;
+    }
+    static bool combo_down = false;
+    const u32 buttons = pad_published.load(std::memory_order_relaxed);
+    const bool combo = (buttons & (Gow3Pad::kR3 | Gow3Pad::kL2)) ==
+                       (Gow3Pad::kR3 | Gow3Pad::kL2);
+    if (combo && !combo_down) {
+        SetOpen(!menu_open.load(std::memory_order_relaxed));
+    }
+    combo_down = combo;
+}
+
 void BeginChoice(const std::string& title, const std::vector<std::string>& items,
                  std::vector<Gow3Png::Image> pictures, int focus) {
     std::scoped_lock lock{imgui_mutex};
@@ -1108,11 +1204,38 @@ void BeginChoice(const std::string& title, const std::vector<std::string>& items
     choice_items = items;
     choice_index = focus >= 0 && focus < int(items.size()) ? focus : 0;
     choice_result = -1;
+    // Ignore buttons held when entering the save menu; require a new press.
+    choice_pad_held = ChoicePadMask();
     choice_active = true;
+    /* 列表弹出之前就被按住的键,不算对它的一次按下。 */
+    Gow3Pad::Forget(pad_seen, pad_published.load());
 }
 
 int PollChoice() {
-    return choice_result;
+    if (!choice_active || !std::getenv("GOW3_PAD_FILE")) return choice_result.load();
+    std::scoped_lock lock{imgui_mutex};
+    if (!choice_active) return choice_result.load();
+    const unsigned held = ChoicePadMask();
+    const unsigned pressed = held & ~choice_pad_held;
+    choice_pad_held = held;
+    const int count = int(choice_items.size());
+    if (count) {
+        if (pressed & 1u) choice_index = (choice_index + count - 1) % count;
+        if (pressed & 2u) choice_index = (choice_index + 1) % count;
+    }
+    if (pressed & (4u | 8u)) {
+        choice_result = ((pressed & 4u) && count) ? choice_index : -2;
+        choice_active = false;
+        RetireChoiceTextures();
+    }
+    return choice_result.load();
+}
+
+void CancelChoice() {
+    // runtime 放弃等待了(没有任何输入源能到达列表)。列表必须真的关掉:choice_active 只要还是
+    // true,它就会继续绘制,并继续扣住游戏的输入。
+    std::scoped_lock lock{imgui_mutex};
+    if (choice_active) ApplyChoiceAction(0, 2);
 }
 
 void SetTextEntry(bool active, const std::string& prompt, const std::string& text) {
@@ -1123,6 +1246,7 @@ void SetTextEntry(bool active, const std::string& prompt, const std::string& tex
 }
 
 void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
+    PollMenuShortcut();
     // Present interval for the FPS readout (measured also while nothing is drawn).
     const auto now = std::chrono::steady_clock::now();
     const float ms = std::chrono::duration<float, std::milli>(now - last_present).count();

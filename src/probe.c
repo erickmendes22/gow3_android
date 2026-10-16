@@ -30,9 +30,31 @@
 #include <ucontext.h>
 #include <fcntl.h>
 #include <dlfcn.h>
+#ifdef __ANDROID__
+#include <unwind.h>
+#include <sys/prctl.h>
+#else
 #include <execinfo.h>
+#endif
 #include <sys/syscall.h>
 #include <sys/uio.h>
+#endif
+
+#if defined(__ANDROID__) && !defined(_WIN32)
+typedef struct { void **frames; int count, max; } UnwindState;
+static _Unwind_Reason_Code unwind_step(struct _Unwind_Context *context, void *argument) {
+    UnwindState *state = argument;
+    uintptr_t pc = _Unwind_GetIP(context);
+    if (!pc) return _URC_END_OF_STACK;
+    if (state->count >= state->max) return _URC_END_OF_STACK;
+    state->frames[state->count++] = (void *)pc;
+    return _URC_NO_REASON;
+}
+static int backtrace(void **frames, int max) {
+    UnwindState state = {frames, 0, max};
+    _Unwind_Backtrace(unwind_step, &state);
+    return state.count;
+}
 #endif
 
 typedef struct { uint64_t address, size, flags; } Segment;
@@ -564,8 +586,16 @@ void runtime_restart(void) {
     TerminateProcess(GetCurrentProcess(),0);
 #else
     puts("Runtime: restarting through run.sh");
+#ifdef __ANDROID__
+    // close_range is blocked by Android seccomp on supported devices.
+    long max_fd = sysconf(_SC_OPEN_MAX);
+    for (int fd = 3; fd < (max_fd > 0 ? max_fd : 65536); ++fd) close(fd);
+    const char* runner = getenv("GOW3_BIONIC_RUNNER");
+    if (runner && *runner) execl("/system/bin/sh", "sh", runner, "game", (char*)NULL);
+#else
     syscall(SYS_close_range, 3u, ~0u, 0u);
     execlp("bash", "bash", "run.sh", (char *)NULL);
+#endif
     perror("runtime_restart: exec");
     _exit(1);
 #endif
@@ -573,11 +603,26 @@ void runtime_restart(void) {
 
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IONBF, 0);
+#ifdef __ANDROID__
+    /* The launcher tracks the runner shell. Kill the native child too when the
+       app stops/restarts that shell, including during an internal game restart. */
+    pid_t parent = getppid();
+    if (parent == 1 || prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != parent) {
+        fputs("Bionic: launcher parent is unavailable\n", stderr);
+        return 2;
+    }
+#endif
 #ifndef _WIN32
     /* Keep host heap objects handed to the guest (thread handles, TLS) in the
        non-PIE brk heap, i.e. below 1 TiB: the guest packs pointers into 40 bits. */
+#ifdef __ANDROID__
+    // Scudo does not support glibc's brk-heap tunables. Guest code stores 40-bit pointers;
+    // runtime_low_map remains responsible for allocations crossing the guest boundary.
+    mallopt(M_BIONIC_SET_HEAP_TAGGING_LEVEL, M_HEAP_TAGGING_LEVEL_NONE);
+#else
     mallopt(M_ARENA_MAX,1);
     mallopt(M_MMAP_THRESHOLD,32*1024*1024);
+#endif
     /* The guest CPU allocates the memory the guest may hold pointers to through this (below
      * 1 TiB). No-op on x86-64 hosts (src/runtime_cpu.c). */
     guest_cpu_init(runtime_low_map);

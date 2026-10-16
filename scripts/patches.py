@@ -70,9 +70,11 @@ def find_pattern(image, pattern, limit=2):
 
 
 def locate(image, element, prefix=''):
-    """Image offset of a Line's or Target's site: its Pattern (unique) plus At, else Address."""
+    """实际映像必须唯一匹配特征码；无映像的参考编译才允许 Address。"""
     pattern=element.get(prefix+'Pattern')
     if not pattern:
+        if image is not None:
+            raise ValueError('missing signature')
         return int(element.get('Address'),0)-EBOOT_BASE
     found=find_pattern(image,parse_pattern(pattern))
     if len(found)!=1:
@@ -88,10 +90,15 @@ def resolve_targets(image, meta, sites):
     for target in meta.iter('Target'):
         name=target.get('Name')
         if target.get('Line'):
-            targets[name]=sites[int(target.get('Line'))]
+            index=int(target.get('Line'))
+            if not 0 <= index < len(sites) or sites[index] is None:
+                raise ValueError('invalid target line reference')
+            targets[name]=sites[index]
             continue
         at=locate(image,target)
         if target.get('Ref'):
+            if at < 0 or at + 4 > len(image):
+                raise ValueError('reference operand outside the image')
             disp,=struct.unpack_from('<i',image,at)
             at=at+4+int(target.get('Tail','0'))+disp
         targets[name]=at
@@ -133,26 +140,34 @@ def compile_patches(xml, names, app_version, segments, image=None, skipped=None)
     for meta in ET.parse(xml).getroot().iter('Metadata'):
         if meta.get('Name') in names and app_version in (None,meta.get('AppVer')) and meta.get('AppElf','eboot.bin')=='eboot.bin':
             found[meta.get('Name')]=meta
-    missing=[n for n in names if n not in found]
-    if missing: raise ValueError(f'patches not found for app version {app_version}: {missing}')
     writes=[]
-    for name in names:
-        lines=list(found[name].iter('Line'))
+    for name in dict.fromkeys(names):
         try:
-            sites=[locate(image,line) if image is not None else int(line.get('Address'),0)-EBOOT_BASE
+            if name not in found:
+                raise ValueError(f'patch not found for app version {app_version}')
+            lines=list(found[name].iter('Line'))
+            if not lines:
+                raise ValueError('empty patch')
+            sites=[(None if line.get('Target') else locate(image,line)) if image is not None else int(line.get('Address'),0)-EBOOT_BASE
                    for line in lines]
             targets=(resolve_targets(image,found[name],sites) if image is not None else
                      {t.get('Name'):int(t.get('Address'),0)-EBOOT_BASE for t in found[name].iter('Target')})
+            if any(not any(start <= target < end for start,end in segments)
+                   for target in targets.values()):
+                raise ValueError('target outside the eboot')
             sites=[targets[line.get('Target')] if line.get('Target') else site for line,site in zip(lines,sites)]
-        except LookupError as error:
+            ours=[]
+            for line,offset in zip(lines,sites):
+                data=fill(line.get('Value'),offset,targets) if '{' in line.get('Value','') else encode(line)
+                if not 0 < len(data) <= 4096 or not any(start<=offset and offset+len(data)<=end for start,end in segments):
+                    raise ValueError(f'address {offset+EBOOT_BASE:#x} or write length is outside the eboot')
+                ours.append((offset,data))
+        except (LookupError, ValueError, TypeError, struct.error, OverflowError) as error:
             if skipped is None: raise ValueError(f'{name}: {error}')
             skipped[name]=str(error)
             continue
-        for line,offset in zip(lines,sites):
-            data=fill(line.get('Value'),offset,targets) if '{' in line.get('Value','') else encode(line)
-            if not any(start<=offset and offset+len(data)<=end for start,end in segments):
-                raise ValueError(f'{name}: address {offset+EBOOT_BASE:#x} is outside the eboot')
-            writes.append((offset,data))
+        # 整项验证完成后才提交，避免后续行失败时留下部分写入。
+        writes.extend(ours)
     return writes
 
 
@@ -344,6 +359,62 @@ def compile_external(selected, segments):
     return writes
 
 
+
+# Verified directly against the CUSA01715 01.02 retail SELF (SHA-256 below), by
+# extracting its PT_LOAD segments and disassembling the original x86-64 code.
+# These are the ACTUAL instruction operand addresses in that ELF, not the old
+# shadPS4 XML's reference-build Address values. XML Pattern/At still resolves
+# each site first; then the literal original operand and site address are checked.
+CUSA01715_0102_ANDROID_SHA = '6e72330e9092e5164049b865e5568f2d450904001a73fe0a2f4b39194c195b3c'
+CUSA01715_0102_SITES = (0x005f0c5b, 0x005f0c63, 0x005f0c6c, 0x005f0c73,
+                         0x005643e3, 0x005643f0, 0x005ff889, 0x005ff88f)
+CUSA01715_0102_FIELDS = ('width', 'height', 'width', 'height',
+                          'height', 'width', 'width', 'height')
+
+
+def android_native_resolution_writes(xml, image, segments, sha, render_res, patch_names):
+    """Return exact-byte-verified CUSA01715 startup-resize overrides for this ELF.
+
+    Applies ONLY to the supplied 01.02 executable, and never silently treats
+    a selected '720p' setting as an actually applied 640x360 scene. All eight
+    dimensions were checked in disassembly; the ninth XML write adjusts DMEM
+    and is deliberately left untouched. No Bloodborne offsets are used.
+    """
+    if not render_res:
+        return {}, None
+    if sha != CUSA01715_0102_ANDROID_SHA:
+        raise ValueError('Direct resolution requires verified CUSA01715 01.02 eboot.bin')
+    if 'Resolution Patch - 720p' not in patch_names:
+        raise ValueError('Direct resolution requires verified 720p patch template')
+    match = re.fullmatch(r'([0-9]{2,4})x([0-9]{2,4})', render_res)
+    if not match:
+        raise ValueError(f'invalid direct resolution {render_res!r}')
+    width, height = map(int, match.groups())
+    if (width, height) not in ((1280, 720), (960, 540), (854, 480), (752, 424),
+                              (640, 360), (426, 240)):
+        raise ValueError(f'unsupported verified direct resolution: {render_res}')
+    template = compile_patches(xml, ['Resolution Patch - 720p'], '01.02',
+                               segments, image)
+    if len(template) != 9:
+        raise ValueError('incomplete 720p template: expected eight geometry operands and DMEM')
+    overrides = {}
+    for i, (offset, patched) in enumerate(template[:8]):
+        address = offset + EBOOT_BASE
+        expected_address = CUSA01715_0102_SITES[i]
+        if address != expected_address:
+            raise ValueError(f'Resolution operand {i}: got {address:#x}, expected {expected_address:#x}')
+        field = CUSA01715_0102_FIELDS[i]
+        original = (1920 if field == 'width' else 1080).to_bytes(len(patched), 'little')
+        if image[offset:offset + len(patched)] != original:
+            raise ValueError(f'Resolution operand {i}: unexpected original instruction operand at {address:#x}')
+        if patched != (1280 if field == 'width' else 720).to_bytes(len(patched), 'little'):
+            raise ValueError(f'Resolution operand {i}: 720p patch template mismatch at {address:#x}')
+        overrides[offset] = (width if field == 'width' else height).to_bytes(len(patched), 'little')
+    return overrides, {'render': f'{width}x{height}', 'output': f'{width}x{height}',
+                       'verified_eboot_sha256': sha,
+                       'verified_sites': [hex(site) for site in CUSA01715_0102_SITES]}
+
+
 def write_patches(out, writes):
     # G3PATCH2: the patch base, so the loader can rebase pointers the patches write into
     # relocated slots.
@@ -373,7 +444,29 @@ def main():
     elf=(a.out/'eboot.elf').read_bytes()
     segments=eboot_segments(elf)
     skipped={}
-    writes=compile_patches(xml,names,None,segments,eboot_image(elf),skipped)
+    image=eboot_image(elf)
+    writes=compile_patches(xml,names,None,segments,image,skipped)
+    native_input = os.environ.get('GOW3_PATCH_INPUT_RES', '')
+    native_info = None
+    if native_input:
+        # If the 720p patch signature fails, DO NOT report that the new input
+        # resolution was installed with incompatible operands.
+        if 'Resolution Patch - 720p' in skipped:
+            raise ValueError('cannot apply direct resolution: 720p template skipped')
+        overrides, native_info = android_native_resolution_writes(
+            xml,image,segments,sha,native_input,names)
+        unmatched = set(overrides)
+        remapped = []
+        for offset,data in writes:
+            if offset in overrides:
+                data=overrides[offset]
+                unmatched.discard(offset)
+            remapped.append((offset,data))
+        if unmatched:
+            raise ValueError(f'direct resolution overrides missing from patch stream: {sorted(unmatched)}')
+        writes=remapped
+        print(f"Patches: verified CUSA01715 DIRECT render {native_info['render']} "
+              f"({len(overrides)} operand writes)")
     for name,reason in skipped.items():
         print(f'Patches: {name} skipped ({reason} in this eboot.bin)')
     if a.patches_dir and sha==REFERENCE_SHA256:
@@ -383,7 +476,8 @@ def main():
                                                     a.patches_config),segments)
     write_patches(a.out,writes)
     applied=[n for n in names if n not in skipped]
-    (a.out/'patch_status.json').write_text(json.dumps({'sha256':sha,'applied':applied,'skipped':skipped}))
+    (a.out/'patch_status.json').write_text(json.dumps({'sha256':sha,'applied':applied,
+        'skipped':skipped,'android_native_resolution':native_info}))
     print(f'Patches: {title}; {len(writes)} writes from {applied or "none"}')
 
 if __name__=='__main__':

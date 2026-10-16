@@ -49,7 +49,19 @@ set(ENV{PKG_CONFIG_SYSROOT_DIR} "${GOW3_ARM64_SYSROOT}")
 set(ENV{PKG_CONFIG_LIBDIR}
     "${GOW3_ARM64_SYSROOT}/usr/lib/aarch64-linux-gnu/pkgconfig:${GOW3_ARM64_SYSROOT}/usr/share/pkgconfig")
 set(ENV{PKG_CONFIG_PATH} "")
-# Share target dependency isolation with Mesa; never invoke Conda's wrapper.
-set(ENV{GOW3_PKG_CONFIG_SYSROOT} "${GOW3_ARM64_SYSROOT}")
-set(PKG_CONFIG_EXECUTABLE "${GOW3_REPO}/tools/android/build/target-pkg-config.sh"
-    CACHE FILEPATH "Target-only pkg-config" FORCE)
+# pkgconf (conda-forge builds of it) enables --define-prefix by default, which rewrites the
+# "/usr" prefix of the Debian .pc files to a sysroot-relative path. Combined with
+# PKG_CONFIG_SYSROOT_DIR that yields a double-prefixed, non-existent include path
+# (<sysroot>/<sysroot>/usr/lib/include). These two switches restore freedesktop pkg-config
+# behaviour, which prefixes the sysroot exactly once. Both are unknown to freedesktop
+# pkg-config and therefore harmless there.
+set(ENV{PKG_CONFIG_DONT_DEFINE_PREFIX} "1")
+set(ENV{PKG_CONFIG_FDO_SYSROOT_RULES} "1")
+# The env vars above are ignored by older pkgconf; --dont-define-prefix is the authoritative switch
+# and is only understood by pkgconf, so probe for it before handing it to pkg_check_modules.
+execute_process(COMMAND pkg-config --dont-define-prefix --version
+                RESULT_VARIABLE GOW3_PKG_CONFIG_DONT_DEFINE_PREFIX
+                OUTPUT_QUIET ERROR_QUIET)
+if(GOW3_PKG_CONFIG_DONT_DEFINE_PREFIX EQUAL 0)
+    set(PKG_CONFIG_ARGN "--dont-define-prefix")
+endif()

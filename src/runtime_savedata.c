@@ -266,7 +266,14 @@ static ABI int32_t save_search(const SearchCond *cond, SearchResult *result) {
     DIR *d=opendir(base);
     for (struct dirent *e; d && (e=readdir(d));) {
         size_t n=strlen(e->d_name);
-        if (e->d_name[0]=='.' || n>=32 || (n>8 && !strcmp(e->d_name+n-8,".sce_sys"))) continue;
+        /* Metadata and SaveDataMemory are not selectable game saves. */
+        if (e->d_name[0]=='.' || n>=32 ||
+            (n>=7 && !strcmp(e->d_name+n-7,".memory")) ||
+            (n>=8 && !strcmp(e->d_name+n-8,".sce_sys"))) continue;
+        char candidate[720];
+        struct stat candidate_stat;
+        if (snprintf(candidate,sizeof(candidate),"%s/%s",base,e->d_name) >= (int)sizeof(candidate) ||
+            stat(candidate,&candidate_stat) || !S_ISDIR(candidate_stat.st_mode)) continue;
         if (cond->dir && cond->dir->data[0] && !like(e->d_name,cond->dir->data)) continue;
         if (count==capacity) { capacity=capacity ? capacity*2 : 16; entries=realloc(entries,capacity*sizeof(*entries)); }
         snprintf(entries[count].name,32,"%s",e->d_name);
@@ -285,6 +292,8 @@ static ABI int32_t save_search(const SearchCond *cond, SearchResult *result) {
         if (result->infos) { memset(&result->infos[i],0,sizeof(SearchInfo)); result->infos[i].blocks=32768; result->infos[i].free_blocks=16384; }
     }
     result->set_count=set;
+    printf("Runtime: save search user=%d hits=%u returned=%u capacity=%u\n",
+           cond->user, result->hits, result->set_count, result->names_capacity);
     free(entries);
     return 0;
 }

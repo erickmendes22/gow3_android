@@ -61,6 +61,18 @@ class LaunchEnvReasonTests(unittest.TestCase):
         self.assertEqual(plan['updates']['GOW3_PATCH_STATUS'], 'validated')
         self.assertIsNotNone(plan['dmem'])
 
+    def test_android_effect_toggles_preserve_home_resolution_and_mandatory_fixes(self):
+        self.config.write_text('render_resolution=720p\nengine_fps=120\npatch_disable_ssao=1\npatch_skip_video=0\n')
+        plan = self._plan({'GOW3_ANDROID_PORT': '1'})
+        self.assertIn('Disable SSAO', plan['patch_names'])
+        self.assertIn('Resolution Patch - 720p', plan['patch_names'])
+        self.assertIn('Frame Rate Patch - 120 FPS', plan['patch_names'])
+        self.assertIn('Bug Fix - Startup Black Screen', plan['patch_names'])
+        self.assertNotIn('Skip Any Video With X Button', plan['patch_names'])
+        self.assertIn('render_resolution=720p', self.config.read_text())
+        desktop = self._plan()
+        self.assertNotIn('Disable SSAO', desktop['patch_names'])
+
     def test_player_files_remain_byte_identical(self):
         game = self.dir / 'game'
         (game / 'sce_sys').mkdir(parents=True)

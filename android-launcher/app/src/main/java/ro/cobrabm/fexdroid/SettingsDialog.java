@@ -26,11 +26,12 @@ import java.util.Locale;
 import java.util.Map;
 
 /** Graphics settings for the Thor, kept in gow3.ini (run-gow3.sh reads them at start: scene
- *  size, upscaler, the game's effect patches). Other lines and comments of the file are kept. */
+ *  size, game resolution, the game's effect patches). Other lines and comments of the file are kept. */
 final class SettingsDialog {
     /** Scene sizes of the presets at the Thor's 1280x720 output (run-gow3.sh). */
-    private static final String[] PRESETS={"Native (1280×720)","Quality (854×480)","Balanced (752×424)",
-        "Performance (640×360)","Ultra performance (426×240)"};
+    private static final String[] PRESETS={"Native (1280×720)","Quality (854×480)",
+        "Performance (640×360)","Ultra Performance (426×240)"};
+    private static final String[] PRESET_VALUES={"0","1","3","4"};
     private static final String[][] EFFECTS={
         {"effect_chromatic_aberration","Chromatic aberration","1"},
         {"effect_dof","Depth of field","1"},
@@ -40,7 +41,7 @@ final class SettingsDialog {
         {"effect_dynamic_shadows","Shadows from dynamic lights","1"},
         {"effect_ssr","Screen-space reflections (not in the original)","0"},
     };
-    // FSR 4 (INT8) is not offered: ~470 ms a frame and a black scene on the Adreno 740 (run-gow3.sh).
+    // Legacy temporal reconstruction controls are not exposed on Android.
     /** Game settings: the game patches run-gow3.sh applies at start (patch-parts), as upstream's
      *  System menu pages and launcher offer them: {key, title, note, default}. */
     private static final String[][] GAME_PATCHES={
@@ -56,8 +57,12 @@ final class SettingsDialog {
         {"cheat_item","Infinite blood vials and items","Using a blood vial, bullet or other item leaves its count as it was "
             +"(items moved to storage or given away stay too)","0"},
     };
-    private static final String[] UPSCALER_VALUES={"off","fsr3"};
-    private static final String[] UPSCALER_NAMES={"Off (render at 1280×720)","FSR 3.1"};
+    // One selector for all original and newly verified in-game resolutions.
+    // The PS4 original uses the "native" storage key but appears as 1080p.
+    private static final String[] RESOLUTION_VALUES={"240p","360p","424p","480p",
+        "540p","720p","800p","native","1440p","1800p","4K"};
+    private static final String[] RESOLUTION_NAMES={"240p","360p","424p","480p",
+        "540p","720p","800p","1080p","1440p","1800p","4K"};
     private static final String[] LSFG_VALUES={"0","2","3","4"};
     private static final String[] LSFG_NAMES={"Off","2× frames","3× frames","4× frames"};
     // flow scale 取值域照 run-gow3.sh 的白名单（0.25|0.5|0.75|1|1.0）：此前缺 0.25 这一档，这里
@@ -119,18 +124,18 @@ final class SettingsDialog {
     }
 
     private TextView heading(LinearLayout box,String title) {
-        TextView t=new TextView(activity); t.setText(title); t.setTextSize(15);
+        TextView t=new TextView(activity); t.setText(UiText.get(activity, title)); t.setTextSize(15);
         t.setTypeface(Typeface.DEFAULT,Typeface.BOLD); t.setPadding(0,dp(14),0,dp(4));
         box.addView(t); return t;
     }
     private Switch toggle(LinearLayout box,String title,boolean on) {
-        Switch s=new Switch(activity); s.setText(title); s.setChecked(on); s.setTextSize(15);
+        Switch s=new Switch(activity); s.setText(UiText.get(activity, title)); s.setChecked(on); s.setTextSize(15);
         s.setPadding(0,dp(6),0,dp(6)); box.addView(s); return s;
     }
     private RadioGroup choices(LinearLayout box,String[] names,int selected) {
         RadioGroup g=new RadioGroup(activity);
         for (int i=0;i<names.length;++i) {
-            RadioButton b=new RadioButton(activity); b.setId(View.generateViewId()); b.setText(names[i]); b.setTextSize(15);
+            RadioButton b=new RadioButton(activity); b.setId(View.generateViewId()); b.setText(UiText.get(activity, names[i])); b.setTextSize(15);
             g.addView(b); if (i==selected) g.check(b.getId());
         }
         box.addView(g); return g;
@@ -163,6 +168,18 @@ final class SettingsDialog {
         }
         return all ? "" : list.toString();
     }
+    private static String canonicalResolution(String value) {
+        switch (value) {
+            case "426x240": return "240p";
+            case "640x360": return "360p";
+            case "752x424": return "424p";
+            case "854x480": return "480p";
+            case "960x540": return "540p";
+            case "1280x720": return "720p";
+            case "1080p": return "native";
+            default: return value;
+        }
+    }
     private static int checkedIndex(RadioGroup g) {
         for (int i=0;i<g.getChildCount();++i) if (((RadioButton)g.getChildAt(i)).isChecked()) return i;
         return -1;
@@ -173,31 +190,16 @@ final class SettingsDialog {
         LinearLayout box=new LinearLayout(activity); box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(24),dp(4),dp(24),dp(8));
 
-        // 升采样入口只提供 off / fsr3。运行时的 UPSCALERS 还有 fsr4、fsr411、taa、dlss
-        // （gow3_settings.cpp 的 UpscalerName，见 my-docs/gow3/LAUNCHER.md §3.2），此处刻意不给：
-        // FSR 4 / 4.1.1 在 Adreno 740 上约 470ms 一帧且黑屏（run-gow3.sh 实测）；taa 需要 native
-        // guest 目标的实时路径、dlss 需要 gow3_dlss.dll/nvngx_dlss.dll，都是桌面 N 卡路径，在本
-        // 移植上不成立。要加新升采样器前，先确认它在这套 Vulkan/Turnip 上真能出画面。
-        heading(box,"Upscaling (to 1280×720)");
-        final RadioGroup upscalers=choices(box,UPSCALER_NAMES,indexOf(UPSCALER_VALUES,get("upscaler","fsr3"),1));
         heading(box,"Render resolution");
-        int preset=0;
-        try { preset=Math.max(0,Math.min(4,Integer.parseInt(get("preset","3")))); } catch (NumberFormatException ignored) { preset=3; }
-        final RadioGroup presets=choices(box,PRESETS,preset);
-        // FSR 3.1 frame generation (frame_generation=1) is not wired: shadps4 has no
-        // GOW3_FRAME_GEN consumer and no FSR 3.1 frame-gen patch on this tree, so the
-        // option would have been a no-op. LSFG is the only frame-generation path here;
-        // tune its multiplier / flow scale / performance mode from the in-game drawer.
-        final TextView presetNote=new TextView(activity); presetNote.setTextSize(13); presetNote.setAlpha(0.7f);
-        box.addView(presetNote);
-        RadioGroup.OnCheckedChangeListener upscaling=(g,id) -> {
-            int upscaler=checkedIndex(upscalers);
-            boolean on=upscaler!=0;
-            for (int i=0;i<presets.getChildCount();++i) presets.getChildAt(i).setEnabled(on);
-            presetNote.setText(on ? "Lower is faster; the upscaler fills the screen." : "Without upscaling the game renders at 1280×720.");
-        };
-        upscalers.setOnCheckedChangeListener(upscaling); upscaling.onCheckedChanged(upscalers,0);
-
+        final RadioGroup resolutions=choices(box,RESOLUTION_NAMES,
+            indexOf(RESOLUTION_VALUES,canonicalResolution(get("render_resolution","720p")),5));
+        final TextView nativeNote=new TextView(activity);
+        nativeNote.setText(UiText.get(activity, "Choose the game rendering resolution. Changes apply after restart."));
+        nativeNote.setTextSize(13); nativeNote.setAlpha(0.7f); box.addView(nativeNote);
+        heading(box,"Anisotropic filtering");
+        final String[] anisotropyValues={"0","2","4","8","16"};
+        final RadioGroup anisotropy=choices(box,new String[]{"Game default","2×","4×","8×","16×"},
+            indexOf(anisotropyValues,get("anisotropy","0"),0));
         heading(box,"Image");
         final Switch sharpen=toggle(box,"Sharpening","1".equals(get("sharpen","0")));
         final TextView sharpLabel=new TextView(activity); sharpLabel.setTextSize(14); box.addView(sharpLabel);
@@ -206,7 +208,7 @@ final class SettingsDialog {
         try { initial=Float.parseFloat(get("sharpness","0.5")); } catch (NumberFormatException ignored) {}
         sharpness.setProgress(Math.round(Math.max(0,Math.min(1,initial))*100));
         SeekBar.OnSeekBarChangeListener sharpText=new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar s,int p,boolean user) { sharpLabel.setText("Sharpness: "+p+"%"); }
+            @Override public void onProgressChanged(SeekBar s,int p,boolean user) { sharpLabel.setText(UiText.get(activity, "Sharpness: "+p+"%")); }
             @Override public void onStartTrackingTouch(SeekBar s) {}
             @Override public void onStopTrackingTouch(SeekBar s) {}
         };
@@ -214,6 +216,12 @@ final class SettingsDialog {
         box.addView(sharpness);
         sharpen.setOnCheckedChangeListener((b,on) -> sharpness.setEnabled(on)); sharpness.setEnabled(sharpen.isChecked());
         final Switch fps=toggle(box,"Show FPS","1".equals(get("show_fps","0")));
+        // effect_dynamic_shadows is consumed by launch_env.py to select the
+        // SHA-gated Disable Dynamic Shadows eboot patch on the next launch.
+        heading(box,"Game effects");
+        final Switch disableShadows=toggle(box,"Disable dynamic shadows",
+            "1".equals(get("disable_dynamic_shadows",
+                           "0".equals(get("effect_dynamic_shadows","1")) ? "1" : "0")));
 
         // FPS 上限入口：取值域必须与运行时 FPS_LIMITS（gow3_graphics.h 的 FpsLimits：30/60/120/
         // 240/0）完全一致——ParseFpsLimit 把表外的值（例如旧版提供的 40/45）一律当成 0（不限制），
@@ -223,7 +231,7 @@ final class SettingsDialog {
         heading(box,"FPS limit");
         final RadioGroup fpsLimit=choices(box,FPS_NAMES,indexOf(FPS_VALUES,get("fps_limit","30"),0));
         TextView fpsNote=new TextView(activity); fpsNote.setTextSize(13); fpsNote.setAlpha(0.7f);
-        fpsNote.setText("Above 30 uses the community frame-rate patch (game timing follows the real frame time).");
+        fpsNote.setText(UiText.get(activity, "Above 30 uses the community frame-rate patch (game timing follows the real frame time)."));
         box.addView(fpsNote);
 
         /* 以下三段已注释掉：写入 gow3.ini 的键在本仓库的 fexdroid 启动链路里没有消费方，勾选后
@@ -259,13 +267,17 @@ final class SettingsDialog {
          */
 
         ScrollView scroll=new ScrollView(activity); scroll.addView(box);
-        new AlertDialog.Builder(activity).setTitle("Graphics settings").setView(scroll)
-            .setNegativeButton("Cancel",null)
-            .setPositiveButton("Apply & restart",(d,w) -> {
+        new AlertDialog.Builder(activity).setTitle(UiText.get(activity, "Graphics settings")).setView(scroll)
+            .setNegativeButton(UiText.get(activity, "Cancel"),null)
+            .setPositiveButton(UiText.get(activity, "Apply & restart"),(d,w) -> {
                 Map<String,String> changed=new LinkedHashMap<>();
-                changed.put("upscaler",UPSCALER_VALUES[Math.max(0,checkedIndex(upscalers))]);
+                changed.put("anisotropy",anisotropyValues[Math.max(0,checkedIndex(anisotropy))]);
+                changed.put("upscaler","off");
                 changed.put("fps_limit",FPS_VALUES[Math.max(0,checkedIndex(fpsLimit))]);
-                changed.put("preset",String.valueOf(Math.max(0,checkedIndex(presets))));
+                changed.put("preset","0");
+                changed.put("render_resolution",RESOLUTION_VALUES[Math.max(0,checkedIndex(resolutions))]);
+                changed.put("disable_dynamic_shadows",disableShadows.isChecked() ? "1" : "0");
+                changed.put("effect_dynamic_shadows",disableShadows.isChecked() ? "0" : "1");
                 changed.put("sharpen",sharpen.isChecked() ? "1" : "0");
                 changed.put("sharpness",String.format(Locale.ROOT,"%.2f",sharpness.getProgress()/100f));
                 changed.put("show_fps",fps.isChecked() ? "1" : "0");
@@ -280,7 +292,7 @@ final class SettingsDialog {
         for (Map.Entry<String,String> e:changed.entrySet()) if (!e.getValue().equals(values.get(e.getKey()))) same=false;
         if (same) return;
         if (save(changed)) restart.run();
-        else new AlertDialog.Builder(activity).setMessage("The settings could not be saved.").setPositiveButton("OK",null).show();
+        else new AlertDialog.Builder(activity).setMessage(UiText.get(activity, "The settings could not be saved.")).setPositiveButton(UiText.get(activity, "OK"),null).show();
     }
 
     /* showGame() 已注释掉（入口也随之在 GameActivity 里隐藏）：这四个 ini 键
@@ -297,17 +309,17 @@ final class SettingsDialog {
         for (int i=0;i<GAME_PATCHES.length;++i) {
             toggles[i]=toggle(box,GAME_PATCHES[i][1],"1".equals(get(GAME_PATCHES[i][0],GAME_PATCHES[i][3])));
             TextView note=new TextView(activity); note.setTextSize(12); note.setAlpha(0.65f);
-            note.setText(GAME_PATCHES[i][2]); note.setPadding(0,0,0,dp(6));
+            note.setText(UiText.get(activity, GAME_PATCHES[i][2])); note.setPadding(0,0,0,dp(6));
             box.addView(note);
         }
         TextView restartNote=new TextView(activity); restartNote.setTextSize(13); restartNote.setAlpha(0.7f);
-        restartNote.setText("These are patches to the game: Apply restarts it (unsaved progress is lost).");
+        restartNote.setText(UiText.get(activity, "These are patches to the game: Apply restarts it (unsaved progress is lost)."));
         restartNote.setPadding(0,dp(8),0,0);
         box.addView(restartNote);
         ScrollView scroll=new ScrollView(activity); scroll.addView(box);
-        new AlertDialog.Builder(activity).setTitle("Game settings").setView(scroll)
-            .setNegativeButton("Cancel",null)
-            .setPositiveButton("Apply",(d,w) -> {
+        new AlertDialog.Builder(activity).setTitle(UiText.get(activity, "Game settings")).setView(scroll)
+            .setNegativeButton(UiText.get(activity, "Cancel"),null)
+            .setPositiveButton(UiText.get(activity, "Apply"),(d,w) -> {
                 Map<String,String> changed=new LinkedHashMap<>();
                 for (int i=0;i<GAME_PATCHES.length;++i) changed.put(GAME_PATCHES[i][0],toggles[i].isChecked() ? "1" : "0");
                 apply(changed);
@@ -335,17 +347,17 @@ final class SettingsDialog {
         for (int i=0;i<CHEATS.length;++i) {
             toggles[i]=toggle(box,CHEATS[i][1],"1".equals(get(CHEATS[i][0],CHEATS[i][3])));
             TextView note=new TextView(activity); note.setTextSize(12); note.setAlpha(0.65f);
-            note.setText(CHEATS[i][2]); note.setPadding(0,0,0,dp(6));
+            note.setText(UiText.get(activity, CHEATS[i][2])); note.setPadding(0,0,0,dp(6));
             box.addView(note);
         }
         TextView restartNote=new TextView(activity); restartNote.setTextSize(13); restartNote.setAlpha(0.7f);
-        restartNote.setText("For God of War III 1.09 offline play. They switch at once, while you play.");
+        restartNote.setText(UiText.get(activity, "For God of War III 1.09 offline play. They switch at once, while you play."));
         restartNote.setPadding(0,dp(8),0,0);
         box.addView(restartNote);
         ScrollView scroll=new ScrollView(activity); scroll.addView(box);
-        new AlertDialog.Builder(activity).setTitle("Cheats").setView(scroll)
-            .setNegativeButton("Cancel",null)
-            .setPositiveButton("Apply",(d,w) -> {
+        new AlertDialog.Builder(activity).setTitle(UiText.get(activity, "Cheats")).setView(scroll)
+            .setNegativeButton(UiText.get(activity, "Cancel"),null)
+            .setPositiveButton(UiText.get(activity, "Apply"),(d,w) -> {
                 Map<String,String> changed=new LinkedHashMap<>();
                 for (int i=0;i<CHEATS.length;++i) changed.put(CHEATS[i][0],toggles[i].isChecked() ? "1" : "0");
                 // The running game follows cheats.state (probe.c reads it): no restart.
@@ -370,8 +382,7 @@ final class SettingsDialog {
      *  (run-gow3.sh wrote lsfg-vk.toml), changes go to that file and apply at once (lsfg-vk watches
      *  it; off is multiplier 1). Turning it on when the layer was not loaded restarts the game.
      *  flow scale 已按 run-gow3.sh 的白名单补齐 0.25 档（见 LSFG_FLOW_VALUES）。这是本移植唯一的
-     *  帧生成路径：FSR 3.1 帧生成（frame_generation=1）没有接通，shadps4 无 GOW3_FRAME_GEN 消费者，
-     *  所以这里不要再加一个"FSR 帧生成"开关。 */
+     *  帧生成仅通过 Lossless Scaling 实现，不提供其他帧生成开关。 */
     void showLossless(java.util.function.BooleanSupplier gameRunning,Runnable onLiveApplied) {
         load();
         final File live=new File(file.getParentFile(),"lsfg-vk.toml");
@@ -383,11 +394,11 @@ final class SettingsDialog {
         final RadioGroup lsfgFlow=choices(box,LSFG_FLOW_NAMES,indexOf(LSFG_FLOW_VALUES,get("lsfg_flow_scale","1.0"),0));
         final Switch lsfgPerformance=toggle(box,"Performance mode","1".equals(get("lsfg_performance","0")));
         TextView lsfgNote=new TextView(activity); lsfgNote.setTextSize(13); lsfgNote.setAlpha(0.7f);
-        lsfgNote.setText("Needs Lossless.dll from your own Lossless Scaling (Steam) next to the game "
-            +"folder. Works with any upscaler and replaces FSR 3.1 frame generation. "
+        lsfgNote.setText(UiText.get(activity, "Needs Lossless.dll from your own Lossless Scaling (Steam) next to the game "
+            +"folder. Uses the final game image and requires no game resolution changes. "
             +"It sees only finished frames, so fast motion and the HUD show more artifacts. Lower flow "
             +"scale and performance mode are faster. Changes apply while you play; only turning it on "
-            +"after starting without it restarts the game.");
+            +"after starting without it restarts the game."));
         box.addView(lsfgNote);
         RadioGroup.OnCheckedChangeListener lossless=(g,id) -> {
             boolean on=checkedIndex(lsfg)>0;
@@ -397,9 +408,9 @@ final class SettingsDialog {
         lsfg.setOnCheckedChangeListener(lossless); lossless.onCheckedChanged(lsfg,0);
 
         ScrollView scroll=new ScrollView(activity); scroll.addView(box);
-        new AlertDialog.Builder(activity).setTitle("Lossless Scaling frame generation").setView(scroll)
-            .setNegativeButton("Cancel",null)
-            .setPositiveButton("Apply",(d,w) -> {
+        new AlertDialog.Builder(activity).setTitle(UiText.get(activity, "Lossless Scaling frame generation")).setView(scroll)
+            .setNegativeButton(UiText.get(activity, "Cancel"),null)
+            .setPositiveButton(UiText.get(activity, "Apply"),(d,w) -> {
                 Map<String,String> changed=new LinkedHashMap<>();
                 String multiplier=LSFG_VALUES[Math.max(0,checkedIndex(lsfg))];
                 changed.put("lsfg_multiplier",multiplier);
@@ -408,15 +419,15 @@ final class SettingsDialog {
                 if (gameRunning.getAsBoolean() && live.isFile()) {
                     boolean ok=save(changed) && writeLsfgProfile(live,"0".equals(multiplier) ? "1" : multiplier,
                         changed.get("lsfg_flow_scale"),lsfgPerformance.isChecked());
-                    android.widget.Toast.makeText(activity,ok ? "Lossless Scaling: applied"
-                        : "Lossless Scaling: could not apply",android.widget.Toast.LENGTH_SHORT).show();
+                    android.widget.Toast.makeText(activity,UiText.get(activity, ok ? "Lossless Scaling: applied"
+                        : "Lossless Scaling: could not apply"),android.widget.Toast.LENGTH_SHORT).show();
                     // layer 已按新倍率热更新 toml；这里同步重选设备显示模式，否则层参数和刷新率会
                     // 分叉（4.3 复评）。
                     if (ok && onLiveApplied!=null) onLiveApplied.run();
                 } else if (!"0".equals(multiplier) && gameRunning.getAsBoolean()) {
                     apply(changed); // the layer loads at start only
                 } else if (!save(changed)) {
-                    new AlertDialog.Builder(activity).setMessage("The settings could not be saved.").setPositiveButton("OK",null).show();
+                    new AlertDialog.Builder(activity).setMessage(UiText.get(activity, "The settings could not be saved.")).setPositiveButton(UiText.get(activity, "OK"),null).show();
                 }
             }).show();
     }

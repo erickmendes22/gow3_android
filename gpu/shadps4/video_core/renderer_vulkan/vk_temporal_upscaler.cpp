@@ -174,7 +174,8 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
     }
     // Available unless GOW3_UPSCALER=none; on/off and the parameters are the menu's settings.
     const char* env = std::getenv("GOW3_UPSCALER");
-    enabled = !(env && std::strcmp(env, "none") == 0);
+    enabled = !std::getenv("GOW3_ANDROID_PORT") &&
+              !(env && std::strcmp(env, "none") == 0);
     if (const char* hash = std::getenv("GOW3_UPSCALE_BEFORE_CS")) {
         trigger_hash = std::strtoull(hash, nullptr, 16);
     }
@@ -296,7 +297,11 @@ bool TemporalUpscaler::OnFrameStart() {
     const bool active = Active();
     const bool jitter_on = active && settings.jitter && !Gow3Toggle::Disabled(1u << 25);
     const int upscaler = settings.upscaler.load();
-    const int output = settings.output_res.load();
+    // Android has one immutable output target (720p). Use a local effective
+    // value, not a write through the const settings reference. This also
+    // ignores legacy UI/preset-file values that request 1080p or above.
+    const int output = std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")
+                           ? 0 : settings.output_res.load();
     const bool output_changed = !scaled_session && applied_output != output;
     if (output_changed) {
         target_width = Gow3Settings::OutputWidths[output];
@@ -331,6 +336,7 @@ bool TemporalUpscaler::OnFrameStart() {
     applied_upscaler = upscaler;
     last_active = active;
     last_jitter = jitter_on;
+    completed_temporal_frame = dispatched_last_frame;
     dispatched_last_frame = false;
 
     // The display pass of an upscaled frame reads the upscaled UI image.
@@ -351,18 +357,35 @@ bool TemporalUpscaler::OnFrameStart() {
     // CameraMotion::OnDisplayPass has already cleared Depth(). Use the context's render
     // size, which survives the frame boundary (Performance 960 -> 1920 needs 32 phases).
     const u32 phases = Scaled() ? Motion::JitterPhases(render_width, target_width)
-        : Motion::JitterPhases(scene_targets.Size().width, 1920);
+        : Motion::JitterPhases(scene_targets.Size().width, scene_targets.GuestSize().width);
     jitter_index = jitter_index % phases + 1;
     jitter = {Halton(jitter_index, 2) - 0.5f, Halton(jitter_index, 3) - 0.5f};
     return changed;
 }
 
 void TemporalUpscaler::OnDispatch(u64 cs_hash) {
-    if (cs_hash != trigger_hash || done_this_frame || failed || Scaled()) {
-        return;
+    // Sample the decision once per 256 matching dispatches, at most 24 times.
+    // Distinguishes a missing scene/motion feed from a disabled or failed FSR,
+    // without flooding Android logcat on every compute dispatch.
+    if (cs_hash != trigger_hash) return;
+    static u32 matched_dispatches = 0;
+    static u32 trace_lines = 0;
+    const bool sample = (++matched_dispatches % 256 == 1) && trace_lines < 24;
+    const bool ready_color = bool(scene_color);
+    const bool ready_motion = camera_motion.Ready();
+    const bool scaled = Scaled();
+    const bool active = Active();
+    if (sample) {
+        ++trace_lines;
+        std::printf("GOW3_FSR_DISPATCH hash=%llx expected=%llx scaled=%d done=%d failed=%d active=%d color=%d motion=%d\n",
+                    static_cast<unsigned long long>(cs_hash),
+                    static_cast<unsigned long long>(trigger_hash),
+                    int(scaled), int(done_this_frame), int(failed),
+                    int(active), int(ready_color), int(ready_motion));
     }
+    if (done_this_frame || failed || scaled) return;
     done_this_frame = true;
-    if (!scene_color || !camera_motion.Ready() || !Active()) {
+    if (!ready_color || !ready_motion || !active) {
         reset = true;
         return;
     }
@@ -406,7 +429,11 @@ bool TemporalUpscaler::EnsureResources(u32 w, u32 h, u32 ow, u32 oh, bool hdr) {
     device_info.shaderFloat16Enabled = instance.IsShaderFloat16Enabled();
     device_info.subgroupSizeControlEnabled = instance.IsSubgroupSizeControlEnabled();
     device_info.synchronization2Enabled = VK_TRUE;
-    device_info.shaderStorageImageWriteWithoutFormatEnabled = VK_TRUE;
+    // This describes an ENABLED logical-device feature. Do not claim VK_TRUE
+    // unconditionally: that would make the portable FSR backend try shaders
+    // whose feature was not enabled when VkDevice was created.
+    device_info.shaderStorageImageWriteWithoutFormatEnabled =
+        instance.IsStorageImageWriteWithoutFormatEnabled() ? VK_TRUE : VK_FALSE;
 
     FfxVkPortableUpscaleCreateInfo create_info{};
     create_info.structSize = sizeof(create_info);
@@ -422,8 +449,25 @@ bool TemporalUpscaler::EnsureResources(u32 w, u32 h, u32 ow, u32 oh, bool hdr) {
             PrintIssues("create info", issues);
             return false;
         }
-        if (ffxVkPortableUpscaleContextCreate(&device_info, &create_info, &context) !=
-            FFX_VK_PORTABLE_OK) {
+        const auto create_result = ffxVkPortableUpscaleContextCreate(&device_info, &create_info, &context);
+        if (create_result != FFX_VK_PORTABLE_OK) {
+            std::printf("GOW3_FSR_STATUS state=CONTEXT_FAILED code=%d input=%ux%u output=%ux%u hdr=%d half=%d subgroup=%d storage_without_format=%d\n",
+                        int(create_result), w, h, ow, oh, int(hdr),
+                        int(device_info.shaderFloat16Enabled),
+                        int(device_info.subgroupSizeControlEnabled),
+                        int(device_info.shaderStorageImageWriteWithoutFormatEnabled));
+            // The backend returns UNSUPPORTED both for missing shader features
+            // and for builds with the FSR3 implementation disabled.  Show the
+            // actual device contract rather than assigning blame to Turnip.
+            FfxVkPortableDeviceCapabilities caps{};
+            caps.structSize = sizeof(caps);
+            const auto caps_result = ffxVkPortableQueryDeviceCapabilities(
+                device_info.physicalDevice, &caps);
+            std::printf("GOW3_FSR_CAPS query=%d fsr3=%d compute=%d subgroup=%d formats=%d storage_no_format=%d\n",
+                        int(caps_result), int(caps.fsr3ComputePrerequisites),
+                        int(caps.hasComputeQueue), int(caps.subgroupOperations),
+                        int(caps.requiredFsr3StorageFormats),
+                        int(device_info.shaderStorageImageWriteWithoutFormatEnabled));
             std::printf("Upscaler: FSR 3 context creation failed\n");
             context = nullptr;
             return false;
@@ -1280,7 +1324,7 @@ std::array<u32, 2> TemporalUpscaler::SceneSize(u32 w, u32 h) const {
 float TemporalUpscaler::SceneMipBias() const {
     if (!Active() || Gow3Settings::Get().upscaler == Gow3Settings::UpscalerTaa) return 0.0f;
     const float render = float(Gow3Settings::Get().active_render_width.load());
-    const float output = float(Scaled() ? target_width : 1920u);
+    const float output = float(Scaled() ? target_width : scene_targets.GuestSize().width);
     return render > 0.0f && render < output ? std::log2(render / output) : 0.0f;
 }
 
@@ -1294,17 +1338,51 @@ void TemporalUpscaler::OnColorTarget(VideoCore::ImageId color) {
     }
     const auto& image = texture_cache.GetImage(color);
     const auto& depth = texture_cache.GetImage(camera_motion.Depth());
-    if (image.info.pixel_format == vk::Format::eR8G8B8A8Unorm &&
+    if ((image.info.pixel_format == vk::Format::eR8G8B8A8Unorm ||
+         image.info.pixel_format == vk::Format::eR8G8B8A8Srgb) &&
         image.info.size.width == depth.info.size.width &&
         image.info.size.height == depth.info.size.height) {
         ldr_target = color;
     }
 }
 
+void TemporalUpscaler::OnDisplayBoundary(VideoCore::ImageId color) {
+    // In CUSA01715 the 640x360 frame is complete before the display copy.
+    // GoW3 lacks Bloodborne's five-MRT scene and known HUD shader hashes.
+    if (!std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") || !scaled_session ||
+        !Active() || !color || done_this_frame || ui_phase ||
+        !camera_motion.Depth() || render_width >= target_width ||
+        render_height >= target_height)
+        return;
+    // The draw that starts the display-copy pass binds the DISPLAY image, not
+    // the completed game scene.  OnColorTarget cached the last 640x360 LDR
+    // render target before that pass.  Never feed the display copy to FSR.
+    const VideoCore::ImageId scene = ldr_target;
+    if (!scene || FrameCapture::IsDisplayBuffer(texture_cache.GetImage(scene).info.guest_address))
+        return;
+    const auto& image = texture_cache.GetImage(scene);
+    const auto& depth = texture_cache.GetImage(camera_motion.Depth());
+    if ((image.info.pixel_format != vk::Format::eR8G8B8A8Unorm &&
+         image.info.pixel_format != vk::Format::eR8G8B8A8Srgb) ||
+        image.info.size.width != render_width ||
+        image.info.size.height != render_height ||
+        image.info.size.width != depth.info.size.width ||
+        image.info.size.height != depth.info.size.height)
+        return;
+    RunScaled();
+}
+
 void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
                               VideoCore::ImageId depth, bool native_viewport) {
     if (!Scaled() && vs_hash == ui_trigger_vs) done_this_frame = true;
     if (!Scaled() || !color) {
+        return;
+    }
+    // CUSA01715 has no verified scene camera in this path. Redirecting a
+    // half-rendered 640x360 target into the 1280x720 host UI/display buffers
+    // corrupts the final frame. Leave guest UI, color and display untouched
+    // until temporal reprojection is actually available.
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && !camera_motion.Ready()) {
         return;
     }
     if (ui_phase) {
@@ -1318,15 +1396,57 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
         return;
     }
     const auto& image = texture_cache.GetImage(color);
-    const bool movie = vs_hash == ui_trigger_vs || UiComposition::MovieShader(vs_hash) ||
-                       (scaled_session && native_viewport);
+    // Android's patched 720p guest may compile different UI shader hashes.
+    // The alternate trigger is deliberately limited to a new UI depth target
+    // drawn over the CURRENT LDR scene color with valid camera/depth. Generic
+    // fullscreen postprocess passes reusing scene depth must not trigger FSR.
+    const bool android = std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") != nullptr;
+    // Camera motion can be unavailable on GoW III's forward renderer.  Depth
+    // and the verified scene target suffice for a temporal dispatch with
+    // zero-motion fallback; do not mislabel it camera-reprojected FSR.
+    const bool android_hud_transition =
+        android && native_viewport && camera_motion.Depth() &&
+        ldr_target == color && depth && depth != camera_motion.Depth();
+    // The hashes 0x34e8a281 etc. were identified in Bloodborne, not in
+    // the supplied CUSA01715 executable. Do not use them to trigger GoW3
+    // temporal dispatch. Only a camera/depth-verified HUD transition may do so.
+    const bool movie = android ? android_hud_transition
+        : (vs_hash == ui_trigger_vs || UiComposition::MovieShader(vs_hash) ||
+           (scaled_session && native_viewport));
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && native_viewport && !movie) {
+        static unsigned candidates = 0;
+        const unsigned index = ++candidates;
+        // The first six UI hashes were all captured during the intro.
+        if (index == 1 || index == 128 || index == 512 ||
+            index == 2048 || index == 8192 || index == 32768) {
+            const auto& candidate = texture_cache.GetImage(color);
+            std::printf("GOW3_FSR_UI_CANDIDATE hash=%llx size=%ux%u camera=%d matched_ldr=%d\n",
+                        static_cast<unsigned long long>(vs_hash),
+                        candidate.info.size.width, candidate.info.size.height,
+                        int(camera_motion.Ready()), int(ldr_target == color));
+        }
+    }
     const bool ui_draw = movie &&
         (image.info.pixel_format == vk::Format::eR8G8B8A8Unorm ||
          image.info.pixel_format == vk::Format::eR8G8B8A8Srgb) &&
         RenderTarget(image.info.size.width, image.info.size.height) &&
         !FrameCapture::IsDisplayBuffer(image.info.guest_address);
-    switch (UiComposition::Choose(Scaled(), ui_draw,
-                                  camera_motion.Ready() && ldr_target == color,
+    const bool motion_ready = camera_motion.Ready();
+    const bool scene_ready = (android ? bool(camera_motion.Depth()) : motion_ready) &&
+                             ldr_target == color;
+    // Only the first few relevant transitions, not per-frame log spam.
+    if (movie) {
+        static unsigned trace = 0;
+        if (trace < 12) {
+            ++trace;
+            std::printf("GOW3_FSR_UI_GATE event=%u ui=%d scene=%d camera=%d ldr=%d active=%d size=%ux%u output=%ux%u\n",
+                        trace, int(ui_draw), int(scene_ready), int(motion_ready),
+                        int(ldr_target == color), int(Active()),
+                        image.info.size.width, image.info.size.height,
+                        target_width, target_height);
+        }
+    }
+    switch (UiComposition::Choose(Scaled(), ui_draw, scene_ready,
                                   Active() && !failed)) {
     case UiComposition::Background::None:
         return;
@@ -1541,6 +1661,18 @@ void TemporalUpscaler::RunScaled() {
     if (depth.info.size.width != iw || depth.info.size.height != ih || w > ow || h > oh) {
         return;
     }
+    // No camera: no temporal data. Do not use RunUiOnly() here: that
+    // changes ui_phase and redirects the game's display-copy pass to a
+    // different-sized host target, corrupting the image. The original
+    // 640x360 guest frame remains valid and is presented normally.
+    if (std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT") && !camera_motion.Ready()) {
+        static bool warned = false;
+        if (!warned) {
+            warned = true;
+            std::printf("GOW3_FSR_STATUS state=MOTION_UNVERIFIED action=NATIVE_PRESENT\n");
+        }
+        return;
+    }
     if (!EnsureResources(w, h, ow, oh, false)) {
         failed = true;
         return;
@@ -1599,13 +1731,26 @@ void TemporalUpscaler::RunScaled() {
     // The previous frame's display pass read it: all commands before.
     barrier(vk::Image(ui_image), vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eUndefined,
             all, vk::AccessFlagBits2::eNone, vk::ImageLayout::eGeneral, all, rw);
+    // CUSA01715: RunScaled is rejected above without validated motion.
+    // Never label a zero-filled motion texture as working temporal FSR.
+    const bool reprojection = camera_motion.Ready();
+    const auto motion_stage = reprojection ? vk::PipelineStageFlagBits2::eComputeShader
+                                           : vk::PipelineStageFlagBits2::eTransfer;
+    const auto motion_write = reprojection ? vk::AccessFlagBits2::eShaderWrite
+                                           : vk::AccessFlagBits2::eTransferWrite;
     barrier(vk::Image(motion_image), vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eUndefined,
             all, vk::AccessFlagBits2::eNone, vk::ImageLayout::eGeneral,
-            vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderWrite);
-    camera_motion.RecordMotion(cmdbuf, depth_view, *motion_view, w, h);
+            motion_stage, motion_write);
+    if (reprojection) {
+        camera_motion.RecordMotion(cmdbuf, depth_view, *motion_view, w, h);
+    } else {
+        const vk::ClearColorValue zero{std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}};
+        const vk::ImageSubresourceRange range{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+        cmdbuf.clearColorImage(vk::Image(motion_image), vk::ImageLayout::eGeneral, zero, range);
+    }
     barrier(vk::Image(motion_image), vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eGeneral,
-            vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderWrite,
-            vk::ImageLayout::eGeneral, all, vk::AccessFlagBits2::eShaderRead);
+            motion_stage, motion_write, vk::ImageLayout::eGeneral, all,
+            vk::AccessFlagBits2::eShaderRead);
 
     const auto now = std::chrono::steady_clock::now();
     float frame_ms = std::chrono::duration<float, std::milli>(now - last_frame).count();
@@ -1728,9 +1873,9 @@ void TemporalUpscaler::RunScaled() {
     info.outputSize = {ow, oh};
     info.frameTimeMilliseconds = frame_ms;
     info.preExposure = 1.0f;
-    info.cameraNear = camera_motion.Near();
+    info.cameraNear = reprojection ? camera_motion.Near() : 0.1f;
     info.cameraFar = 3000.0f;
-    info.cameraVerticalFovRadians = camera_motion.VerticalFov();
+    info.cameraVerticalFovRadians = reprojection ? camera_motion.VerticalFov() : 1.0471976f;
     info.viewSpaceToMeters = 1.0f;
     info.sharpness = std::min(settings.sharpness.load(), 1.0f);
     info.enableSharpening = settings.sharpen ? VK_TRUE : VK_FALSE;
@@ -1752,6 +1897,20 @@ void TemporalUpscaler::RunScaled() {
         ok = true;
         reset = false;
         dispatched_last_frame = true;
+        // Positive proof of an actual recorded FSR dispatch; setup/selection alone
+        // is not success. Keep one initial sample and periodic heartbeats.
+        static u64 successful_scaled_dispatches = 0;
+        ++successful_scaled_dispatches;
+        if (successful_scaled_dispatches == 1 || successful_scaled_dispatches % 600 == 0 ||
+            (successful_scaled_dispatches == 2 && !info.reset)) {
+            const auto motion = camera_motion.EstimatedMotion(w, h);
+            std::printf("GOW3_FSR_STATUS state=%s count=%llu input=%ux%u output=%ux%u camera=%d depth=%d reset=%d motion_px=%.3f,%.3f\n",
+                        successful_scaled_dispatches >= 2 && !info.reset
+                            ? "TEMPORAL_HISTORY_ACTIVE" : "DISPATCH_RECORDED",
+                        static_cast<unsigned long long>(successful_scaled_dispatches),
+                        w, h, ow, oh, int(reprojection), int(bool(camera_motion.Depth())),
+                        int(info.reset), motion[0], motion[1]);
+        }
         ExtraSharpen(cmdbuf, vk::Image(ui_image), true, ow, oh);
     }
     barrier(vk::Image(ui_image), vk::ImageAspectFlagBits::eColor, vk::ImageLayout::eGeneral, all,
@@ -1896,6 +2055,15 @@ bool TemporalUpscaler::DisplayOverride(VAddr address, Display& display) {
         return false;
     }
     display = {vk::Image(it->second.image), it->second.format, it->second.width, it->second.height};
+    // This runs in the actual presenter, after guest draw redirection. A
+    // recorded dispatch alone is not evidence that its image was displayed.
+    if (completed_temporal_frame) {
+        static u64 presented_temporal_frames = 0;
+        if (++presented_temporal_frames == 1 || presented_temporal_frames % 600 == 0)
+            std::printf("GOW3_FSR_STATUS state=TEMPORAL_PRESENTED count=%llu output=%ux%u\n",
+                        static_cast<unsigned long long>(presented_temporal_frames),
+                        display.width, display.height);
+    }
     // Diagnostic capture of the actual completed display buffer, including native UI.
     // GOW3_PRESENT_DUMP_COUNT=N: the trigger dumps N consecutive frames (temporal stability).
     static const char* dump = std::getenv("GOW3_PRESENT_DUMP_TRIGGER");

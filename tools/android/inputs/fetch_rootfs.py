@@ -40,6 +40,8 @@ def migrate_interpreters(rootfs):
 
     rewritten = 0
     for path in sorted(rootfs.rglob('*')):
+        # Avoid traversing absolute symlinks into the CI host filesystem.
+        # Only migrate real ELF members; preserve symlink metadata in the archive.
         if path.is_symlink() or not path.is_file():
             continue
         try:

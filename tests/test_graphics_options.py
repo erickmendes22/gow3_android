@@ -49,6 +49,23 @@ class GraphicsOptionsTest(unittest.TestCase):
         g.prepare(self.ini, self.state)
         self.assertEqual(json.loads(self.state.read_text())['last_good']['engine_fps'], '240')
 
+    def test_resolution_names_are_unique_and_legacy_aliases_migrate(self):
+        self.assertEqual(g.RESOLUTIONS, (
+            '240p', '360p', '424p', '480p', '540p', '720p',
+            '800p', 'native', '1440p', '1800p', '4K'))
+        for value, expected in (('1280x720', '720p'), ('854x480', '480p'),
+                                ('960x540', '540p'), ('640x360', '360p'),
+                                ('752x424', '424p'), ('426x240', '240p')):
+            with self.subTest(value=value):
+                self.assertEqual(g.startup_options({'render_resolution': value})['render_resolution'], expected)
+        for name, patch in (('480p','480p'), ('720p','720p'),
+                            ('240p','720p'), ('360p','720p'),
+                            ('424p','720p'), ('540p','720p')):
+            with self.subTest(name=name):
+                selected = g.patch_names([], g.startup_options({
+                    'render_resolution': name, 'engine_fps': '60'}))
+                self.assertEqual(selected, ['Resolution Patch - ' + patch])
+
     def test_patch_names(self):
         launcher = ['Bug Fix - Texture Corruption Fix', 'Frame Rate Patch - 120 FPS', 'Skip Any Video With X Button']
         options = g.startup_options({'render_resolution': '1440p', 'engine_fps': '240'})

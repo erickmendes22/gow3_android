@@ -28,8 +28,8 @@ import com.gow3.android.R
 import com.gow3.android.ui.components.ActionButton
 import com.gow3.android.ui.components.LauncherColors
 
-private const val GITHUB_URL = "https://github.com/zFitness/gow3_android_port"
-private const val ISSUES_URL = "https://github.com/zFitness/gow3_android_port/issues"
+private const val GITHUB_URL = "https://github.com/erickmendes22/gow3_android_daedalus_fork"
+private const val ISSUES_URL = "https://github.com/erickmendes22/gow3_android_daedalus_fork/issues"
 
 /** 求 Star 与问题反馈，跳转到作者的 GitHub 仓库 / Issues 页面。 */
 @Composable

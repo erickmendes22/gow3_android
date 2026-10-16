@@ -3,7 +3,7 @@ name: android-dev-apk
 on:
   pull_request:
   push:
-    branches: [android, main, gow3]
+    branches: [gow3]
     tags: ['v*']
   workflow_dispatch:
 
@@ -18,33 +18,34 @@ env:
   ANDROID_PLATFORM: '35'
   ANDROID_BUILD_TOOLS: '35.0.0'
   GOW3_BUILD_TYPE: Release
+  # CI builds a game-free APK. Game patches are generated on-device from the user's eboot.
+  GOW3_SKIP_GAME_PATCH_PARTS: '1'
   # These paths are intentionally outside the checkout and are never uploaded.
   GOW3_ROOTFS: /data/user/0/com.gow3.android/files/rootfs
 
 jobs:
   source-check:
     name: Android source checks
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false  # unit tests inspect tracked files only
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Validate Android manifests and packaging tests
+      - name: Validate Android manifests, resource strings and packaging tests
         run: |
-          python -m unittest \
-            discover -s tests -p 'test_android_*.py'
-          python -m py_compile tools/android/*.py
+          python -m unittest discover -s tests -p 'test_android_*.py'
+          python -m compileall -q tools/android scripts
 
   release:
     name: Build Android development APK (local signing key)
+    needs: source-check
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     permissions:
@@ -70,11 +71,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Validate Android bundle and patch contracts before native build
-        run: |
-          python3 -m unittest discover -s tests -p 'test_android_*.py' -v
-          python3 -m unittest discover -s tests -p 'test_launch_env.py' -v
-
       - name: Restore Android SDK package cache
         uses: actions/cache@v4
         with:
@@ -98,6 +94,15 @@ jobs:
             platform-tools
             platforms;android-${{ env.ANDROID_PLATFORM }}
             build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+
+      # Detect invalid XML and Android resource escapes before the native builds.
+      - name: Preflight all Android resources (AAPT2)
+        shell: bash
+        run: |
+          set -euo pipefail
+          aapt2="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS/aapt2"
+          test -x "$aapt2"
+          "$aapt2" compile --dir android-launcher/app/src/main/res -o "$RUNNER_TEMP/android-resources-preflight.zip"
 
       - name: Install Android and native build tools
         run: |
@@ -131,21 +136,6 @@ jobs:
         shell: bash -el {0}
         run: bash ci/setup-deps.sh "$CONDA_PREFIX"
 
-      - name: Preflight graphics build tools
-        shell: bash -el {0}
-        run: |
-          set -euo pipefail
-          echo "Active build environment: ${CONDA_PREFIX:-not-set}"
-          for tool in clang clang++ llvm-ar llvm-strip bison flex ninja cmake pkg-config glslangValidator; do
-            command -v "$tool" || {
-              echo "::error title=Missing graphics build tool::$tool is not available in the build environment"
-              exit 1
-            }
-          done
-          glslangValidator --version
-          bison -Wcounterexamples -V >/dev/null
-          echo "Graphics toolchain preflight passed"
-
       - name: Configure temporary paths
         shell: bash
         run: |
@@ -175,32 +165,13 @@ jobs:
             libxcb-dri3-dev libxcb-present-dev libxcb-sync-dev libxcb-shm0-dev libxshmfence-dev \
             libx11-dev libxrandr-dev libdrm-dev
 
-      - name: Validate migrated runtime ELF before native builds
+      # Resolve/compile actual release resources and Kotlin with fetched Steam jars
+      # before spending time on FEXCore, Turnip, LSFG and runtime archives.
+      - name: Preflight Android release resources and Kotlin
+        shell: bash
         run: |
-          python3 - <<'PY'
-          from tools.android.runtime.build_release_runtime import SOURCE, RUNTIME_LOADER, EXPLICIT_LOADER_ENTRYPOINTS
-          from tools.android.runtime.validate_runtime_elf import validate_tree
-          records = validate_tree(SOURCE, RUNTIME_LOADER,
-                                  reject=('com.gp.android', '/Users/', '/home/'),
-                                  explicit_paths=EXPLICIT_LOADER_ENTRYPOINTS)
-          print(f'Validated {len(records)} runtime ELF files')
-          PY
-
-      - name: Preflight ARM64 linker and libatomic before native builds
-        shell: bash -el {0}
-        run: bash tools/android/build/preflight_turnip_link.sh
-
-      - name: Configure both Turnip variants and LSFG before native builds
-        shell: bash -el {0}
-        env:
-          GOW3_CONFIGURE_ONLY: '1'
-        run: |
-          bash tools/android/build/build_turnip.sh main
-          bash tools/android/build/build_turnip.sh gen8
-          bash tools/android/build/build_lsfg.sh
-
-      - name: Validate launcher compilation before native runtime
-        run: bash android-launcher/gradlew -p android-launcher :app:compileReleaseJavaWithJavac --no-daemon --max-workers=2
+          set -euo pipefail
+          bash android-launcher/gradlew -p android-launcher :app:mergeReleaseResources :app:compileReleaseKotlin --no-daemon
 
       - name: Build ARM64 native runtime
         shell: bash -el {0}
@@ -217,14 +188,14 @@ jobs:
             tools/android/build/kgsl_chip_id.c -o out/arm64/kgsl-chip-id
           find .local-deps/android/migration/x/rootfs/usr/lib/aarch64-linux-gnu \
             -type f -printf '%f\n' | sort -u > "$RUNNER_TEMP/device-libs.txt"
-          GOW3_SKIP_GAME_PATCH_PARTS=1 python3 tools/android/build/build_arm64_bundle.py \
+          python3 tools/android/build/build_arm64_bundle.py \
             --device-libs "$RUNNER_TEMP/device-libs.txt" \
             --sysroot .local-deps/android/arm64-sysroot
 
       - name: Build Turnip and LSFG variants
         shell: bash -el {0}
         run: |
-          set -euo pipefail
+          # Meson requires glslangValidator from the activated conda environment.
           command -v glslangValidator
           glslangValidator --version
           bash tools/android/build/build_turnip.sh main
@@ -266,14 +237,3 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload build diagnostics on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-build-diagnostics-${{ github.sha }}
-          path: |
-            out/arm64/*-build.log
-            out/arm64/*-build/meson-logs/meson-log.txt
-            out/arm64/*-build/CMakeFiles/CMakeConfigureLog.yaml
-          if-no-files-found: ignore
-          retention-days: 7

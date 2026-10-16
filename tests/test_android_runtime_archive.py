@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = json.loads((ROOT / 'tools/android/runtime/runtime-manifest.json').read_text())
 
 
-def write_fixture(path, forbidden=None):
+def write_fixture(path, forbidden=None, non_executable=None):
     with tarfile.open(path, 'w:gz') as archive:
         manifest = (ROOT / 'tools/android/runtime/runtime-manifest.json').read_bytes()
         info = tarfile.TarInfo('runtime-manifest.json')
@@ -34,10 +34,24 @@ def write_fixture(path, forbidden=None):
             item.mode = 0o755 if any(entry['path'] == name and
                                      entry['type'] == 'executable'
                                      for entry in MANIFEST['required_paths']) else 0o644
+            if name == non_executable:
+                item.mode = 0o644
             archive.addfile(item, __import__('io').BytesIO(data))
 
 
 class RuntimeArchiveTests(unittest.TestCase):
+    def test_pkg_extractor_has_explicit_loader_entrypoint(self):
+        # Native aarch64 binaries retain /lib/ld-linux-aarch64.so.1 as
+        # PT_INTERP, but Android intentionally launches them via the Debian
+        # loader in the app-private rootfs; do not reject the working binary.
+        pkg = 'gow3port/arm64/bin/orbis-pkg-util'
+        entrypoints = [e for e in MANIFEST['entrypoints'] if e['path'] == pkg]
+        self.assertEqual(len(entrypoints), 1)
+        self.assertTrue(entrypoints[0]['launch_via_loader'])
+        self.assertEqual(entrypoints[0]['owner'], 'PkgInstallManager')
+        self.assertIn({'path': pkg, 'type': 'executable'}, MANIFEST['required_paths'])
+
+
     def test_fixture_passes_layout_and_digest_gate(self):
         with tempfile.TemporaryDirectory() as directory:
             archive = Path(directory) / 'runtime.tar.gz'
@@ -52,6 +66,13 @@ class RuntimeArchiveTests(unittest.TestCase):
             archive = Path(directory) / 'runtime.tar.gz'
             write_fixture(archive, 'eboot.bin')
             with self.assertRaisesRegex(ArchiveError, 'forbidden'):
+                validate_archive(archive)
+
+    def test_archive_rejects_nonexecutable_game_launcher(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / 'runtime.tar.gz'
+            write_fixture(archive, non_executable='gow3port/run-gow3.sh')
+            with self.assertRaisesRegex(ArchiveError, 'required executable is not executable: gow3port/run-gow3.sh'):
                 validate_archive(archive)
 
     def test_nested_rootfs_is_rejected(self):

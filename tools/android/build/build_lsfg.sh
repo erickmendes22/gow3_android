@@ -11,14 +11,17 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../../.."
 die() { echo "build_lsfg: $*" >&2; exit 1; }
+# The CI's conda toolchain exports x86-64-only flags (-march=nocona,
+# -mtune=haswell), include paths, and linker search paths. This is a
+# Clang aarch64 cross-build: consume the conda host tools via PATH,
+# but never pass its x86-64 build flags or paths to CMake.
+unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH CMAKE_PREFIX_PATH PKG_CONFIG_PATH
 if [[ -n ${GOW3_LLVM_PREFIX:-} && -d $GOW3_LLVM_PREFIX/bin ]]; then
     export PATH="$GOW3_LLVM_PREFIX/bin:$PATH"
 fi
 if [[ -n ${GOW3_LLD_PREFIX:-} && -d $GOW3_LLD_PREFIX/bin ]]; then
     export PATH="$GOW3_LLD_PREFIX/bin:$PATH"
 fi
-# The LSFG CMake ARM64 cross build must be isolated from conda host link flags too.
-source tools/android/build/clean_cross_env.sh
 for tool in git cmake ninja llvm-strip; do
     command -v "$tool" >/dev/null || die "$tool is required"
 done
@@ -44,13 +47,8 @@ for patch in "${patches[@]}"; do
     git -C "$src" apply --whitespace=nowarn "$PWD/$patch"
 done
 rm -rf "$build" "$out"
-mkdir -p "$(dirname "$build")"
 cmake -S "$src" -B "$build" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$PWD/tools/android/build/aarch64-toolchain.cmake" \
     -DCMAKE_BUILD_TYPE=Release > "$build.log" 2>&1 || { tail -30 "$build.log" >&2; exit 1; }
-if [[ ${GOW3_CONFIGURE_ONLY:-0} == 1 ]]; then
-    echo 'LSFG ARM64 configuration passed'
-    exit 0
-fi
 ninja -C "$build" lsfg-vk >> "$build.log" 2>&1 || { grep -v '^\[' "$build.log" | tail -40 >&2; exit 1; }
 mkdir -p "$out"
 llvm-strip --strip-debug -o "$out/liblsfg-vk.so" "$build/liblsfg-vk.so"

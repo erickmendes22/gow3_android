@@ -14,6 +14,13 @@ from pathlib import Path
 PORT = Path(__file__).resolve().parent.parent
 
 
+def disable_shadows_requested(ini):
+    """New positive-toggle setting wins; legacy inverse toggle remains readable."""
+    if 'disable_dynamic_shadows' in ini:
+        return ini['disable_dynamic_shadows'] == '1'
+    return ini.get('effect_dynamic_shadows', '1') == '0'
+
+
 def derive(game, config, state_path, env):
     """Plan one launch.
 
@@ -33,17 +40,62 @@ def derive(game, config, state_path, env):
     import graphics_options
     from patches import game_profile, game_title_id, patch_profile_status, patch_requirements, selected_patches
 
+    # Upgrade previous duplicated pixel-size entries before preparing the launch
+    # state, so both launchers and the persisted ini agree on one canonical name.
+    old_ini = graphics_options.read_ini(config)
+    previous = old_ini.get('render_resolution')
+    if previous is not None:
+        canonical = graphics_options.canonical_resolution(previous)
+        if canonical != previous:
+            graphics_options.write_keys(config, {'render_resolution': canonical})
     graphics, reverted = graphics_options.prepare(config, state_path)
+    android_port = env.get('GOW3_ANDROID_PORT') == '1'
+    ini = graphics_options.read_ini(config)
+    # Earlier Android builds wrote no frames_queued key and silently used one
+    # in-flight frame, forcing the CPU submission thread to wait for the GPU
+    # once each frame. Use two only when that key is absent; explicit 1/2/0
+    # choices remain untouched. The in-game setting still controls latency.
+    if android_port and 'frames_queued' not in ini:
+        graphics_options.write_keys(config, {'frames_queued': '2'})
+        ini = graphics_options.read_ini(config)
+    if android_port and ini.get('upscaler') != 'off':
+        graphics_options.write_keys(config, {'upscaler': 'off', 'preset': '0',
+                                             'fsr1': '0', 'rcas': '0'})
+        ini = graphics_options.read_ini(config)
     updates = dict(graphics_options.environment(graphics))
-    # The temporal upscalers and motion vectors are not calibrated for this game yet; linear
-    # image readbacks fix its corrupted textures. Defaults only: an explicit value wins.
-    for key, default in (('GOW3_UPSCALER', 'none'), ('GOW3_READBACK_LINEAR', '1')):
-        if key not in env:
-            updates[key] = default
-        updates[f'{key}_SOURCE'] = 'override' if key in env else 'android-safe-default'
+    if android_port:
+        # Off in the guest Vulkan core, not merely hidden from the Android UI.
+        updates['GOW3_UPSCALER'] = 'none'
+        updates['GOW3_FSR1'] = '0'
+        updates['GOW3_RCAS'] = '0'
+        updates['GOW3_UPSCALER_SOURCE'] = 'disabled-android'
+        updates['GOW3_RESOLUTION_STATUS'] = 'native-game-patch'
+    elif 'GOW3_UPSCALER' not in env:
+        updates['GOW3_UPSCALER'] = 'none'
+        updates['GOW3_UPSCALER_SOURCE'] = 'desktop-safe-default'
+    if 'GOW3_READBACK_LINEAR' not in env:
+        updates['GOW3_READBACK_LINEAR'] = '1'
+    updates['GOW3_READBACK_LINEAR_SOURCE'] = (
+        'override' if 'GOW3_READBACK_LINEAR' in env else 'android-safe-default')
+    identity_check = patch_profile_status(game)
+    resolution = graphics['render_resolution']
+    if android_port and resolution in graphics_options.DIRECT_RESOLUTIONS:
+        from patches import CUSA01715_0102_ANDROID_SHA
+        if (identity_check['title_id'] == 'CUSA01715' and
+            identity_check['app_version'] == '01.02' and
+            identity_check['eboot_sha256'] == CUSA01715_0102_ANDROID_SHA and
+            identity_check['reason'] == 'validated'):
+            updates['GOW3_PATCH_INPUT_RES'] = graphics_options.DIRECT_PIXEL_RESOLUTIONS[resolution]
+            updates['GOW3_RESOLUTION_STATUS'] = 'verified-direct-game-patch'
+        else:
+            graphics['render_resolution'] = 'native'
+            updates['GOW3_RESOLUTION_STATUS'] = 'unsupported-eboot-native-fallback'
 
     names, dmem, vblank = [], None, None
-    identity = patch_profile_status(game)
+    shadow_requested = disable_shadows_requested(ini)
+    updates['GOW3_SHADOWS_REQUESTED'] = 'off' if shadow_requested else 'on'
+    updates['GOW3_SHADOWS_STATUS'] = 'pending' if shadow_requested else 'enabled'
+    identity = identity_check
     profile = game_profile(identity['title_id'])
     reason = identity['reason'] or 'unknown'
     if identity['reason'] != 'validated':
@@ -60,6 +112,33 @@ def derive(game, config, state_path, env):
         if names:
             # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).
             names = graphics_options.patch_names(names, graphics)
+            # This exact-address patch belongs only to the supplied and
+            # verified eboot revision. Other builds retain their shadows.
+            shadow_reference = '6e72330e9092e5164049b865e5568f2d450904001a73fe0a2f4b39194c195b3c'
+            if shadow_requested and identity['eboot_sha256'] == shadow_reference:
+                names.append('Disable Dynamic Shadows')
+            updates['GOW3_SHADOWS_STATUS'] = ('disabled-patch-selected'
+                if 'Disable Dynamic Shadows' in names else
+                'unsupported-eboot' if shadow_requested else 'enabled')
+            if android_port:
+                # Only explicit Android toggles affect their own named patches.
+                # Keep mandatory fixes and Home resolution/FPS selection intact.
+                optional = {
+                    'skip_intro': 'Skip Intro',
+                    'patch_skip_video': 'Skip Any Video With X Button',
+                    'patch_disable_ssao': 'Disable SSAO',
+                    'patch_disable_motion_blur': 'Disable Motion Blur',
+                    'patch_disable_dof': 'Disable Depth of Field',
+                    'patch_disable_bloom': 'Disable Bloom',
+                    'patch_disable_soft_particles': 'Disable Soft Particles',
+                }
+                for key, patch in optional.items():
+                    if key not in ini:
+                        continue
+                    if ini[key] == '1' and patch not in names:
+                        names.append(patch)
+                    elif ini[key] != '1':
+                        names = [name for name in names if name != patch]
             dmem, vblank = patch_requirements(profile[1], names, profile[2])
             # The retail pool plus the patches' extra DMEM must fit the device (design: gate
             # values by device/runtime capability and fail with a clear log, not an OOM kill).

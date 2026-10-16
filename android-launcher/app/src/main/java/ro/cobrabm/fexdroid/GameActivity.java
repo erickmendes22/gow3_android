@@ -58,7 +58,7 @@ public final class GameActivity extends Activity {
     private LinearLayout drawerItems;
     private TextView status;
     private View resume;
-    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem;
+    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem, swapFaceItem;
     private TouchControllerOverlay controllerOverlay;
     private PadBridge pad;
     private AudioBridge audio;
@@ -72,6 +72,8 @@ public final class GameActivity extends Activity {
     private float touchX, touchY;
     private boolean edgeGesture, imeOpen, imePolling;
     private final AtomicBoolean imeAnswered=new AtomicBoolean();
+    private EditText imeField;
+    private AlertDialog imeDialog;
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -87,14 +89,67 @@ public final class GameActivity extends Activity {
         }
         displayOnly="x".equals(getIntent().getStringExtra("action"));
         pad=new PadBridge(new File(BASE,"android-pad.state"));
+        pad.setSwapFaceButtons(getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false));
         audio=new AudioBridge(new File(BASE,"audio.fifo"));
         buildScreen();
         immersive();
     }
 
+    private boolean bionicRuntime() { return "com.gow3.android.bionic".equals(getPackageName()); }
+
+    private boolean runtimeReady;
+
+    /** Installation must finish before choosing presentation or starting native bridges. */
+    private void startRuntime(SurfaceHolder holder) {
+        if (destroyed || !holder.getSurface().isValid()) return;
+        if (runtimeReady) {
+            if (bionicRuntime()) startBionic(holder);
+            else if (shmid>=0) attach(holder);
+            else if (!startingX) { startingX=true; worker.execute(() -> startX(holder)); }
+            return;
+        }
+        if (startingX) return;
+        startingX=true;
+        worker.execute(() -> {
+            try {
+                boolean installed=RuntimeInstaller.ensure(GameActivity.this, new File(FILES),
+                    message -> main.post(() -> status.setText(UiText.get(GameActivity.this, message))));
+                android.util.Log.i("God of War III","runtime installed="+installed);
+                main.post(() -> {
+                    startingX=false;
+                    if (destroyed) return;
+                    runtimeReady=true;
+                    startRuntime(surface.getHolder());
+                });
+            } catch (Exception ex) {
+                main.post(() -> startingX=false);
+                error(ex.toString());
+            }
+        });
+    }
+
+    private void startBionic(SurfaceHolder holder) {
+        if (destroyed || !holder.getSurface().isValid()) return;
+        try {
+            if (Build.VERSION.SDK_INT < 30) throw new java.io.IOException("Bionic runtime requires Android 11 or newer");
+            String result=Gow3Present.start(holder,BASE+"/present.sock","1".equals(setting("android_fullscreen")));
+            if (!result.startsWith("bridge running:")) throw new java.io.IOException(result);
+            if (!displayOnly && game==null && !startingX) {
+                startingX=true;
+                worker.execute(() -> {
+                    if (audio!=null) audio.start();
+                    if (audio==null || !audio.awaitReady(5000)) { error("Android audio bridge could not start"); return; }
+                    startGame();
+                });
+            }
+            pollFrames();
+            if (!imePolling) { imePolling=true; pollIme(); }
+        } catch (Exception ex) { error(ex.toString()); }
+    }
+
     private int dp(float n) { return Math.round(n*getResources().getDisplayMetrics().density); }
     private TextView text(String value, int size, int color) {
-        TextView t=new TextView(this); t.setText(value); t.setTextSize(size); t.setTextColor(color); return t;
+        TextView t=new TextView(this); t.setText(UiText.get(this, value)); t.setTextSize(size); t.setTextColor(color); return t;
     }
     private FrameLayout.LayoutParams frame(int width,int height,int gravity) {
         return new FrameLayout.LayoutParams(width,height,gravity);
@@ -102,7 +157,9 @@ public final class GameActivity extends Activity {
     private void fitSurface(int width,int height) {
         if (width<=0 || height<=0) return;
         int w=width, h=height;
-        if ((long)w*9>(long)h*16) w=h*16/9; else h=w*9/16;
+        if (!"1".equals(setting("android_fullscreen"))) {
+            if ((long)w*9>(long)h*16) w=h*16/9; else h=w*9/16;
+        }
         FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)surface.getLayoutParams();
         if (p.width==w && p.height==h) return;
         p.width=w; p.height=h;
@@ -119,17 +176,13 @@ public final class GameActivity extends Activity {
         screen.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> fitSurface(r-l,b-t));
         surface.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override public void surfaceCreated(SurfaceHolder h) {
-                if (shmid>=0) attach(h);
-                else if (!hasGame()) {
-                    // MainActivity owns the first-run game-folder check. Reaching this state means
-                    // the launcher was bypassed or the selected folder was removed while away.
+                if (!hasGame()) {
                     pendingHolder=h;
                     error("Game folder is unavailable. Return to the launcher and choose it again.");
-                }
-                else if (!startingX) { startingX=true; worker.execute(() -> startX(h)); }
+                } else startRuntime(h);
             }
             @Override public void surfaceChanged(SurfaceHolder h,int format,int w,int height) {}
-            @Override public void surfaceDestroyed(SurfaceHolder h) { DisplayBridge.stop(); }
+            @Override public void surfaceDestroyed(SurfaceHolder h) { if (!bionicRuntime()) DisplayBridge.stop(); }
         });
         surface.setOnTouchListener((v,e) -> {
             if (shmid<0 || drawerOpen) return true;
@@ -144,7 +197,7 @@ public final class GameActivity extends Activity {
         screen.addView(status,frame(-1,-1,Gravity.CENTER));
         status.setClickable(false);
 
-        controllerOverlay=new TouchControllerOverlay(this,pad,"1".equals(setting("overlay_mouse")));
+        controllerOverlay=new TouchControllerOverlay(this,pad,!bionicRuntime() && "1".equals(setting("overlay_mouse")));
         controllerOverlay.setVisibility(controllerEnabled() ? View.VISIBLE : View.GONE);
         screen.addView(controllerOverlay,frame(-1,-1,Gravity.CENTER));
 
@@ -195,8 +248,8 @@ public final class GameActivity extends Activity {
         });
          */
         menuItem("ic_refresh","Restart game","Unsaved progress is lost",() -> new AlertDialog.Builder(this)
-            .setTitle("Restart God of War III?").setMessage("Any unsaved progress will be lost.")
-            .setNegativeButton("Cancel",null).setPositiveButton("Restart",(dialog,which) -> restartGame()).show());
+            .setTitle(UiText.get(this, "Restart God of War III?")).setMessage(UiText.get(this, "Any unsaved progress will be lost."))
+            .setNegativeButton(UiText.get(this, "Cancel"),null).setPositiveButton(UiText.get(this, "Restart"),(dialog,which) -> restartGame()).show());
 
         section("Graphics");
         // Graphics 入口只保留运行时真正消费的那几项：upscaler / preset / sharpen / sharpness /
@@ -226,6 +279,12 @@ public final class GameActivity extends Activity {
             controllerOverlay.release();
             closeDrawer();
         });
+        swapFaceItem=menuItem("ic_gamepad","Swap Square/Triangle","",() -> {
+            boolean enabled=!getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false);
+            getSharedPreferences("gow3",MODE_PRIVATE).edit().putBoolean("swap_square_triangle",enabled).apply();
+            pad.setSwapFaceButtons(enabled);
+            setDetail(swapFaceItem,enabled ? "On" : "Off");
+        });
         menuItem("ic_edit","Edit controller layout","Drag and resize the buttons",() -> {
             getSharedPreferences("gow3",MODE_PRIVATE).edit().putBoolean("controller_overlay",true).apply();
             closeDrawer();
@@ -237,14 +296,14 @@ public final class GameActivity extends Activity {
         });
 
         menuItem("ic_exit","Quit game",null,() -> new AlertDialog.Builder(this)
-            .setTitle("Quit God of War III?").setMessage("Any unsaved progress will be lost.")
-            .setNegativeButton("Cancel",null).setPositiveButton("Quit",(dialog,which) -> finish()).show());
+            .setTitle(UiText.get(this, "Quit God of War III?")).setMessage(UiText.get(this, "Any unsaved progress will be lost."))
+            .setNegativeButton(UiText.get(this, "Cancel"),null).setPositiveButton(UiText.get(this, "Quit"),(dialog,which) -> finish()).show());
 
         // The version, pinned under the scrolling menu.
         String version="";
         try { version=" "+getPackageManager().getPackageInfo(getPackageName(),0).versionName; }
         catch (Exception ignored) {}
-        TextView about=text("God of War III for Android"+version,12,0xff8e9097);
+        TextView about=text(getString(com.gow3.android.R.string.app_name)+version,12,0xff8e9097);
         about.setPadding(dp(24),dp(8),dp(14),dp(14));
         drawer.addView(about,new LinearLayout.LayoutParams(-1,-2));
         screen.addView(drawer,frame(dp(320),-1,Gravity.LEFT));
@@ -252,7 +311,8 @@ public final class GameActivity extends Activity {
     }
 
     private void restartGame() {
-        closeDrawer(); status.setText("Restarting God of War III…"); status.setVisibility(View.VISIBLE);
+        closeDrawer(); status.setText(UiText.get(this, "Restarting God of War III…")); status.setVisibility(View.VISIBLE);
+        if (!runtimeReady) { startPending(); return; }
         worker.execute(() -> { stopGame(); startGame(); });
     }
 
@@ -299,7 +359,7 @@ public final class GameActivity extends Activity {
     }
     private static void setDetail(LinearLayout row,String value) {
         TextView detail=row==null ? null : (TextView)row.findViewWithTag("detail");
-        if (detail!=null) detail.setText(value);
+        if (detail!=null) detail.setText(UiText.get(detail.getContext(), value));
     }
     /** 抽屉里的一行不可用时：不可点击、不可获焦（手柄/键盘导航会跳过它），并整体变灰。
      *  action 存在 row 的 tag 里，监听器保持挂着——setClickable(false) 会让点击不再分发，
@@ -336,16 +396,17 @@ public final class GameActivity extends Activity {
         //  preflight 找不到它时会静默不开 layer（只剩 30 FPS），玩家看不出是自己漏了导入。
         //  所以直接把这一行置灰不可点，并说明去 Home 页导入，而不是让它"看着能开却不生效"。
         boolean dllPresent=hasFrameGenDll();
-        setRowEnabled(losslessItem,dllPresent);
-        setDetail(losslessItem,!dllPresent ? "Import Lossless.dll on the Home page first"
+        setRowEnabled(losslessItem,dllPresent && !bionicRuntime());
+        setDetail(losslessItem,bionicRuntime() ? (UiText.portuguese(this) ? "Indisponível no runtime Bionic experimental" : "Unavailable in the experimental Bionic runtime") : !dllPresent ? "Import Lossless.dll on the Home page first"
             : lsfgOn ? lsfg+"× frames · flow "
             +(setting("lsfg_flow_scale")==null ? "1.0" : setting("lsfg_flow_scale")) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
+        setDetail(swapFaceItem,getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false) ? "On" : "Off");
     }
 
     private void openDrawer() {
         if (drawerOpen) return;
-        drawerOpen=true; controllerOverlay.release(); pad.reset(); XInput.button(1,false);
+        drawerOpen=true; controllerOverlay.release(); pad.reset(); if (!bionicRuntime()) XInput.button(1,false);
         refreshDrawer();
         controllerOverlay.setVisibility(View.GONE);
         handle.setVisibility(View.GONE);
@@ -425,6 +486,7 @@ public final class GameActivity extends Activity {
             }
             return super.dispatchKeyEvent(e);
         }
+        if (imeGamepad(e)) return true;
         if (pad.key(e)) return true;
         if (shmid>=0 && e.getScanCode()>0 && e.getScanCode()+8<=255) {
             XInput.key(e.getScanCode()+8,e.getAction()==KeyEvent.ACTION_DOWN); return true;
@@ -461,10 +523,23 @@ public final class GameActivity extends Activity {
         env.put("HOME",FILES+"/home/gow3port"); env.put("LANG","C.UTF-8");
         env.put("TMPDIR",ROOT+"/tmp"); env.put("XDG_RUNTIME_DIR",ROOT+"/tmp");
         env.put("FXD_FILES",FILES); env.put("FXD_ROOT",ROOT); env.put("GOW3_ANDROID_INPUT","1");
+        env.put("GOW3_LANGUAGE", UiText.gameLanguage(this));
+        if (gameDir!=null) env.put("GOW3_GAME_DIR",gameDir);
+        if (updateDir!=null) env.put("GOW3_PATCH_DIR",updateDir);
+        if (bionicRuntime()) {
+            GpuDriverManager.configureEnvironment(this,env);
+            env.put("GOW3_SCREEN_W","1280"); env.put("GOW3_SCREEN_H","720");
+            env.put("PATH","/system/bin"); env.put("TMPDIR",BASE+"/tmp"); env.put("XDG_RUNTIME_DIR",BASE+"/tmp");
+            env.put("LD_LIBRARY_PATH",BASE+"/arm64/lib:"+BASE+"/arm64/python/lib");
+            env.put("GOW3_PRESENT_SOCKET",BASE+"/present.sock");
+            env.put("GOW3_DISPLAY_HZ",String.valueOf(Math.round(getWindowManager().getDefaultDisplay().getRefreshRate())));
+            return b.start();
+        }
         // Keep native port libraries and rootfs libraries visible to the explicit rootfs loader.
         env.put("LD_LIBRARY_PATH",BASE+"/arm64/lib:"+ROOT+"/usr/lib/aarch64-linux-gnu:"+ROOT+"/usr/lib");
         // Its libc emulates SysV shared memory through fxshmd (started below).
         env.put("FXD_SHM_SOCKET",ROOT+"/tmp/.fxshm/sock");
+        env.put("GOW3_LANGUAGE", UiText.gameLanguage(this));
         if (gameDir!=null) env.put("GOW3_GAME_DIR",gameDir);
         if (updateDir!=null) env.put("GOW3_PATCH_DIR",updateDir);
         if (target.endsWith("/Xvfb")) env.put("LD_PRELOAD",ROOT+"/usr/lib/fexdroid/libfxpath.so");
@@ -473,8 +548,6 @@ public final class GameActivity extends Activity {
     }
     private void startX(SurfaceHolder holder) {
         try {
-            boolean installed=RuntimeInstaller.ensure(this, new File(FILES), message -> main.post(() -> status.setText(message)));
-            android.util.Log.i("God of War III","runtime installed="+installed);
             if (audio!=null) audio.start();
             if (audio==null || !audio.awaitReady(5000))
                 throw new java.io.IOException("Android audio bridge did not become ready; see logcat for details.");
@@ -530,12 +603,14 @@ public final class GameActivity extends Activity {
     }
     // ---- Game folder: the extracted retail game in shared storage ----
     /** Known retail folder names; the selected folder is still validated by eboot.bin. */
-    private static final String[] SERIALS={"CUSA01740","CUSA00900","CUSA00207","CUSA00208","CUSA00299",
+    private static final String[] SERIALS={"CUSA01715","CUSA01740","CUSA00900","CUSA00207","CUSA00208","CUSA00299",
         "CUSA01363","CUSA03179","CUSA03014","CUSA03023"};
     private static boolean isGame(File dir) { return dir!=null && new File(dir,"eboot.bin").isFile(); }
     private boolean hasGame() {
-        if (Build.VERSION.SDK_INT>=23 && checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE)
-                !=android.content.pm.PackageManager.PERMISSION_GRANTED) return false;
+        // Match GameFolderManager: the selected real path is the source of truth.
+        // Android 11+ all-files access and app-owned PKG destinations do not need
+        // READ_EXTERNAL_STORAGE. Requiring that obsolete permission here rejected
+        // folders the launcher had already validated, before starting the runtime.
         return gameDir!=null && isGame(new File(gameDir));
     }
     /** Explains, asks for storage access when needed, then opens the folder picker. */
@@ -546,18 +621,18 @@ public final class GameActivity extends Activity {
                 android.Manifest.permission.WRITE_EXTERNAL_STORAGE},REQUEST_STORAGE);
             return;
         }
-        status.setText(change ? "Choose the God of War III game folder." :
-            "Choose your God of War III game folder (e.g. CUSA01740, the folder with eboot.bin).");
+        status.setText(UiText.get(this, change ? "Choose the God of War III game folder." :
+            "Choose your God of War III game folder (e.g. CUSA01740, the folder with eboot.bin)."));
         status.setVisibility(View.VISIBLE);
-        new AlertDialog.Builder(this).setTitle("God of War III game folder")
-            .setMessage("Select the extracted game folder (e.g. CUSA01740 or CUSA00900, which contains eboot.bin) or the folder "
-                +"that holds it, in your phone's storage."+(gameDir!=null ? "\n\nCurrent: "+gameDir : ""))
-            .setPositiveButton("Choose folder",(d,w) -> {
+        new AlertDialog.Builder(this).setTitle(UiText.get(this, "God of War III game folder"))
+            .setMessage(UiText.get(this, "Select the extracted game folder (e.g. CUSA01740 or CUSA00900, which contains eboot.bin) or the folder "
+                +"that holds it, in your phone's storage."+(gameDir!=null ? "\n\nCurrent: "+gameDir : "")))
+            .setPositiveButton(UiText.get(this, "Choose folder"),(d,w) -> {
                 Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
                 try { startActivityForResult(pick,REQUEST_FOLDER); }
                 catch (Exception ex) { error("No folder picker: "+ex); }
             })
-            .setNegativeButton(change ? "Cancel" : "Quit",(d,w) -> { if (!change) finish(); })
+            .setNegativeButton(UiText.get(this, change ? "Cancel" : "Quit"),(d,w) -> { if (!change) finish(); })
             .setCancelable(change).show();
     }
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results) {
@@ -575,15 +650,15 @@ public final class GameActivity extends Activity {
         if (dir!=null && !isGame(dir))
             for (String serial : SERIALS) if (isGame(new File(dir,serial))) { dir=new File(dir,serial); break; }
         if (!isGame(dir)) {
-            new AlertDialog.Builder(this).setTitle("Not a God of War III folder")
-                .setMessage((dir==null ? "That location" : dir.getPath())+" has no eboot.bin.")
-                .setPositiveButton("Choose again",(d,w) -> askGameFolder(gameDir!=null)).show();
+            new AlertDialog.Builder(this).setTitle(UiText.get(this, "Not a God of War III folder"))
+                .setMessage(UiText.get(this, (dir==null ? "That location" : dir.getPath())+" has no eboot.bin."))
+                .setPositiveButton(UiText.get(this, "Choose again"),(d,w) -> askGameFolder(gameDir!=null)).show();
             return;
         }
         boolean changed=gameDir!=null && !gameDir.equals(dir.getPath());
         gameDir=dir.getPath();
         getSharedPreferences("gow3",MODE_PRIVATE).edit().putString("game_dir",gameDir).apply();
-        status.setText("Starting God of War III…");
+        status.setText(UiText.get(this, "Starting God of War III…"));
         if (changed && game!=null) restartGame(); else startPending();
     }
     /** A storage folder of the picker (tree document "primary:Path" or "XXXX-XXXX:Path") as a path. */
@@ -600,14 +675,12 @@ public final class GameActivity extends Activity {
     private void startPending() {
         SurfaceHolder h=pendingHolder!=null ? pendingHolder : surface.getHolder();
         pendingHolder=null;
-        if (h.getSurface()!=null && h.getSurface().isValid() && !startingX && shmid<0) {
-            startingX=true; worker.execute(() -> startX(h));
-        }
+        startRuntime(h);
     }
 
     private void pollFrames() {
         if (destroyed) return;
-        if (!hadError && DisplayBridge.directFrames()>0) status.setVisibility(View.GONE);
+        if (!hadError && (bionicRuntime() ? Gow3Present.framesIfLoaded() : DisplayBridge.directFrames())>0) status.setVisibility(View.GONE);
         // run-gow3.sh 在 LSFG 运行时失败、自动回退到普通 Vulkan 时会写这个标记：这时刷新率要退回
         // 「无 LSFG」的目标，否则会停在 LSFG 倍率对应的高刷上空跑（4.1 复评）。
         if (!lsfgFallbackOff && new File(BASE,"lsfg-fallback.marker").isFile()) {
@@ -639,18 +712,35 @@ public final class GameActivity extends Activity {
         field.setFilters(new InputFilter[]{new InputFilter.LengthFilter(max)});
         field.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         FrameLayout box=new FrameLayout(this); box.setPadding(dp(20),dp(8),dp(20),0); box.addView(field);
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(title.isEmpty() ? "Enter text" : title)
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(UiText.get(this, title.isEmpty() ? "Enter text" : title))
             .setView(box)
-            .setPositiveButton("OK",(d,w) -> answerIme(true,field.getText().toString()))
-            .setNegativeButton("Cancel",(d,w) -> answerIme(false,""))
+            .setPositiveButton(UiText.get(this, "OK"),(d,w) -> answerIme(true,field.getText().toString()))
+            .setNegativeButton(UiText.get(this, "Cancel"),(d,w) -> answerIme(false,""))
             .setOnCancelListener(d -> answerIme(false,"")).create();
         field.setOnEditorActionListener((v,action,event) -> {
             if (action!=EditorInfo.IME_ACTION_DONE) return false;
             dialog.dismiss(); answerIme(true,field.getText().toString()); return true;
         });
         dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
-        dialog.setOnDismissListener(d -> { imeOpen=false; immersive(); surface.requestFocus(); });
+        dialog.setOnDismissListener(d -> { imeOpen=false; imeField=null; imeDialog=null; immersive(); surface.requestFocus(); });
+        dialog.setOnKeyListener((d,code,event) -> imeGamepad(event));
+        imeField=field; imeDialog=dialog;
         dialog.show(); field.requestFocus();
+    }
+    /** Consume both edges so accepting a name cannot also press Cross in the game. */
+    private boolean imeGamepad(KeyEvent e) {
+        if (!imeOpen) return false;
+        int code=e.getKeyCode(), scan=e.getScanCode();
+        boolean cross=code==KeyEvent.KEYCODE_BUTTON_A || scan==304;
+        boolean circle=code==KeyEvent.KEYCODE_BUTTON_B || scan==305;
+        if (!cross && !circle) return false;
+        if (e.getAction()==KeyEvent.ACTION_UP) {
+            EditText field=imeField;
+            AlertDialog dialog=imeDialog;
+            answerIme(cross, cross && field!=null ? field.getText().toString() : "");
+            if (dialog!=null) dialog.dismiss();
+        }
+        return true;
     }
     private void answerIme(boolean ok,String value) {
         if (!imeAnswered.compareAndSet(false,true)) return;
@@ -679,6 +769,7 @@ public final class GameActivity extends Activity {
      *  运行时的 layer（manifest + liblsfg-vk.so）都在、玩家的 Lossless.dll 在两处查找位置之一。
      *  刷新率必须依此判断，而不是只看 gow3.ini 的 lsfg_multiplier（4.2 复评）。 */
     private boolean lsfgLaunchable() {
+        if (bionicRuntime()) return false;
         String lsfg=setting("lsfg_multiplier");
         if (!"2".equals(lsfg) && !"3".equals(lsfg) && !"4".equals(lsfg)) return false;
         if (!new File(BASE,"arm64/lsfg/VkLayer_LS_frame_generation.json").isFile()) return false;
@@ -726,8 +817,9 @@ public final class GameActivity extends Activity {
         pickRefreshRate();
         new File(BASE,"ime.request").delete(); new File(BASE,"ime.request.result").delete();
         try {
-            Process launched=process(ROOT+"/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
-                ROOT+"/bin/sh",BASE+"/run-gow3.sh","game"); game=launched;
+            Process launched=bionicRuntime() ? process("/system/bin/sh",BASE+"/run-bionic.sh","game")
+                : process(ROOT+"/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
+                    ROOT+"/bin/sh",BASE+"/run-gow3.sh","game"); game=launched;
             Thread log=new Thread(() -> {
                 try (BufferedReader r=new BufferedReader(new InputStreamReader(launched.getInputStream()));
                      PrintWriter out=new PrintWriter(new File(BASE,"logs/android-game.log"))) {
@@ -751,7 +843,7 @@ public final class GameActivity extends Activity {
     private void error(String message) {
         hadError=true;
         android.util.Log.e("God of War III",message);
-        main.post(() -> { if (!destroyed) { status.setText(message); status.setVisibility(View.VISIBLE); } });
+        main.post(() -> { if (!destroyed) { status.setText(UiText.get(this, message)); status.setVisibility(View.VISIBLE); } });
     }
     private void stopGame() {
         Process p=game; game=null;
@@ -759,7 +851,7 @@ public final class GameActivity extends Activity {
     }
     @Override protected void onDestroy() {
         destroyed=true; pad.reset(); audio.stop(); main.removeCallbacksAndMessages(null);
-        DisplayBridge.stop(); stopGame(); if (xvfb!=null) xvfb.destroyForcibly();
+        if (bionicRuntime()) Gow3Present.stop(); else DisplayBridge.stop(); stopGame(); if (xvfb!=null) xvfb.destroyForcibly();
         worker.shutdownNow(); super.onDestroy();
     }
 }

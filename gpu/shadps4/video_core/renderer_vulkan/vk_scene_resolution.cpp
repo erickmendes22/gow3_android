@@ -24,6 +24,23 @@ SceneTargets::SceneTargets(const Instance& i, Scheduler& s, Runtime& r, Lookup g
     runtime.scene_targets = this;
     const char* force = std::getenv("GOW3_SCENE_STENCIL_BITS");
     force_stencil_bits = force && force[0] == '1';
+    // For the verified CUSA01715 startup patches, the guest actually allocates
+    // the input preset (640x360 for Performance), NOT 1280x720. Both target
+    // dimensions must match until the real G-buffer confirms the allocation.
+    if (const char* fixed = std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT");
+        fixed && fixed[0] == '1') {
+        guest_size = {1280, 720};
+        if (const char* render = std::getenv("GOW3_RENDER_RES")) {
+            unsigned w = 0, h = 0;
+            if (std::sscanf(render, "%ux%u", &w, &h) == 2 &&
+                ((w == 1280 && h == 720) || (w == 854 && h == 480) ||
+                 (w == 752 && h == 424) || (w == 640 && h == 360) ||
+                 (w == 426 && h == 240))) {
+                guest_size = {w, h};
+                size = guest_size;
+            }
+        }
+    }
     CreateResampleResources();
 }
 SceneTargets::~SceneTargets() {
@@ -70,17 +87,20 @@ bool SceneTargets::ShaderResampled(const VideoCore::Image& image) const {
 // 1 for the scene size, 2 for half resolution (the game's post-processing chain), else 0.
 // Half resolution needs a scene size that halves exactly: the proxy keeps the scene's factor,
 // so the shaders' FragCoord conversion (1920 / scene width) stays correct for it.
-static u32 SizeDivisor(const VideoCore::ImageInfo& i, SceneResolution::Size scene) {
-    if (i.size.width == 1920 && i.size.height == 1080) return 1;
-    if (i.size.width == 960 && i.size.height == 540 && scene.width % 2 == 0 &&
-        scene.height % 2 == 0 && !Gow3Toggle::Disabled(Gow3Toggle::SceneHalfRes)) {
+static u32 SizeDivisor(const VideoCore::ImageInfo& i, SceneResolution::Size scene,
+                       SceneResolution::Size guest) {
+    if (i.size.width == guest.width && i.size.height == guest.height) return 1;
+    if (guest.width % 2 == 0 && guest.height % 2 == 0 &&
+        i.size.width == guest.width / 2 && i.size.height == guest.height / 2 &&
+        scene.width % 2 == 0 && scene.height % 2 == 0 &&
+        !Gow3Toggle::Disabled(Gow3Toggle::SceneHalfRes)) {
         return 2;
     }
     return 0;
 }
 bool SceneTargets::Eligible(const VideoCore::Image& image) const {
     const auto& i = image.info;
-    const u32 div = SizeDivisor(i, size);
+    const u32 div = SizeDivisor(i, size, guest_size);
     if (!div || i.size.depth != 1 || i.resources.layers != 1 || i.num_samples != 1 ||
         i.props.is_block || !image.backing || image.backing->num_samples != 1) {
         return false;
@@ -92,11 +112,41 @@ bool SceneTargets::Eligible(const VideoCore::Image& image) const {
     }
     return Blittable(image.backing->image.image_ci.format) || ShaderResampled(image);
 }
+void SceneTargets::ObserveGuestScene(u32 width, u32 height) {
+    // Called only for a credible 5+ MRT G-buffer depth attachment, and
+    // never inferred from the configured output resolution alone.
+    if (guest_scene_observed || !std::getenv("GOW3_ANDROID_FSR_FIXED_OUTPUT")) return;
+    if (!((width == guest_size.width && height == guest_size.height) ||
+          (width == 1280 && height == 720) ||
+          (width == 1920 && height == 1080))) {
+        static u32 unsupported = 0;
+        if (unsupported++ < 3) {
+            std::printf("GOW3_GBUFFER_UNKNOWN size=%ux%u expected=%ux%u\n",
+                        width, height, guest_size.width, guest_size.height);
+        }
+        return;
+    }
+    guest_scene_observed = true;
+    const SceneResolution::Size actual{width, height};
+    if (guest_size != actual) {
+        // No surviving proxy can be reused with a different guest extent.
+        ResolveAll();
+        scheduler.Finish();
+        entries.clear();
+        tracked.clear();
+        recent = {};
+        ++generation;
+        guest_size = actual;
+    }
+    std::printf("GOW3_GBUFFER_ACTUAL guest=%ux%u scene=%ux%u scaled=%u\n",
+                width, height, size.width, size.height, unsigned(size != guest_size));
+}
 bool SceneTargets::EligibleScene(const VideoCore::Image& image) const {
-    return image.info.size.width == 1920 && image.info.size.height == 1080 && Eligible(image);
+    return image.info.size.width == guest_size.width &&
+           image.info.size.height == guest_size.height && Eligible(image);
 }
 SceneResolution::Size SceneTargets::ProxySize(const VideoCore::Image& image, u32 level) const {
-    const u32 div = std::max(1u, SizeDivisor(image.info, size));
+    const u32 div = std::max(1u, SizeDivisor(image.info, size, guest_size));
     return {std::max(1u, size.width / div >> level), std::max(1u, size.height / div >> level)};
 }
 bool SceneTargets::SetSize(SceneResolution::Size next) {
@@ -108,8 +158,9 @@ bool SceneTargets::SetSize(SceneResolution::Size next) {
     ++generation;
     recent = {};
     size = next;
-    std::printf("Scene resolution: raster %ux%u, half-resolution targets %ux%u, UI 1920x1080 "
-                "(live)\n", size.width, size.height, size.width / 2, size.height / 2);
+    std::printf("Scene resolution: raster %ux%u, half-resolution targets %ux%u, guest/UI %ux%u "
+                "(live)\n", size.width, size.height, size.width / 2, size.height / 2,
+                guest_size.width, guest_size.height);
     return true;
 }
 void SceneTargets::ResolveAll() {

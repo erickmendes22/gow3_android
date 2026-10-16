@@ -1,6 +1,10 @@
 /* libScePad on SDL3 gamepads, with a keyboard fallback. SDL events are pumped
  * by the window thread (gpu/shim/window.cpp); here state is only sampled.
  *
+ * pad 文件注入、GOW3_ANDROID_INPUT 门控,以及让 overlay 对话框读到注入按键的 pad 快照,都移植
+ * 自同谱系的 Bloodborne-Android(src/runtime_pad.c),改动时留意这份渊源。其中扳机解析和快照是
+ * 本仓库新增的:Bloodborne 从不弹宿主侧的存档列表,因此它没有快照的消费者。
+ *
  * Default keyboard layout (GOW3_KEY_MAP changes the buttons, see apply_button_map):
  *   WASD left stick, arrow keys right stick, Space Cross, LShift Circle,
  *   E Square, Q Triangle, 1 L1, 3 R1, R L2, F R2, Z L3, C R3,
@@ -14,7 +18,9 @@
 #include <string.h>
 #include <pthread.h>
 #include <time.h>
+#ifndef __ANDROID__
 #include <SDL3/SDL.h>
+#endif
 #include <sys/stat.h>
 
 #define ERR_INVALID_ARG ((int32_t)0x80920001)
@@ -56,25 +62,33 @@ _Static_assert(__builtin_offsetof(PadData,timestamp)==80,"OrbisPadData timestamp
 _Static_assert(sizeof(ControllerInfo)==28,"OrbisPadControllerInformation layout");
 
 static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
-static int initialized, opened, sdl_ready;
+static int initialized, opened;
+#ifndef __ANDROID__
+static int sdl_ready;
 static SDL_Gamepad *gamepad;
+#endif
 static size_t reads;
 static uint8_t connected_count;
 
 static uint64_t now_us(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t); return (uint64_t)t.tv_sec*1000000u+(uint64_t)t.tv_nsec/1000u; }
+#ifndef __ANDROID__
 static uint8_t axis(int16_t v) { int x=(v+32768)>>8; return (uint8_t)(x<0 ? 0 : x>255 ? 255 : x); }
 static uint8_t trigger(int16_t v) { int x=v>>7; return (uint8_t)(x<0 ? 0 : x>255 ? 255 : x); }
 static uint16_t touch_axis(float v, int max) {
     return (uint16_t)(v<=0.0f ? 0 : v>=1.0f ? max : (int)(v*max+0.5f));
 }
+#endif
 static void touch_click(PadData *d, int right) {
     d->buttons|=BTN_TOUCHPAD;
     d->touch_count=1;
     d->touches[0]=(PadTouch){.x=right ? 1440 : 480,.y=471,.id=0};
 }
 
+#ifndef __ANDROID__
 /* Opens the first gamepad SDL knows about; called under lock. */
 static SDL_Gamepad *current_gamepad(void) {
+    /* Android app 把所有手柄交给本文件(GOW3_PAD_FILE),那里没有 SDL 手柄可开:见 window.cpp。 */
+    if (!sdl_ready) { const char *android=getenv("GOW3_ANDROID_INPUT"); if (android && android[0]=='1') sdl_ready=-1; }
     if (!sdl_ready) sdl_ready = SDL_WasInit(SDL_INIT_GAMEPAD) ? 1 : SDL_InitSubSystem(SDL_INIT_GAMEPAD) ? 1 : -1;
     if (sdl_ready<0) return NULL;
     if (gamepad && !SDL_GamepadConnected(gamepad)) { SDL_CloseGamepad(gamepad); gamepad=NULL; }
@@ -89,6 +103,8 @@ static SDL_Gamepad *current_gamepad(void) {
     }
     return gamepad;
 }
+#endif
+
 /* Button sources: a host button or key and the PS4 button it presses. The defaults below can be
  * changed per PS4 button with GOW3_PAD_MAP (gamepad) and GOW3_KEY_MAP (keyboard), e.g.
  * GOW3_KEY_MAP="cross=Q,square=Left Shift" or GOW3_PAD_MAP="cross=b,circle=a": comma-separated
@@ -100,6 +116,7 @@ static const struct { const char *name; uint32_t ps; } ps_names[]={
     {"options",BTN_OPTIONS}, {"touchpad",BTN_TOUCHPAD},
     {"up",BTN_UP}, {"down",BTN_DOWN}, {"left",BTN_LEFT}, {"right",BTN_RIGHT},
 };
+#ifndef __ANDROID__
 typedef struct { int source; uint32_t ps; } ButtonSource;
 typedef struct { ButtonSource entries[48]; size_t count; } ButtonMap;
 static ButtonMap pad_map={{
@@ -225,12 +242,22 @@ static void sample_host(PadData *d) {
     key_axis(&d->right_y,k[SDL_SCANCODE_UP],k[SDL_SCANCODE_DOWN]);
 }
 
+#else
+static void sample_host(PadData *d) {
+    memset(d,0,sizeof(*d));
+    d->left_x=d->left_y=d->right_x=d->right_y=128;
+    d->orientation[3]=1.0f;
+    d->connected=1; d->connected_count=1;
+    d->timestamp=now_us();
+}
+#endif
+
 /* GOW3_PAD_FILE=<file>: scripted input for automated runs. The file holds whitespace-separated
  * tokens, re-read when it changes: button names (cross circle square triangle l1 r1 l2 r2 l3 r3
  * options touchpad touchpad_left touchpad_right up down left right) are held while listed;
  * touchpad defaults to a left-side click; lx= ly= rx= ry= (0..255) override
  * the sticks. An empty file releases everything. */
-static struct { uint32_t buttons; int stick[4]; int touch_side; } injected={0,{-1,-1,-1,-1},-1};
+static struct { uint32_t buttons; int stick[4]; int trigger[2]; int touch_side; } injected={0,{-1,-1,-1,-1},{-1,-1},-1};
 static int replay_armed;      /* 1 while a GOW3_PAD_REPLAY recording plays, 2 once it ended */
 static uint64_t replay_start; /* 0: (re)start at the next sample */
 static void read_inject(void) {
@@ -253,9 +280,12 @@ static void read_inject(void) {
     FILE *f=fopen(path,"r");
     if (!f) return;
     static const char *sticks[]={"lx=","ly=","rx=","ry="};
+    /* Android 的 PadBridge 在扳机值大于 0 时跳过 l2/r2 token,只写 l2=/r2= 数值。 */
+    static const char *triggers[]={"l2=","r2="};
     injected.buttons=0;
     injected.touch_side=-1;
     for (int i=0;i<4;++i) injected.stick[i]=-1;
+    for (int i=0;i<2;++i) injected.trigger[i]=-1;
     char token[64];
     while (fscanf(f,"%63s",token)==1) {
         if (!strcmp(token,"replay") && replay_armed!=1) { replay_armed=1; replay_start=0; } /* GOW3_PAD_REPLAY */
@@ -265,16 +295,36 @@ static void read_inject(void) {
         }
         for (size_t i=0;i<sizeof(ps_names)/sizeof(*ps_names);++i) if (!strcmp(token,ps_names[i].name)) injected.buttons|=ps_names[i].ps;
         for (int i=0;i<4;++i) if (!strncmp(token,sticks[i],3)) { int v=atoi(token+3); injected.stick[i]=v<0 ? 0 : v>255 ? 255 : v; }
+        for (int i=0;i<2;++i) if (!strncmp(token,triggers[i],3)) { int v=atoi(token+3); injected.trigger[i]=v<0 ? 0 : v>255 ? 255 : v; }
     }
     fclose(f);
-    printf("Runtime: pad file: buttons 0x%x sticks %d %d %d %d\n",injected.buttons,
-           injected.stick[0],injected.stick[1],injected.stick[2],injected.stick[3]);
+    // The touch overlay rewrites the same state frequently. Only report a
+    // semantic input change, not each file mtime; avoids thousands of repeated
+    // lines and excessive logging overhead during gameplay.
+    static uint32_t last_buttons = UINT32_MAX;
+    static int last_stick[4] = {-2,-2,-2,-2};
+    if (injected.buttons != last_buttons ||
+        memcmp(injected.stick, last_stick, sizeof(last_stick)) != 0) {
+        // The Android input bridge updates this file on nearly every touch
+        // event. Its launcher already sets GOW3_PAD_QUIET=1: honor it instead
+        // of synchronously printing during gameplay. Input updates are never
+        // skipped; only the diagnostic output is suppressed.
+        const char *quiet = getenv("GOW3_PAD_QUIET");
+        if (!quiet || strcmp(quiet, "1") != 0) {
+            printf("Runtime: pad file: buttons 0x%x sticks %d %d %d %d\n",
+                   injected.buttons, injected.stick[0], injected.stick[1],
+                   injected.stick[2], injected.stick[3]);
+        }
+        last_buttons = injected.buttons;
+        memcpy(last_stick, injected.stick, sizeof(last_stick));
+    }
 }
 /* GOW3_PAD_RECORD=<file>: F9 starts and stops recording the pad state (gamepad or keyboard) with
  * the time since F9; GOW3_PAD_REPLAY=<file> plays such a recording back, started by the token
  * "replay" in GOW3_PAD_FILE (scripted tests repeat a route the player ran once). Lines: ms buttons
  * lx ly rx ry l2 r2, written when the state changes. */
 typedef struct { uint32_t ms, buttons; uint8_t axes[4], l2, r2; } PadSample;
+#ifndef __ANDROID__
 static FILE *record_file;
 static uint64_t record_start;
 static PadSample record_last;
@@ -305,6 +355,9 @@ static void record_sample(const PadData *d) {
             s.axes[3],s.l2,s.r2);
     fflush(record_file);
 }
+#else
+static void record_sample(const PadData *d) { (void)d; }
+#endif
 static PadSample *replay; static size_t replay_count, replay_next;
 static void replay_sample(PadData *d) {
     if (!replay_armed) return;
@@ -343,15 +396,31 @@ static void replay_sample(PadData *d) {
 static int hold_after_capture;
 static void sample(PadData *d) {
     sample_host(d);
-    if (gow3gpu_overlay_captures_input()) { hold_after_capture=1; return; }
-    record_sample(d);
+    const int capture = gow3gpu_overlay_captures_input();
+    /* The pad file is read (and published to the overlay) even while the overlay captures input:
+     * on Android that file is the only way the save list and the text box hear a press. What the
+     * overlay captured is deliberately withheld from the game below, so one key is never taken
+     * twice — see the two early returns. Only the file is published; a GOW3_PAD_REPLAY recording
+     * drives the game, not the overlay dialogs, and a script that needs the dialogs writes the
+     * pad file directly instead. */
     read_inject();
+    gow3gpu_pad_publish(injected.buttons);
+    if (capture) { hold_after_capture=1; return; }
+    record_sample(d);
     replay_sample(d);
     d->buttons|=injected.buttons;
     if (injected.touch_side>=0) touch_click(d,injected.touch_side);
     else if ((d->buttons & BTN_TOUCHPAD) && !d->touch_count) touch_click(d,0);
     if (injected.buttons & BTN_L2) d->l2=255;
     if (injected.buttons & BTN_R2) d->r2=255;
+    /* 二值 token 已被上面的 255 覆盖,数值解析填其余的模拟量。 */
+    if (injected.trigger[0]>0 && d->l2<injected.trigger[0]) d->l2=(uint8_t)injected.trigger[0];
+    if (injected.trigger[1]>0 && d->r2<injected.trigger[1]) d->r2=(uint8_t)injected.trigger[1];
+    /* 与 sample_host() 的物理手柄路径一致:模拟扳机越过阈值时同时置位数字按键位,
+     * 否则 GOW3_PAD_FILE 注入(Android 触屏手柄只写 l2=/r2= 数值、省略 token)的游戏
+     * 侧 PadData.buttons 里永远没有 BTN_L2/BTN_R2,游戏按数字位响应的动作无响应。 */
+    if (d->l2>30) d->buttons|=BTN_L2;
+    if (d->r2>30) d->buttons|=BTN_R2;
     uint8_t *axes[4]={&d->left_x,&d->left_y,&d->right_x,&d->right_y};
     for (int i=0;i<4;++i) if (injected.stick[i]>=0) *axes[i]=(uint8_t)injected.stick[i];
     if (hold_after_capture) {
@@ -371,7 +440,11 @@ static ABI int32_t pad_open(int32_t user, int32_t type, int32_t index, const voi
     int already=opened; opened=1;
     pthread_mutex_unlock(&lock);
     if (already) return ERR_ALREADY_OPENED;
+#ifdef __ANDROID__
+    puts("Runtime: pad opened for user 1 (Android PadBridge)");
+#else
     puts("Runtime: pad opened for user 1 (SDL gamepad or keyboard)");
+#endif
     return PAD_HANDLE;
 }
 static ABI int32_t pad_close(int32_t handle) {
@@ -401,7 +474,9 @@ static ABI int32_t pad_info(int32_t handle, ControllerInfo *info) {
     info->dead_zone_left=info->dead_zone_right=2;
     info->connection_type=0; info->connected=1; info->device_class=0;
     pthread_mutex_lock(&lock);
+#ifndef __ANDROID__
     current_gamepad();
+#endif
     info->connected_count=connected_count ? connected_count : 1;
     pthread_mutex_unlock(&lock);
     return 0;
@@ -410,8 +485,10 @@ static ABI int32_t pad_vibration(int32_t handle, const uint8_t *param) {
     if (handle!=PAD_HANDLE || !opened) return ERR_INVALID_HANDLE;
     if (!param) return ERR_INVALID_ARG;
     pthread_mutex_lock(&lock);
+#ifndef __ANDROID__
     SDL_Gamepad *g=current_gamepad();
     if (g) SDL_RumbleGamepad(g,(uint16_t)(param[0]*257),(uint16_t)(param[1]*257),1000);
+#endif
     pthread_mutex_unlock(&lock);
     return 0;
 }
@@ -432,4 +509,9 @@ static const RuntimeExport exports[]={
     {"scePadSetMotionSensorState",pad_ok_handle_flag},
 };
 uintptr_t runtime_pad_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }
+#ifndef __ANDROID__
 void runtime_pad_report(void) { printf("Runtime: pad reads=%zu, gamepad=%s\n",reads,gamepad ? SDL_GetGamepadName(gamepad) : "none"); }
+
+#else
+void runtime_pad_report(void) { printf("Runtime: pad reads=%zu, input=Android PadBridge\n",reads); }
+#endif

@@ -40,7 +40,13 @@ elseif (GOW3_PGO STREQUAL "use")
                         -fprofile-correction -Wno-missing-profile -Wno-coverage-mismatch)
 endif()
 
-find_package(Vulkan REQUIRED)
+if(ANDROID)
+    find_package(VulkanHeaders CONFIG REQUIRED)
+    add_library(Vulkan::Vulkan INTERFACE IMPORTED)
+    set_target_properties(Vulkan::Vulkan PROPERTIES INTERFACE_LINK_LIBRARIES Vulkan::Headers)
+else()
+    find_package(Vulkan REQUIRED)
+endif()
 find_package(fmt REQUIRED)
 find_package(Boost REQUIRED)
 # gow3 (Windows): MSYS2 has no magic_enum/miniz packages; the submodules are used instead.
@@ -62,9 +68,14 @@ if (NOT VulkanMemoryAllocator_FOUND)
 endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(XXHASH REQUIRED IMPORTED_TARGET libxxhash)
-pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
-if (NOT WIN32)
-    pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11)
+if(ANDROID)
+    add_library(PkgConfig::SDL3 INTERFACE IMPORTED)
+    add_library(PkgConfig::X11 INTERFACE IMPORTED)
+else()
+    pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
+    if(NOT WIN32)
+        pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11)
+    endif()
 endif()
 find_package(miniz QUIET)
 if (NOT miniz_FOUND)
@@ -141,8 +152,15 @@ set(COMMON
     shadps4/common/string_util.cpp shadps4/common/thread.cpp shadps4/common/signal_context.cpp
     shim/common/logging/log.cpp)
 file(GLOB AVPLAYER CONFIGURE_DEPENDS shadps4/core/libraries/avplayer/*.cpp)
+if(ANDROID)
+    set(PKG_CONFIG_ARGN --static)
+endif()
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil libswscale libswresample)
+unset(PKG_CONFIG_ARGN)
 file(GLOB SHIM_SOURCES CONFIGURE_DEPENDS shim/*.cpp shim/*/*.cpp)
+if(NOT ANDROID)
+    list(FILTER SHIM_SOURCES EXCLUDE REGEX "vk_forwarders\\.cpp$")
+endif()
 # Windows: a DLL cannot leave the runtime_* symbols for gow3-probe.exe to resolve, so the
 # library is static there and linked into the executable.
 if (WIN32)
@@ -174,7 +192,19 @@ if (NOT WIN32)
     target_link_options(gow3gpu PRIVATE -Wl,--allow-shlib-undefined)
 endif()
 target_link_libraries(gow3gpu PRIVATE ffx-vulkan::portable ffx-vulkan::fsr4-v07-vulkan)
-target_link_libraries(gow3gpu PUBLIC Vulkan::Headers fmt::fmt Boost::headers magic_enum::magic_enum
+# Android cross builds include host-side code-generation headers from conda;
+# conda's fmt headers can be v12 while Debian aarch64 libfmt is v10/11.
+# Using fmt header-only eliminates the missing fmt::v12 dynamic symbol that
+# caused game process exit 127 on Android, without changing desktop linking.
+if(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+    if(NOT TARGET fmt::fmt-header-only)
+        message(FATAL_ERROR "ARM64 build needs fmt::fmt-header-only to avoid host/target ABI mismatch")
+    endif()
+    set(GOW3_FMT_TARGET fmt::fmt-header-only)
+else()
+    set(GOW3_FMT_TARGET fmt::fmt)
+endif()
+target_link_libraries(gow3gpu PUBLIC Vulkan::Headers ${GOW3_FMT_TARGET} Boost::headers magic_enum::magic_enum
     tsl::robin_map GPUOpen::VulkanMemoryAllocator PkgConfig::XXHASH PkgConfig::SDL3 PkgConfig::FFMPEG miniz::miniz Zydis::Zydis sirit)
 if (WIN32)
     # Guest code is entered with the System V ABI; NOMINMAX/WIN32_LEAN_AND_MEAN keep
@@ -226,6 +256,15 @@ if (WIN32)
     add_executable(gow3-play WIN32 ../packaging/windows/play.c ../packaging/windows/play.rc)
     target_compile_options(gow3-play PRIVATE -municode)
     target_link_options(gow3-play PRIVATE -municode)
+endif()
+
+if(ANDROID)
+    target_compile_definitions(gow3gpu PRIVATE VK_USE_PLATFORM_ANDROID_KHR)
+    target_include_directories(gow3gpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../tools/android/present)
+    target_link_libraries(gow3gpu PRIVATE nativewindow dl)
+    # Runtime exports are resolved by gow3-probe; verify_bionic.py checks them before packaging.
+    target_link_options(gow3gpu PRIVATE -Wl,-z,undefs
+        -Wl,--exclude-libs,libavcodec.a:libavformat.a:libavutil.a:libswscale.a:libswresample.a)
 endif()
 
 # Explicit test targets; neither launches the game nor needs a Vulkan device.

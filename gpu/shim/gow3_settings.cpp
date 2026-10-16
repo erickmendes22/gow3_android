@@ -4,9 +4,11 @@
 #include "gow3_graphics.h"
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <string>
 #include <string_view>
 
@@ -23,7 +25,7 @@ float Clamp(float v, float lo, float hi) {
     return std::clamp(v, lo, hi);
 }
 
-void Set(Values& v, const std::string& key, const std::string& value) {
+bool Set(Values& v, const std::string& key, const std::string& value) {
     const float f = float(std::atof(value.c_str()));
     const int i = std::atoi(value.c_str());
     static const char* const overlay_keys[] = {"overlay_fps", "overlay_frametime", "overlay_upscaler",
@@ -32,39 +34,39 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         if (key == overlay_keys[item]) {
             const unsigned bit = 1u << item;
             v.overlay_items = i ? (v.overlay_items | bit) : (v.overlay_items & ~bit);
-            return;
+            return true;
         }
     }
     if (key == "overlay_scale") {
         v.overlay_scale = std::clamp(i, 50, 300);
-        return;
+        return true;
     }
     if (key == "overlay_corner") {
-        v.overlay_corner = i >= 0 && i <= 3 ? i : 1;
-        return;
+        v.overlay_corner = i >= 0 && i <= 4 ? i : 1;
+        return true;
     }
     if (key == "overlay_opacity") {
         v.overlay_opacity = std::clamp(i, 0, 100);
-        return;
+        return true;
     }
     if (key == "overlay_layout") {
         v.overlay_layout = i == 1 ? 1 : 0;
-        return;
+        return true;
     }
     if (key == "menu_tab") {
         v.menu_tab = i >= 0 && i <= 3 ? i : 0;
-        return;
+        return true;
     }
     if (key == "overlay_mouse") {
         v.overlay_mouse = i != 0;
-        return;
+        return true;
     }
     const char* cheat_keys[] = {"cheat_health", "cheat_magic", "cheat_item", "cheat_rage", "cheat_orbs",
                                 "cheat_very_hard", "cheat_double_jumps"};
     for (unsigned cheat = 0; cheat < GOW3_CHEAT_COUNT; ++cheat) {
         if (key == cheat_keys[cheat]) {
             v.cheats[cheat] = i != 0;
-            return;
+            return true;
         }
     }
     if (key == "upscaler") {
@@ -111,6 +113,8 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.rcas_strength = Gow3Graphics::ParseRcasStrength(value.empty() ? -1 : i);
     } else if (key == "frames_queued") {
         v.frames_queued = Gow3Graphics::ParseFramesQueued(value.empty() ? -1 : i);
+    } else if (key == "anisotropy") {
+        v.anisotropy = Gow3Graphics::ParseAnisotropy(i);
     } else if (key == "render_resolution") {
         v.render_resolution = Gow3Graphics::ParseResolution(value);
     } else if (key == "engine_fps") {
@@ -147,7 +151,10 @@ void Set(Values& v, const std::string& key, const std::string& value) {
                 v.output_res = r;
             }
         }
+    } else {
+        return false;
     }
+    return true;
 }
 
 } // namespace
@@ -188,6 +195,7 @@ void Load() {
         {"GOW3_ASYNC_SHADERS", "async_shaders"},      {"GOW3_DEFERRED_READBACK", "deferred_readback"},
         {"GOW3_STALE_READBACK", "stale_readback"},     {"GOW3_FSR1", "fsr1"},
         {"GOW3_RCAS", "rcas"},                        {"GOW3_FRAMES_AHEAD", "frames_queued"},
+        {"GOW3_ANISOTROPY", "anisotropy"},
     };
     for (const auto& [env, key] : env_keys) {
         if (const char* value = std::getenv(env); value && value[0]) {
@@ -206,6 +214,7 @@ void Load() {
                                                  : v.engine_fps.load();
     v.startup_deferred_readback = v.deferred_readback;
     v.startup_stale_readback = v.stale_readback;
+    v.startup_anisotropy = v.anisotropy;
 }
 
 bool GraphicsNeedRestart() {
@@ -213,7 +222,8 @@ bool GraphicsNeedRestart() {
     return v.render_resolution != v.startup_render_resolution ||
            v.engine_fps != v.startup_engine_fps ||
            v.deferred_readback != v.startup_deferred_readback ||
-           v.stale_readback != v.startup_stale_readback;
+           v.stale_readback != v.startup_stale_readback ||
+           v.anisotropy != v.startup_anisotropy;
 }
 
 void ConfigureUpscalerSupport(bool fsr4, bool fsr411) {
@@ -264,6 +274,29 @@ bool ResolutionNeedsRestart() {
 }
 
 void Save() {
+    // 启动器的补丁选择、LSFG 和手柄配置不属于此菜单，保存时按整行保留。
+    // 从当前磁盘读取，避免用启动时的缓存覆盖启动器后来保存的选择。
+    std::string retained, line;
+    errno = 0;
+    std::ifstream input(Path());
+    if (!input.is_open() && errno != ENOENT) {
+        std::printf("Settings: cannot open %s; keeping existing configuration\n", Path());
+        return;
+    }
+    Values probe;
+    while (std::getline(input, line)) {
+        const auto eq = line.find('=');
+        const auto first = line.find_first_not_of(" \t");
+        if (eq == std::string::npos || first == std::string::npos || line[first] == '#') continue;
+        std::string key = line.substr(first, eq - first);
+        key.erase(key.find_last_not_of(" \t") + 1);
+        if (!Set(probe, key, line.substr(eq + 1))) retained += line + "\n";
+    }
+    if (input.bad()) {
+        std::printf("Settings: cannot read %s; keeping existing configuration\n", Path());
+        return;
+    }
+    input.close();
     const auto& v = Get();
     FILE* file = std::fopen(Path(), "w");
     if (!file) {
@@ -306,17 +339,20 @@ void Save() {
     std::fprintf(file,
                  "display_mode=%s\nvsync=%d\nfps_limit=%d\nasync_shaders=%d\n"
                  "fsr1=%d\nrcas=%d\nrcas_strength=%d\nframes_queued=%d\n"
+                 "anisotropy=%d\n"
                  "render_resolution=%s\nengine_fps=%d\ndeferred_readback=%d\nstale_readback=%d\n"
                  "restart_unconfirmed=%d\n",
                  Gow3Graphics::DisplayModeKeys[std::clamp(v.display_mode.load(), 0, 2)].data(),
                  int(v.vsync.load()), v.fps_limit.load(), int(v.async_shaders.load()),
                  int(v.fsr1.load()), int(v.rcas.load()), v.rcas_strength.load(), v.frames_queued.load(),
-                 Gow3Graphics::Resolutions[std::clamp(v.render_resolution.load(), 0, 5)].data(),
+                 v.anisotropy.load(),
+                 Gow3Graphics::Resolutions[std::clamp(v.render_resolution.load(), 0, int(Gow3Graphics::Resolutions.size()) - 1)].data(),
                  v.engine_fps.load(), int(v.deferred_readback.load()), int(v.stale_readback.load()),
                  int(v.restart_unconfirmed.load()));
     // Read by run.sh at start.
     std::fprintf(file, "live_resolution=%s\n", v.live_resolution < 0 ? "auto"
                                                   : v.live_resolution ? "1" : "0");
+    std::fwrite(retained.data(), 1, retained.size(), file);
     std::fclose(file);
 }
 

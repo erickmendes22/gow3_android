@@ -33,11 +33,33 @@ internal class SaveManager(private val activity: Activity) {
     /** 由 [launchExport]/[launchImport] 设置，由 [onActivityResult] 消费。 */
     private var pending: ((SaveResult) -> Unit)? = null
 
-    /** 游戏的 savedata，即 run-gow3.sh 以 `--user .../user/savedata` 传给游戏的目录。 */
+    /** 游戏的 savedata，即运行时以 `--user <user_dir>` 接收后在 `<user_dir>/savedata` 读写的目录。 */
     fun savedataDir(): File = File(activity.filesDir, "gow3port/user/savedata")
 
     /** 每次导入前创建的安全备份，与 Linux 侧 savedata_backups 布局一致。 */
     fun savedataBackupsDir(): File = File(activity.filesDir, "gow3port/user/savedata_backups")
+
+    /**
+     * 当前游戏推导出的存档标题目录名，规则与运行时 `src/probe.c` 逐字对齐：
+     * 取 `sce_sys/param.sfo` 的 `INSTALL_DIR_SAVEDATA`，其次 `TITLE_ID`。
+     *
+     * 已配置升级补丁目录时优先读它的 `param.sfo` —— 运行时的 `--app0` 是合并后的
+     * game+update 树，冲突时 update 覆盖 base（真机日志里 `APP_VER` 取 update 的值）。
+     *
+     * 都读不到时返回 null，调用方退到形状检查。
+     */
+    fun expectedTitle(): String? {
+        val prefs = activity.getSharedPreferences("gow3", Activity.MODE_PRIVATE)
+        val candidates = listOfNotNull(
+            prefs.getString("update_dir", null),
+            prefs.getString("game_dir", null),
+        )
+        for (dir in candidates) {
+            val name = GameSfo.saveDirName(File(dir, "sce_sys/param.sfo"))
+            if (name != null) return name
+        }
+        return null
+    }
 
     /**
      * 打开系统“另存为”选择器。当没有存档时，立即以失败调用 [onResult]，且不显示
@@ -128,10 +150,12 @@ internal class SaveManager(private val activity: Activity) {
     private fun importFrom(uri: Uri): SaveResult {
         val user = File(activity.filesDir, "gow3port/user")
         val staging = File(user, "savedata.restoring")
+        // 期望的标题目录名从当前游戏推导；推导不出时传 null，校验退到形状检查。
+        val expected = expectedTitle()
         return try {
             val first = activity.contentResolver.openInputStream(uri)
                 ?: return SaveResult.Failed(activity.getString(R.string.save_read_failed))
-            val problem = first.use { SaveArchive.validate(it) }
+            val problem = first.use { SaveArchive.validate(it, expected) }
             if (problem != null) return SaveResult.Failed(saveArchiveProblemMessage(problem))
 
             staging.deleteRecursively()
@@ -169,7 +193,11 @@ internal class SaveManager(private val activity: Activity) {
         is SaveArchiveProblem.UnsafePath -> activity.getString(R.string.save_archive_unsafe_path_fmt, problem.name)
         is SaveArchiveProblem.DuplicateEntry -> activity.getString(R.string.save_archive_duplicate_fmt, problem.name)
         is SaveArchiveProblem.WrongLayout -> activity.getString(R.string.save_archive_wrong_layout_fmt, problem.name)
-        is SaveArchiveProblem.UnsupportedTitle -> activity.getString(R.string.save_archive_title_fmt, problem.name, SaveArchive.TITLE_ID)
+        is SaveArchiveProblem.UnsupportedTitle ->
+            // 报告推导出的期望目录名，而不是某个固定的区域代号。expected 为 null 时形状检查
+            // 已放行任意非空标题目录名，因此这里实际不会遇到；保守回退到布局提示。
+            if (problem.expected != null) activity.getString(R.string.save_archive_title_fmt, problem.name, problem.expected)
+            else activity.getString(R.string.save_archive_wrong_layout_fmt, problem.name)
     }
 
     /** Provider 的显示名称，回退到 URI 的最后一段。 */

@@ -182,7 +182,7 @@ class UnsupportedOptionsAreHidden(unittest.TestCase):
     def test_lossless_entry_notes_that_it_is_the_only_frame_generation_path(self):
         note = _doc_before(_read(DIALOG), 'void showLossless(')
         self.assertIn('LSFG', note)
-        self.assertIn('FSR', note)
+        self.assertNotIn('FSR', note)
 
 
 if __name__ == '__main__':

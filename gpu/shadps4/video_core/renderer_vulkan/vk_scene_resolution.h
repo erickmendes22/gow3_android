@@ -24,8 +24,13 @@ public:
     SceneTargets(const Instance&, Scheduler&, Runtime&, Lookup);
     ~SceneTargets();
     bool SetSize(SceneResolution::Size);
+    // Detect the real G-buffer dimensions before claiming a render target
+    // actually uses the requested 640x360 FSR input.
+    void ObserveGuestScene(u32 width, u32 height);
     SceneResolution::Size Size() const { return size; }
-    bool Reduced() const { return size != SceneResolution::Size{}; }
+    // Native guest buffers are 720p in Android, 1080p on desktop.
+    bool Reduced() const { return size != guest_size; }
+    SceneResolution::Size GuestSize() const { return guest_size; }
     /// A reduced proxy can stand in for the image: a 1920x1080 scene target or, scaled by
     /// the same factor, a half-resolution (960x540) one (toggle SceneHalfRes).
     bool Eligible(const VideoCore::Image&) const;
@@ -97,10 +102,12 @@ private:
     Runtime& runtime;
     Lookup lookup;
     SceneResolution::Size size;
+    SceneResolution::Size guest_size;
     std::unordered_map<u64, std::unique_ptr<Entry>> entries; ///< by Key(uid, level)
     std::unordered_set<u64> tracked; ///< uids with proxies
     bool copying = false;
     bool force_stencil_bits = false; ///< test the portable resampler on any driver
+    bool guest_scene_observed = false;
     u64 generation = 0;
     mutable std::unordered_map<vk::Format, vk::FormatFeatureFlags> format_features;
     mutable std::array<vk::FormatFeatureFlags, 256> format_table{};
