@@ -147,6 +147,7 @@ private fun LanguageSetting(onChange: (String) -> Unit) {
         R.string.language_follow_system to LanguageManager.FOLLOW_SYSTEM,
         R.string.language_zh to LanguageManager.ZH,
         R.string.language_en to LanguageManager.EN,
+        R.string.language_pt to LanguageManager.PT,
     )
     Column(
         modifier = Modifier

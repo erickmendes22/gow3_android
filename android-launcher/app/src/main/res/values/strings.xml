@@ -10,6 +10,7 @@
 
     <!-- 导航 -->
     <string name="nav_home">HOME</string>
+    <string name="nav_mods">PATCHES</string>
     <string name="nav_about">ABOUT</string>
 
     <!-- Home 页 -->
@@ -37,6 +38,8 @@
     <!-- 启动参数：参数名 -->
     <string name="param_upscaler">Upscaler</string>
     <string name="param_resolution">Resolution</string>
+    <string name="param_android_fullscreen">Fullscreen</string>
+    <string name="param_desc_android_fullscreen">Fills the entire phone screen when enabled. Off preserves the original 16:9 image with black bars. Does not change the game render resolution.</string>
     <string name="param_fps_limit">FPS limit</string>
     <string name="param_engine_fps">Engine FPS</string>
     <string name="param_vsync">VSync</string>
@@ -93,6 +96,7 @@
     <string name="language_follow_system">Follow system</string>
     <string name="language_zh">简体中文</string>
     <string name="language_en">English</string>
+    <string name="language_pt">Português</string>
 
     <!-- 存档卡片 -->
     <string name="save_data_title">SAVE DATA</string>
@@ -131,8 +135,29 @@
     <string name="github_open">OPEN</string>
 
     <!-- Mods 页 -->
-    <string name="mods_title">MOD &amp; PATCH</string>
-    <string name="mods_description">Manage game file mods and third-party shadPS4 patches for God of War III.</string>
+    <string name="drawer_controls">Controls</string>
+    <string name="drawer_swap_face">Swap Square/Triangle (some gamepads)</string>
+    <string name="drawer_on">On</string>
+    <string name="drawer_off">Off</string>
+    <string name="mods_group_video">VIDEO SKIPPING</string>
+    <string name="mods_group_fixes">FIXES</string>
+    <string name="mods_group_effects">DISABLE EFFECTS</string>
+    <string name="mods_checked_offline">Offline checked · device test pending</string>
+    <string name="mods_next_launch">Applies on next game launch</string>
+    <string name="mods_no_game">Choose a compatible God of War III game folder to see patches.</string>
+    <string name="mods_save_failed">Could not save patch selection.</string>
+    <string name="patch_skip_intro">Skip Intro</string>
+    <string name="patch_skip_video">Skip Any Video With X Button</string>
+    <string name="patch_texture_fix">Bug Fix - Texture Corruption Fix</string>
+    <string name="patch_black_screen">Bug Fix - Startup Black Screen</string>
+    <string name="patch_ssao">Disable SSAO</string>
+    <string name="patch_blur">Disable Motion Blur</string>
+    <string name="patch_dof">Disable Depth of Field</string>
+    <string name="patch_bloom">Disable Bloom</string>
+    <string name="patch_particles">Disable Soft Particles</string>
+    <string name="patch_shadows">Disable Dynamic Shadows</string>
+    <string name="mods_title">PATCHES</string>
+    <string name="mods_description">Choose only video, fix and effect patches here. Resolution and engine FPS remain on Home.</string>
     <string name="mods_empty_title">NO MODS INSTALLED</string>
     <string name="mods_empty_description">Your mod and patch list will appear here.</string>
 

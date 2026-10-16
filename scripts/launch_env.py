@@ -52,14 +52,21 @@ def derive(game, config, state_path, env):
             updates['GOW3_PATCH_STATUS'] = identity['reason']
     if profile and identity['reason'] == 'validated':
         try:
-            names = selected_patches(profile[1], profile[2], env.get('GOW3_PATCHES', ''),
-                                     env.get('GOW3_PATCHES_ONLY') == '1')
+            # Per-title and version selection from the Android Patches tab.
+            saved = graphics_options.read_ini(config)
+            selection_key = 'patches_{}_{}'.format(identity['title_id'],
+                                                   identity['app_version'].replace('.', '_'))
+            use_saved = selection_key in saved and 'GOW3_PATCHES' not in env
+            extra = saved[selection_key] if use_saved else env.get('GOW3_PATCHES', '')
+            only = use_saved or env.get('GOW3_PATCHES_ONLY') == '1'
+            names = selected_patches(profile[1], profile[2], extra, only)
         except ValueError:
             # Two resolution patches (or another exclusivity violation) cannot both apply.
             names, reason = [], 'patch-conflict'
         if names:
             # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).
-            names = graphics_options.patch_names(names, graphics)
+            names = graphics_options.patch_names(names, graphics,
+                        texture_fix_available=not use_saved)
             dmem, vblank = patch_requirements(profile[1], names, profile[2])
             # The retail pool plus the patches' extra DMEM must fit the device (design: gate
             # values by device/runtime capability and fail with a clear log, not an OOM kill).

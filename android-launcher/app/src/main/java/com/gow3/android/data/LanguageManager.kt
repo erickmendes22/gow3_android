@@ -16,6 +16,7 @@ internal object LanguageManager {
     const val FOLLOW_SYSTEM = "system"
     const val ZH = "zh"
     const val EN = "en"
+    const val PT = "pt"
 
     /** 读取持久化的语言覆盖值；未设置时返回 [FOLLOW_SYSTEM]。 */
     fun read(context: Context): String =
@@ -32,6 +33,7 @@ internal object LanguageManager {
     fun resolve(context: Context): Locale = when (read(context)) {
         ZH -> Locale("zh", "CN")
         EN -> Locale.ENGLISH
+        PT -> Locale("pt", "BR")
         else -> Locale.getDefault()
     }
 }
