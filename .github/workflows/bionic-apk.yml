@@ -46,6 +46,8 @@ jobs:
           "$ANDROID_HOME/build-tools/$GOW3_BUILD_TOOLS/aapt2" compile --dir android-launcher/app/src/main/res -o "$RUNNER_TEMP/resources.zip"
       - name: Check launcher compilation before building native runtime
         run: bash android-launcher/gradlew -p android-launcher :app:compileReleaseJavaWithJavac -Pgow3Bionic=true --no-daemon --max-workers=2
+      - name: Build Android Python for existing patch validators
+        run: GOW3_NDK="$ANDROID_HOME/ndk/29.0.14206865" bash tools/android/bionic/build_python.sh
       - uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: ci/environment.yml
@@ -65,16 +67,11 @@ jobs:
       - name: Build and validate CPU, GPU and native runtime
         shell: bash -el {0}
         run: bash tools/android/bionic/build_runtime.sh
-      - name: Build Android Python for existing patch validators
-        shell: bash -el {0}
-        run: bash tools/android/bionic/build_python.sh
       - name: Build Android PKG extractor
-        shell: bash -el {0}
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           bash tools/android/bionic/build_pkg.sh
       - name: Package, sign and validate experimental APK
-        shell: bash -el {0}
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           bash tools/android/bionic/build_apk.sh --package-only
