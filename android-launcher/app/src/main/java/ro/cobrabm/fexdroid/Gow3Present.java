@@ -1,4 +1,4 @@
-// Adapted from Bloodborne-Android 2e472653. Activated only by a future Bionic launch path.
+// Adapted from Bloodborne-Android 2e472653. Used only by the experimental Bionic launch path.
 package ro.cobrabm.fexdroid;
 
 import android.view.Surface;

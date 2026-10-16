@@ -7,6 +7,7 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../../.."
 root=$PWD/.local-deps/android
+unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH CMAKE_PREFIX_PATH PKG_CONFIG_PATH PKG_CONFIG_LIBDIR PKG_CONFIG_SYSROOT_DIR
 ndk=${GOW3_NDK:-${ANDROID_NDK_HOME:-$root/sdk/ndk/29.0.14206865}}
 api=${GOW3_BIONIC_API:-30}
 prefix=$root/bionic-prefix src=$root/bionic-src bld=$root/bionic-build

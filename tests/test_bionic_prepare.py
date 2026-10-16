@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from bionic_prepare_fixture import synthetic_game, write_game
+from prepare import parse_self
 
 
 class BionicPrepareParity(unittest.TestCase):
@@ -29,6 +30,7 @@ class BionicPrepareParity(unittest.TestCase):
         if a.returncode == 0:
             for name in ['boot-linked.bin','content.bin','game-source.json']:
                 self.assertEqual((native/name).read_bytes(), (py/name).read_bytes(), name)
+            self.assertEqual((native/'eboot.elf').read_bytes(), bytes(parse_self((path/'eboot.bin').read_bytes())[0]))
         return a, b
 
     def test_synthetic_game_imports_relocations_tls_and_marker_reuse(self):
@@ -37,6 +39,9 @@ class BionicPrepareParity(unittest.TestCase):
             game = write_game(root/'game', *synthetic_game())
             a, _ = self.compare(game, root)
             self.assertEqual(a.returncode, 0, a.stderr)
+            self.compare(game, root)
+            # Patch compilation needs the decoded ELF even when the base image cache matches.
+            (root/'native/eboot.elf').unlink()
             self.compare(game, root)
 
     def test_user_content_parameters(self):

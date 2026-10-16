@@ -32,6 +32,7 @@
 #include <dlfcn.h>
 #ifdef __ANDROID__
 #include <unwind.h>
+#include <sys/prctl.h>
 #else
 #include <execinfo.h>
 #endif
@@ -602,6 +603,15 @@ void runtime_restart(void) {
 
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IONBF, 0);
+#ifdef __ANDROID__
+    /* The launcher tracks the runner shell. Kill the native child too when the
+       app stops/restarts that shell, including during an internal game restart. */
+    pid_t parent = getppid();
+    if (parent == 1 || prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != parent) {
+        fputs("Bionic: launcher parent is unavailable\n", stderr);
+        return 2;
+    }
+#endif
 #ifndef _WIN32
     /* Keep host heap objects handed to the guest (thread handles, TLS) in the
        non-PIE brk heap, i.e. below 1 TiB: the guest packs pointers into 40 bits. */

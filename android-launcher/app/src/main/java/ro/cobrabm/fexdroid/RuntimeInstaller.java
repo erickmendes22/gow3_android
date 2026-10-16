@@ -63,6 +63,23 @@ public final class RuntimeInstaller {
     }
 
     private static void validateRuntime(File root) throws Exception {
+        if (path(root,"gow3port/run-bionic.sh").isFile()) {
+            for (String relative : new String[]{"gow3port/run-bionic.sh", "gow3port/arm64/bin/gow3-probe",
+                    "gow3port/arm64/bin/gow3-prepare", "gow3port/arm64/bin/kgsl-chip-id",
+                    "gow3port/arm64/bin/orbis-pkg-util", "gow3port/arm64/python/bin/python3.13"}) requireExecutable(root,relative);
+            for (String relative : new String[]{"gow3port/arm64/lib/libgow3cpu.so", "gow3port/arm64/lib/libgow3gpu.so",
+                    "gow3port/arm64/lib/libgow3present.so", "gow3port/arm64/lib/libc++_shared.so",
+                    "gow3port/arm64/python/lib/libpython3.13.so", "gow3port/arm64/drivers/gen8/libvulkan_freedreno.so",
+                    "runtime-manifest.json"})
+                if (!path(root,relative).isFile()) throw new IllegalStateException("Incomplete Bionic runtime: "+relative);
+            String identity = new String(Files.readAllBytes(path(root,"runtime-manifest.json").toPath()),
+                    StandardCharsets.UTF_8);
+            if (!identity.contains("\"schema\": 1") || !identity.contains("\"runtime_backend\": \"bionic\"") ||
+                    !identity.contains("\"application_id\": \"com.gow3.android.bionic\"") ||
+                    !identity.contains("\"java_package\": \"ro.cobrabm.fexdroid\""))
+                throw new IllegalStateException("Incompatible Bionic runtime identity");
+            requireDirectory(root,"home/gow3port"); return;
+        }
         requireExecutable(root, "rootfs/bin/sh");
         requireExecutable(root, "rootfs/usr/bin/Xvfb");
         requireExecutable(root, "rootfs/usr/libexec/fxshmd");
@@ -175,9 +192,10 @@ public final class RuntimeInstaller {
             if (port.exists()) { renameRequired(port, oldPort, "gow3port"); movedPort = true; }
             if (home.exists()) { renameRequired(home, oldHome, "home"); movedHome = true; }
             if (manifest.exists()) { renameRequired(manifest, oldManifest, "manifest"); movedManifest = true; }
-            if (!new File(stage, "rootfs").renameTo(root))
-                throw new IllegalStateException("Cannot promote runtime rootfs");
-            installedRoot = true;
+            if (new File(stage,"rootfs").exists()) {
+                if (!new File(stage,"rootfs").renameTo(root)) throw new IllegalStateException("Cannot promote runtime rootfs");
+                installedRoot = true;
+            }
             if (!new File(stage, "gow3port").renameTo(port))
                 throw new IllegalStateException("Cannot promote gow3port");
             installedPort = true;

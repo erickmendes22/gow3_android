@@ -94,6 +94,27 @@ public final class GameActivity extends Activity {
         immersive();
     }
 
+    private boolean bionicRuntime() { return new File(BASE,"run-bionic.sh").isFile(); }
+
+    private void startBionic(SurfaceHolder holder) {
+        if (destroyed || !holder.getSurface().isValid()) return;
+        try {
+            if (Build.VERSION.SDK_INT < 30) throw new java.io.IOException("Bionic runtime requires Android 11 or newer");
+            String result=Gow3Present.start(holder,BASE+"/present.sock");
+            if (!result.startsWith("bridge running:")) throw new java.io.IOException(result);
+            if (!displayOnly && game==null && !startingX) {
+                startingX=true;
+                worker.execute(() -> {
+                    if (audio!=null) audio.start();
+                    if (audio==null || !audio.awaitReady(5000)) { error("Android audio bridge could not start"); return; }
+                    startGame();
+                });
+            }
+            pollFrames();
+            if (!imePolling) { imePolling=true; pollIme(); }
+        } catch (Exception ex) { error(ex.toString()); }
+    }
+
     private int dp(float n) { return Math.round(n*getResources().getDisplayMetrics().density); }
     private TextView text(String value, int size, int color) {
         TextView t=new TextView(this); t.setText(UiText.get(this, value)); t.setTextSize(size); t.setTextColor(color); return t;
@@ -121,7 +142,8 @@ public final class GameActivity extends Activity {
         screen.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> fitSurface(r-l,b-t));
         surface.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override public void surfaceCreated(SurfaceHolder h) {
-                if (shmid>=0) attach(h);
+                if (bionicRuntime() && hasGame()) startBionic(h);
+                else if (shmid>=0) attach(h);
                 else if (!hasGame()) {
                     // MainActivity owns the first-run game-folder check. Reaching this state means
                     // the launcher was bypassed or the selected folder was removed while away.
@@ -131,7 +153,7 @@ public final class GameActivity extends Activity {
                 else if (!startingX) { startingX=true; worker.execute(() -> startX(h)); }
             }
             @Override public void surfaceChanged(SurfaceHolder h,int format,int w,int height) {}
-            @Override public void surfaceDestroyed(SurfaceHolder h) { DisplayBridge.stop(); }
+            @Override public void surfaceDestroyed(SurfaceHolder h) { if (!bionicRuntime()) DisplayBridge.stop(); }
         });
         surface.setOnTouchListener((v,e) -> {
             if (shmid<0 || drawerOpen) return true;
@@ -146,7 +168,7 @@ public final class GameActivity extends Activity {
         screen.addView(status,frame(-1,-1,Gravity.CENTER));
         status.setClickable(false);
 
-        controllerOverlay=new TouchControllerOverlay(this,pad,"1".equals(setting("overlay_mouse")));
+        controllerOverlay=new TouchControllerOverlay(this,pad,!bionicRuntime() && "1".equals(setting("overlay_mouse")));
         controllerOverlay.setVisibility(controllerEnabled() ? View.VISIBLE : View.GONE);
         screen.addView(controllerOverlay,frame(-1,-1,Gravity.CENTER));
 
@@ -338,8 +360,8 @@ public final class GameActivity extends Activity {
         //  preflight 找不到它时会静默不开 layer（只剩 30 FPS），玩家看不出是自己漏了导入。
         //  所以直接把这一行置灰不可点，并说明去 Home 页导入，而不是让它"看着能开却不生效"。
         boolean dllPresent=hasFrameGenDll();
-        setRowEnabled(losslessItem,dllPresent);
-        setDetail(losslessItem,!dllPresent ? "Import Lossless.dll on the Home page first"
+        setRowEnabled(losslessItem,dllPresent && !bionicRuntime());
+        setDetail(losslessItem,bionicRuntime() ? ("17".equals(UiText.gameLanguage(this)) ? "Indisponível no runtime Bionic experimental" : "Unavailable in the experimental Bionic runtime") : !dllPresent ? "Import Lossless.dll on the Home page first"
             : lsfgOn ? lsfg+"× frames · flow "
             +(setting("lsfg_flow_scale")==null ? "1.0" : setting("lsfg_flow_scale")) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
@@ -347,7 +369,7 @@ public final class GameActivity extends Activity {
 
     private void openDrawer() {
         if (drawerOpen) return;
-        drawerOpen=true; controllerOverlay.release(); pad.reset(); XInput.button(1,false);
+        drawerOpen=true; controllerOverlay.release(); pad.reset(); if (!bionicRuntime()) XInput.button(1,false);
         refreshDrawer();
         controllerOverlay.setVisibility(View.GONE);
         handle.setVisibility(View.GONE);
@@ -464,6 +486,17 @@ public final class GameActivity extends Activity {
         env.put("HOME",FILES+"/home/gow3port"); env.put("LANG","C.UTF-8");
         env.put("TMPDIR",ROOT+"/tmp"); env.put("XDG_RUNTIME_DIR",ROOT+"/tmp");
         env.put("FXD_FILES",FILES); env.put("FXD_ROOT",ROOT); env.put("GOW3_ANDROID_INPUT","1");
+        env.put("GOW3_LANGUAGE", UiText.gameLanguage(this));
+        if (gameDir!=null) env.put("GOW3_GAME_DIR",gameDir);
+        if (updateDir!=null) env.put("GOW3_PATCH_DIR",updateDir);
+        if (bionicRuntime()) {
+            env.put("GOW3_SCREEN_W","1280"); env.put("GOW3_SCREEN_H","720");
+            env.put("PATH","/system/bin"); env.put("TMPDIR",BASE+"/tmp"); env.put("XDG_RUNTIME_DIR",BASE+"/tmp");
+            env.put("LD_LIBRARY_PATH",BASE+"/arm64/lib:"+BASE+"/arm64/python/lib");
+            env.put("GOW3_PRESENT_SOCKET",BASE+"/present.sock");
+            env.put("GOW3_DISPLAY_HZ",String.valueOf(Math.round(getWindowManager().getDefaultDisplay().getRefreshRate())));
+            return b.start();
+        }
         // Keep native port libraries and rootfs libraries visible to the explicit rootfs loader.
         env.put("LD_LIBRARY_PATH",BASE+"/arm64/lib:"+ROOT+"/usr/lib/aarch64-linux-gnu:"+ROOT+"/usr/lib");
         // Its libc emulates SysV shared memory through fxshmd (started below).
@@ -606,6 +639,7 @@ public final class GameActivity extends Activity {
     private void startPending() {
         SurfaceHolder h=pendingHolder!=null ? pendingHolder : surface.getHolder();
         pendingHolder=null;
+        if (bionicRuntime()) { startBionic(h); return; }
         if (h.getSurface()!=null && h.getSurface().isValid() && !startingX && shmid<0) {
             startingX=true; worker.execute(() -> startX(h));
         }
@@ -613,7 +647,7 @@ public final class GameActivity extends Activity {
 
     private void pollFrames() {
         if (destroyed) return;
-        if (!hadError && DisplayBridge.directFrames()>0) status.setVisibility(View.GONE);
+        if (!hadError && (bionicRuntime() ? Gow3Present.framesIfLoaded() : DisplayBridge.directFrames())>0) status.setVisibility(View.GONE);
         // run-gow3.sh 在 LSFG 运行时失败、自动回退到普通 Vulkan 时会写这个标记：这时刷新率要退回
         // 「无 LSFG」的目标，否则会停在 LSFG 倍率对应的高刷上空跑（4.1 复评）。
         if (!lsfgFallbackOff && new File(BASE,"lsfg-fallback.marker").isFile()) {
@@ -702,6 +736,7 @@ public final class GameActivity extends Activity {
      *  运行时的 layer（manifest + liblsfg-vk.so）都在、玩家的 Lossless.dll 在两处查找位置之一。
      *  刷新率必须依此判断，而不是只看 gow3.ini 的 lsfg_multiplier（4.2 复评）。 */
     private boolean lsfgLaunchable() {
+        if (bionicRuntime()) return false;
         String lsfg=setting("lsfg_multiplier");
         if (!"2".equals(lsfg) && !"3".equals(lsfg) && !"4".equals(lsfg)) return false;
         if (!new File(BASE,"arm64/lsfg/VkLayer_LS_frame_generation.json").isFile()) return false;
@@ -749,8 +784,9 @@ public final class GameActivity extends Activity {
         pickRefreshRate();
         new File(BASE,"ime.request").delete(); new File(BASE,"ime.request.result").delete();
         try {
-            Process launched=process(ROOT+"/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
-                ROOT+"/bin/sh",BASE+"/run-gow3.sh","game"); game=launched;
+            Process launched=bionicRuntime() ? process("/system/bin/sh",BASE+"/run-bionic.sh","game")
+                : process(ROOT+"/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
+                    ROOT+"/bin/sh",BASE+"/run-gow3.sh","game"); game=launched;
             Thread log=new Thread(() -> {
                 try (BufferedReader r=new BufferedReader(new InputStreamReader(launched.getInputStream()));
                      PrintWriter out=new PrintWriter(new File(BASE,"logs/android-game.log"))) {
@@ -782,7 +818,7 @@ public final class GameActivity extends Activity {
     }
     @Override protected void onDestroy() {
         destroyed=true; pad.reset(); audio.stop(); main.removeCallbacksAndMessages(null);
-        DisplayBridge.stop(); stopGame(); if (xvfb!=null) xvfb.destroyForcibly();
+        if (bionicRuntime()) Gow3Present.stop(); else DisplayBridge.stop(); stopGame(); if (xvfb!=null) xvfb.destroyForcibly();
         worker.shutdownNow(); super.onDestroy();
     }
 }

@@ -246,7 +246,8 @@ internal class PkgInstallManager(
 
     private fun install(sourceUri: Uri, targetUri: Uri, update: Boolean): String {
         val helper = File(activity.filesDir, "gow3port/arm64/bin/orbis-pkg-util")
-        val loader = File(activity.filesDir,
+        val bionic = File(activity.filesDir,"gow3port/run-bionic.sh").isFile
+        val loader = if (bionic) File("/system/bin/linker64") else File(activity.filesDir,
             "rootfs/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1")
         if (!helper.isFile || !helper.canExecute() || !loader.isFile)
             throw IOException(localized("The runtime does not contain the ARM64 PKG extractor", "O runtime não contém o extrator PKG ARM64"))
@@ -402,7 +403,9 @@ internal class PkgInstallManager(
 
     private fun execute(loader: File, executable: File, args: List<String>,
                         workingDir: File): String {
-        val builder = ProcessBuilder(listOf(loader.absolutePath, executable.absolutePath) + args)
+        val prefix = if (File(activity.filesDir,"gow3port/run-bionic.sh").isFile)
+            listOf(executable.absolutePath) else listOf(loader.absolutePath, executable.absolutePath)
+        val builder = ProcessBuilder(prefix + args)
             .directory(workingDir)
             .redirectErrorStream(true)
         val files = activity.filesDir

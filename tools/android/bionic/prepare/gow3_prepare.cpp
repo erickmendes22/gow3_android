@@ -32,6 +32,7 @@ Boot prepare(const std::string& game, const std::string& out) {
         MappedFile source = read_file(path_join(game, "eboot.bin"));
         s = parse_self(source.view());
     }
+    { OutFile decoded(path_join(out,"eboot.elf")); decoded.write(s.elf.data(),s.elf.size()); decoded.close(); }
     std::vector<Phdr> loads;
     for (auto& p : s.ph)
         if (p.type == 1 || p.type == PT_SCE_RELRO) loads.push_back(p);
@@ -238,7 +239,7 @@ int run(const std::string& game, const std::string& data) {
     make_dirs(data);
     std::string identity = signature(game);
     std::string marker = path_join(data, "game-source.json");
-    if (is_file(path_join(data, "boot-linked.bin")) && is_file(path_join(data, "content.bin")) && is_file(marker)) {
+    if (is_file(path_join(data, "boot-linked.bin")) && is_file(path_join(data, "content.bin")) && is_file(path_join(data,"eboot.elf")) && is_file(marker)) {
         try {
             MappedFile f = read_file(marker);
             std::string text((const char*)f.view().p, f.view().n);
@@ -265,6 +266,8 @@ int run(const std::string& game, const std::string& data) {
             raise_errno(errno, path_join(work, "boot-linked.bin"));
         if (rename(path_join(work, "content.bin").c_str(), path_join(data, "content.bin").c_str()) < 0)
             raise_errno(errno, path_join(work, "content.bin"));
+        if (rename(path_join(work,"eboot.elf").c_str(),path_join(data,"eboot.elf").c_str())<0)
+            raise_errno(errno,path_join(work,"eboot.elf"));
         write_text_file(marker, identity + "\n");
         say("Game image: ready");
     } catch (...) {
