@@ -205,9 +205,7 @@ std::unique_ptr<RecordChunk> Scheduler::AcquireChunk() {
 
 void Scheduler::SignalAfterHostCopies(std::function<void()> signal) {
     if (parallel_recording) {
-        // Keep a guest-visible fence behind the draws that precede it even if
-        // two distinct command buffers are being recorded concurrently.
-        host_copy_this_submit = true;
+        // Fence writes must follow older segments' Vulkan recording.
         if (active_segment != 0 && IsRecordingDeferred()) {
             SyncRecording();
         }
@@ -261,8 +259,16 @@ void Scheduler::MaybeSplitRecording() {
     // attachment store/load, and splitting queries across command buffers
     // would change their lifetime. Only one boundary per submission for now.
     if (!parallel_recording || !recording_threaded || active_segment != 0 ||
-        is_rendering || direct_mode || host_copy_this_submit ||
+        is_rendering || direct_mode ||
         Gow3Toggle::Disabled(Gow3Toggle::ThreadedRecording)) {
+        return;
+    }
+    // Do not permanently prohibit splitting after a guest copy or EOP.
+    // The old segment is safe to split after its copies and guest-visible
+    // signals have actually completed. Never overtake unfinished work.
+    if (host_copies_done.load(std::memory_order_acquire) < host_copies_issued ||
+        deferred_signals_done->load(std::memory_order_acquire) <
+            deferred_signals_issued.load(std::memory_order_acquire)) {
         return;
     }
 #if TRACY_GPU_ENABLED
@@ -514,7 +520,6 @@ void Scheduler::AllocateWorkerCommandBuffers() {
     segment_cmdbufs = {current_cmdbuf, vk::CommandBuffer{}};
     active_segment = 0;
     segment0_bytes = 0;
-    host_copy_this_submit = false;
 
     // Invalidate dynamic state so it gets applied to the new command buffer.
     dynamic_state.Invalidate();
