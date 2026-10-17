@@ -309,8 +309,12 @@ void Scheduler::MaybeSplitRecording() {
                         static_cast<unsigned long long>(n));
         }
     }
-    // Dynamic Vulkan state is command-buffer-local, not carried from worker 0.
+    // Rasterizer::UpdateDynamicState runs BEFORE BeginRendering(), so the
+    // current draw's state was already emitted to segment 0. Re-emit it now
+    // before recording the render pass and first draw of segment 1, otherwise
+    // the new command buffer would have undefined viewport/scissor/depth state.
     dynamic_state.Invalidate();
+    dynamic_state.Commit(instance, next);
 }
 
 void Scheduler::KickRecording(bool force) {
