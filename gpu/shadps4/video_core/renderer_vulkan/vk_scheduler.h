@@ -809,9 +809,8 @@ public:
     template <typename Func>
     void RecordHostCopy(Func&& copy) {
         if (parallel_recording) {
-            // A guest-memory copy must not overtake an older segment's draws.
-            // Never split after the first guest-memory copy in this submission.
-            host_copy_this_submit = true;
+            // Guest-memory work after a split must not overtake the old
+            // segment's still-recording draws.
             if (active_segment != 0 && IsRecordingDeferred()) {
                 SyncRecording();
             }
@@ -946,7 +945,6 @@ private:
     bool parallel_recording = false;
     std::atomic<u32> active_segment{0}; // recorder spin loop observes producer segment
     size_t segment0_bytes = 0;
-    bool host_copy_this_submit = false;
     std::unique_ptr<CommandPool> parallel_command_pool;
     std::array<vk::CommandBuffer, 2> segment_cmdbufs{};
     // gow3: threaded recording
