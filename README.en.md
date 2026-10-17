@@ -1,114 +1,77 @@
-# God of War III — Daedalus Fork
+# God of War III — Daedalus Fork · Bionic
 
-Daedalus Fork maintained by erickmendes22. Based on the Android work by zFitness and the upstream contributors.
-
-**Version: 2.1.6-daedalus.4-bionic** · [YouTube: @daedalusemulator](https://www.youtube.com/@daedalusemulator) · [Base: zFitness/gow3_android](https://github.com/zFitness/gow3_android)
-
-This release uses the native **Android/Bionic** runtime (Android 11 or later).
-
+**Version: 2.1.6-daedalus.4-bionic**
 
 [Português (Brasil)](README.md) | **English**
 
-<p align="center">
-  <img src="docs/a.jpg" alt="Game screenshot 1" width="45%"/>
-  <img src="docs/b.jpg" alt="Game screenshot 2" width="45%"/>
-</p>
+Fork maintained by **erickmendes22 — [Daedalus Emulator](https://www.youtube.com/@daedalusemulator)**, based on [zFitness's Android project](https://github.com/zFitness/gow3_android) and the work of upstream contributors.
 
-This document is an English translation of the repository README.
+## Native Android/Bionic runtime
 
-The **Android / ARM64 port** of *God of War III Remastered* (PlayStation 4) — under development, see below.
+This version uses **Bionic, Android's native system library**, with **AHardwareBuffer** presentation and Vulkan integration for system or custom drivers.
 
-The game's original executable is x86-64 (the PS4 uses the same architecture). On an Android
-device the game code is dynamically translated by **FEXCore** and runs on ARM64; a runtime
-written specifically for this game replaces the PS4 system libraries, and the graphics are
-translated to Vulkan (connecting to the Adreno GPU through the Turnip driver). It is not a
-generic emulator: the whole project serves this one game. This project forks the
-[R-V-L port](https://github.com/R-V-L/gow3_pc), which is based on
-[deadinside28's bloodborne_pc](https://github.com/deadinside28/bloodborne_pc), and merges the
-God of War III fixes from [cuesta4's shadPS4 fork](https://github.com/cuesta4/shadPS4)
-(see [Acknowledgments](#acknowledgments)).
+The game's original **x86-64 code is still translated to ARM64 by FEXCore**, while the shadPS4-based renderer translates graphics to Vulkan.
 
-> **This project contains no game files.** You need game files dumped from your own PS4
-> (currently tested against CUSA01740, version 01.02).
-> This project is not affiliated with Sony Interactive Entertainment or Santa Monica Studio.
-> God of War is a trademark of Sony Interactive Entertainment.
+The project is dedicated to **God of War III Remastered**.
 
-## Quickstart
+## Main features
 
-The full tutorial from getting the project to running debug (Android port, macOS Apple Silicon
-host) is in **[docs/QUICKSTART.md](docs/QUICKSTART.md)**.
+- **Driver selection:** system driver, bundled Turnip or a custom driver.
+- **Selectable render resolutions**, including 720p, 900p and 1080p.
+- **Performance and graphics synchronization improvements**, with shader, cache and data transfer optimizations.
+- **Texture cache coherence fixes** in the renderer.
+- **Optional patches** for graphics effects, shadows, videos and texture corruption.
+- **Direct PKG installation**, including updates for the selected game.
+- **Configurable FPS counter:** visibility, position and size.
+- **English and Brazilian Portuguese interface**, including in-game settings.
+- **Portuguese game language selection** based on the edition and languages available in the installed files.
+- **Save management and log export.**
 
-## Performance
+The current version uses **direct rendering, without FSR or LSFG**.
 
-The Android side is still being validated on real devices; no stable performance numbers yet.
+## Requirements
 
-## Implemented Features
+- **Android 11 or later.**
+- **ARM64 — arm64-v8a** device; no root required.
+- GPU and driver supporting the Vulkan features required by the runtime.
+- Your own copy of **God of War III Remastered**.
 
-- **Runtime chain**: the x86-64 game code runs on ARM64 through FEXCore (`cpu/`,
-  `libgow3cpu.so`), and the graphics are translated to Vulkan by the ARM64 build of the
-  shadPS4 graphics core (`libgow3gpu.so`), connected to the Adreno GPU via Turnip.
-- **Kotlin/Compose launcher** (`android-launcher/`): installs the runtime (SHA-256
-  validation), manages the Surface, input, audio, settings and process lifecycle.
+Patches depend on the edition and executable version. The patches available in the catalog target update **01.02**.
 
-- Reuses the same game runtime, PS4 system library reimplementation, graphics core and patch
-  logic as the desktop build; the Android side is currently being validated on real devices,
-  and the resolution, FPS and cheats patches have not passed byte-level validation yet.
+## Installation
 
-## System Requirements
+1. Download and install the APK from [Releases](https://github.com/erickmendes22/gow3_android_daedalus_fork/releases).
+2. Grant the file access permission requested on first launch.
+3. Select a folder containing the extracted game or use **Install PKG**.
+4. Configure your preferred resolution, patches and driver.
+5. Launch the game.
 
-- **ARM64 (arm64-v8a) Android device**, no root required.
-- A Vulkan-capable GPU with a reasonably recent driver (Turnip; Adreno devices).
-- Your own game copy: **CUSA01740 with the 01.02 update applied** (a folder containing
-  `eboot.bin`, `sce_module`, `sce_sys`). No game files are included in the downloads.
+Performance varies with the device, driver, resolution and selected effects.
 
-Building the Android side requires a host machine (the current flow is based on macOS Apple
-Silicon); dependencies and steps are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
+## Credits
 
-## How It Works
+- **erickmendes22 / Daedalus Emulator** — fork maintenance and Android adaptations.
+- **[zFitness/gow3_android](https://github.com/zFitness/gow3_android)** — Android project used as the base.
+- **[ducvd89/Bloodborne-Android](https://github.com/ducvd89/Bloodborne-Android)** — Android/Bionic infrastructure adapted for Vulkan driver loading, AHardwareBuffer presentation, native preparation and dependency builds.
+- **[FelipePrado0/gow3_pc](https://github.com/FelipePrado0/gow3_pc)** and **[R-V-L/gow3_pc](https://github.com/R-V-L/gow3_pc)** — upstream projects and port improvements.
+- **[deadinside28/bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)** — project underlying the chain of ports.
+- **[cuesta4/shadPS4](https://github.com/cuesta4/shadPS4)** and **[the shadPS4 team](https://github.com/shadps4-emu/shadPS4)** — renderer and graphics fixes.
+- **[FEX-Emu](https://github.com/FEX-Emu/FEX)** — dynamic translation of x86-64 code to ARM64.
+- **[fexdroid](https://github.com/cobrabm12/fexdroid)** — Android infrastructure used by the original project.
+- **kvicken, cuesta4 and illusion0001** — patches and work underlying the resolution, texture, video and frame rate adaptations.
+- **StevenMXZ, WinNative-Emu and Mesa/Turnip contributors** — bundled drivers and their fixes.
 
-| Module | Location | Purpose |
-| ------ | -------- | ------- |
-| Prepare | `scripts/` | Reads `eboot.bin`, applies relocations, links the game's bundled `libc` and `libSceFios2` into a single image |
-| Loader | `src/probe.c` | Loads the image, installs validated hooks (cheats, multipliers, health bars), starts the game's original code |
-| Runtime | `src/runtime_*.c` | Reimplements PS4 system functions: memory, threads, files, audio, video, gamepad, saves and services |
-| GPU | `gpu/shadps4/` | shadPS4 graphics core, translates PS4 GPU instructions to Vulkan, includes this port's performance optimizations (background shader cache, deferred readback) |
-| In-game menu | `gpu/shim/gow3_overlay.cpp` | Dear ImGui menu and performance overlay; settings live in `gpu/shim/gow3_settings.cpp` |
-| Patches | `patches/God_of_War_III_Remastered.xml`, `scripts/patches.py` | Applied in memory at startup, never modify game files |
-| Launch | Android launcher (`android-launcher/`), `run.sh` | The Android side prepares the image and starts `gow3-probe` via the launcher; `run.sh` is the desktop launch entry point |
+Further attribution is available in the [Bionic runtime notices](tools/android/bionic/NOTICE.txt) and the licenses of the included components.
 
-More docs: [Mods](docs/MODS.md), [Upscaler & frame generation](docs/upscaler.md),
-[Parallel GPU work](docs/parallel_gpu.md) and the [Roadmap](docs/gow3/ROADMAP.md).
+## Support
 
-## Acknowledgments
+**YouTube:** [@daedalusemulator](https://www.youtube.com/@daedalusemulator)  
+**Issues and suggestions:** [GitHub Issues](https://github.com/erickmendes22/gow3_android_daedalus_fork/issues)
 
-- **ducvd89 / Bloodborne-Android**: [Android/Bionic runtime infrastructure](https://github.com/ducvd89/Bloodborne-Android), adapted for the Vulkan HAL loader, AHardwareBuffer presentation, native preparation and dependency builds. Detailed attribution: [Bionic notices](tools/android/bionic/NOTICE.txt).
-
-This project forks R-V-L's Linux port, which in turn derives from FelipePrado0's original
-project:
-
-- **deadinside28**: [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc), the original native port.
-- **gow3_pc** (R-V-L): [bloodborne_pc for Windows](https://github.com/R-V-L/gow3_pc),
-  the branch this project is based on.
-- **cuesta4**: [shadPS4 fork focused on God of War III Remastered](https://github.com/cuesta4/shadPS4)
-  (branch `eltutz`). This port uses its GNM hybrid rewrite, depth/stencil state and image alias fixes.
-- **shadPS4 team**: [shadPS4](https://github.com/shadps4-emu/shadPS4) renderer.
-- **fexdroid**: [fexdroid](https://github.com/cobrabm12/fexdroid)
-
-Patches: kvicken and cuesta4 (resolution, texture fixes, 120 FPS and video skipping, based on
-illusion0001's PS3 patches), published in shadPS4's
-[shadps4-emu/ps4_cheats#145](https://github.com/shadps4-emu/ps4_cheats/pull/145) and adapted
-for this executable. The 240 FPS patch was adapted from the 120 FPS patch by Felipe Prado. The
-cheats are adapted from Celogamez's
-[GoldHEN cheats](https://github.com/GoldHEN/GoldHEN_Cheat_Repository).
-
-Also used: [LibAtrac9](https://github.com/Thealexbarney/LibAtrac9), [FFmpeg](https://ffmpeg.org),
-[SDL3](https://github.com/libsdl-org/SDL), [Dear ImGui](https://github.com/ocornut/imgui),
-[sirit](https://github.com/shadps4-emu/sirit), [magic_enum](https://github.com/Neargye/magic_enum),
-[miniz](https://github.com/richgel999/miniz), [xbyak](https://github.com/herumi/xbyak),
-[Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator),
-[FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) and the AMD FidelityFX SDK,
-[LLVM](https://llvm.org) and [Pillow](https://python-pillow.org).
+When reporting a problem, include your device, driver, game version and logs exported by the app.
 
 ## License
 
-GNU GPL v2 or later (see [LICENSE](LICENSE)). Third-party components retain their own licenses.
+**GNU GPL v2 or later.** See [LICENSE](LICENSE). Third-party components retain their respective licenses.
+
+No game files are distributed. This project is not affiliated with Sony Interactive Entertainment or Santa Monica Studio.
