@@ -276,6 +276,9 @@ void Scheduler::MaybeSplitRecording() {
     if (segment0_bytes + CurrentChunk().Size() < threshold) {
         return;
     }
+    if (auto* profiler = GpuProfiler::Get(); profiler && profiler->Records(this)) {
+        return;
+    }
     // Close the first worker's command buffer only after its pending draws.
     Record([](vk::CommandBuffer cmdbuf) { Check(cmdbuf.end()); });
     KickRecording(true);
