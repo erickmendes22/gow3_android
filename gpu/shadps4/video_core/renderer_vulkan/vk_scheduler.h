@@ -944,7 +944,7 @@ private:
     // at most two ordered buffers per submission, synchronous vkQueueSubmit.
     // GOW3_VK_RECORD_THREADS=1 restores the original single worker.
     bool parallel_recording = false;
-    u32 active_segment = 0;
+    std::atomic<u32> active_segment{0}; // recorder spin loop observes producer segment
     size_t segment0_bytes = 0;
     bool host_copy_this_submit = false;
     std::unique_ptr<CommandPool> parallel_command_pool;
