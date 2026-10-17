@@ -294,6 +294,20 @@ void Scheduler::MaybeSplitRecording() {
     segment_cmdbufs[1] = next;
     current_cmdbuf = next;
     active_segment = 1;
+    // Optional, low-volume confirmation that the second recorder is actually
+    // used. Disabled by default to avoid logging on the render hot path.
+    static const bool trace_parallel = [] {
+        const char* value = std::getenv("GOW3_VK_PARALLEL_TRACE");
+        return value && value[0] == '1';
+    }();
+    if (trace_parallel) {
+        static std::atomic<u64> n_splits{0};
+        const u64 n = n_splits.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (n == 1 || n % 120 == 0) {
+            std::printf("GOW3 Vulkan parallel: %llu two-buffer submissions prepared\n",
+                        static_cast<unsigned long long>(n));
+        }
+    }
     // Dynamic Vulkan state is command-buffer-local, not carried from worker 0.
     dynamic_state.Invalidate();
 }
