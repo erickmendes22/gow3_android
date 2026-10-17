@@ -11,7 +11,6 @@ final class UiText {
     static {
         PT.put("Anisotropic filtering", "Filtragem anisotrópica");
         PT.put("Game default", "Padrão do jogo");
-        PT.put("Lossless Scaling: could not apply", "Lossless Scaling: não foi possível aplicar");
         PT.put("Swipe left or press A to return", "Deslize para a esquerda ou pressione A para voltar");
         PT.put("Game", "Jogo");
         PT.put("Resume game", "Continuar jogo");
@@ -38,11 +37,9 @@ final class UiText {
         PT.put("No upscaling", "Sem ampliação");
         PT.put("no FPS limit", "sem limite de FPS");
         PT.put(" FPS limit", " FPS de limite");
-        PT.put("Import Lossless.dll on the Home page first", "Importe o Lossless.dll na tela inicial primeiro");
         PT.put("Off", "Desativado");
         PT.put("On", "Ativado");
         PT.put("Startup black screen fix", "Correção de tela preta ao iniciar");
-        PT.put("Requires your own Lossless.dll. Generates frames from the final game image. Fast motion and the HUD may show artifacts. Changes apply while you play.", "Requer seu próprio Lossless.dll. Gera quadros a partir da imagem final do jogo. Movimentos rápidos e o HUD podem apresentar artefatos. As alterações são aplicadas durante o jogo.");
         PT.put("Texture corruption fix", "Correção de texturas corrompidas");
         PT.put("OFF keeps the original arena. Texture errors or crashes may occur, especially at higher resolutions. Requires restart.", "Desativado mantém a arena original. Podem ocorrer erros de textura ou falhas, especialmente em resoluções maiores. Requer reiniciar.");
         PT.put("Render resolution", "Resolução de renderização");
@@ -68,10 +65,6 @@ final class UiText {
         PT.put("Performance mode", "Modo de desempenho");
         PT.put("1.0 (best quality)", "1.0 (melhor qualidade)");
         PT.put("0.25 (fastest)", "0.25 (mais rápido)");
-        PT.put("Lossless Scaling frame generation", "Geração de quadros Lossless Scaling");
-        PT.put("Lossless Scaling: applied", "Lossless Scaling: aplicado");
-        PT.put("Lossless Scaling: could not save settings", "Lossless Scaling: não foi possível salvar as configurações");
-        PT.put("Needs Lossless.dll from your own Lossless Scaling (Steam) next to the game folder. Uses the final game image and requires no game resolution changes. It sees only finished frames, so fast motion and the HUD show more artifacts. Lower flow scale and performance mode are faster. Changes apply while you play; only turning it on after starting without it restarts the game.", "Requer o Lossless.dll da sua cópia do Lossless Scaling (Steam). Usa a imagem final do jogo. Movimentos rápidos e o HUD podem apresentar mais artefatos. Uma escala de fluxo menor e o modo de desempenho são mais rápidos. As alterações são aplicadas durante o jogo; ativar após iniciar sem geração de quadros exige reiniciar.");
         PT.put("Game settings", "Configurações do jogo");
         PT.put("Cheats", "Trapaças");
         PT.put("Cheats applied", "Trapaças aplicadas");
@@ -109,7 +102,7 @@ final class UiText {
         // Dynamic subtitles retain their numbers and version identifiers.
         for (String key : new String[]{"God of War III for Android", "No upscaling", "no FPS limit", " FPS limit", "Sharpness: "})
             text = text.replace(key, PT.get(key));
-        return text.replace("× frames · flow ", "× quadros · fluxo ");
+        return text;
     }
     private UiText() {}
 }

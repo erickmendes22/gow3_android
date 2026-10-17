@@ -3,15 +3,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// Steam sign-in (SteamDllDialog.java) needs JavaSteam and its dependencies, fetched by
-// tools/android/inputs/fetch_steam_libs.sh into .local-deps/android/steam-libs. When the
-// libraries are absent (e.g. a plain Android Studio build before the fetcher has run) the
-// src/steamStub/java fallback is compiled instead and GET FROM STEAM explains the build lacks
-// Steam downloads. Once jars.txt exists the real implementation in src/steam/java is used and
-// the jars and zstd JNI are packaged into the APK.
-val steamLibs = rootProject.file("../.local-deps/android/steam-libs")
-val steamAvailable = steamLibs.resolve("jars.txt").isFile
-
 val bionicRuntime = providers.gradleProperty("gow3Bionic").orNull == "true"
 
 android {
@@ -73,11 +64,6 @@ android {
         getByName("main") {
             jniLibs.srcDir("../../tools/android/bridges")
             if (bionicRuntime) jniLibs.srcDir("../../out/bionic/apk-jni")
-            // Steam real implementation vs. no-Steam fallback, gated on the fetched libraries.
-            java.srcDir(if (steamAvailable) "src/steam/java" else "src/steamStub/java")
-            if (steamAvailable) {
-                jniLibs.srcDir(steamLibs.resolve("jni"))
-            }
         }
         getByName("debug") {
             assets.srcDir("../../out/android-debug/assets")
@@ -118,20 +104,4 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // JavaSteam and its dependencies when the Steam libraries are present; see steamAvailable above.
-    if (steamAvailable) {
-        // Drop the jars the Kotlin/AGP plugins already put on the compile/runtime classpath: D8's
-        // duplicate-class check would otherwise fail. The platforms' kotlin-stdlib, kotlinx-coroutines
-        // and kotlinx-serialization are binary-compatible with the versions JavaSteam was built
-        // against. kotlin-stdlib-jdk7/jdk8 stay: nothing else provides them.
-        implementation(fileTree(steamLibs.resolve("jars")) {
-            include("*.jar")
-            exclude("annotations-*.jar")
-            exclude {
-                it.name.startsWith("kotlinx-coroutines-core-jvm-") ||
-                    it.name.startsWith("kotlinx-serialization-core-jvm-") ||
-                    (it.name.startsWith("kotlin-stdlib-") && !it.name.startsWith("kotlin-stdlib-jdk"))
-            }
-        })
-    }
 }

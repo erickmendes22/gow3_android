@@ -14,9 +14,6 @@
 
     <!-- Home 页 -->
     <string name="settings_save_failed">Settings could not be saved</string>
-    <string name="home_imported_fmt">Imported %1$s (%2$s)</string>
-    <string name="home_removed_game_folder_copy">Removed the launcher copy. The Lossless.dll beside the game folder is yours to delete.</string>
-    <string name="home_removed_fmt">%1$s removed</string>
 
     <!-- 启动参数 -->
     <string name="launch_parameters_title">LAUNCH PARAMETERS</string>
@@ -94,15 +91,6 @@
     <string name="param_desc_free_camera">Lets you move the camera freely around the world for exploring or testing, instead of following the gameplay camera. Meant for experimentation, not normal play.</string>
 
     <!-- 帧生成卡片 -->
-    <string name="frame_gen_title">FRAME GENERATION</string>
-    <string name="frame_gen_not_installed">Not installed</string>
-    <string name="frame_gen_needs_dll">Frame generation needs the Lossless.dll from your own copy of Lossless Scaling. Import the file here, or get it from Steam.</string>
-    <string name="frame_gen_source_game_folder">Beside your game folder — remove it there yourself</string>
-    <string name="frame_gen_source_app_private">In the launcher\'s own folder</string>
-    <string name="frame_gen_import_dll">IMPORT .DLL</string>
-    <string name="frame_gen_get_from_steam">GET FROM STEAM</string>
-    <string name="frame_gen_remove">REMOVE</string>
-    <string name="frame_gen_footer">Imported files stay in the app\'s private folder and take effect the next time the game starts. IMPORT .DLL also works when Steam is unavailable.</string>
 
     <!-- About 页 -->
     <string name="about_title">God of War III — Daedalus Fork</string>
@@ -178,11 +166,6 @@
     <string name="save_archive_duplicate_fmt">The archive contains a duplicate path: %1$s</string>
     <string name="save_archive_wrong_layout_fmt">The archive layout is not a savedata layout: %1$s</string>
     <string name="save_archive_title_fmt">The archive title does not match God of War III (%2$s): %1$s</string>
-    <string name="lossless_no_readable_name">That file has no readable name.</string>
-    <string name="lossless_wrong_file_fmt">That is not %1$s (selected: %2$s).</string>
-    <string name="lossless_empty_fmt">%1$s is empty.</string>
-    <string name="lossless_write_failed_fmt">%1$s could not be written. Nothing was changed.</string>
-    <string name="lossless_remove_failed_fmt">%1$s could not be removed.</string>
 
     <!-- 游戏目录管理器 -->
     <string name="storage_permission_title">Storage permission required</string>

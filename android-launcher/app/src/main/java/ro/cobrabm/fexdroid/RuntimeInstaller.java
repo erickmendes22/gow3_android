@@ -102,9 +102,7 @@ public final class RuntimeInstaller {
                 !text.contains("\"application_id\": \"com.gow3.android\"") ||
                 !text.contains("\"java_package\": \"ro.cobrabm.fexdroid\""))
             throw new IllegalStateException("Runtime archive is incompatible: manifest identity");
-        if (!path(root, "gow3port/arm64/lsfg/liblsfg-vk.so").isFile() ||
-                !path(root, "gow3port/arm64/lsfg/VkLayer_LS_frame_generation.json").isFile())
-            throw new IllegalStateException("Runtime archive is incomplete: LSFG layer");
+
     }
 
     private static void renameRequired(File source, File target, String label) throws Exception {

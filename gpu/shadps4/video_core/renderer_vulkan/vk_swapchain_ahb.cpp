@@ -6,7 +6,6 @@
 #include <poll.h>
 #include <unistd.h>
 #include <chrono>
-#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include "common/assert.h"
@@ -27,17 +26,12 @@ constexpr u64 AhbUsage = AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT |
                          AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY;
 
 /// GOW3_PRESENT_BUFFERS: the number of buffers (3 by default: one shown, one pending, one rendered).
-/// With Lossless Scaling frame generation (multiplier 2-4) a cycle holds one buffer per frame it shows
-/// (the multiplier) while the app still has the last ones: multiplier + 3.
-u32 BufferCount(u32 lsfg_multiplier) {
+u32 BufferCount() {
     if (const char* value = std::getenv("GOW3_PRESENT_BUFFERS")) {
         const long count = std::strtol(value, nullptr, 10);
         if (count >= 2 && count <= static_cast<long>(8)) {
-            return std::max(static_cast<u32>(count), lsfg_multiplier >= 2 ? lsfg_multiplier + 3 : 2u);
+            return static_cast<u32>(count);
         }
-    }
-    if (lsfg_multiplier >= 2 && lsfg_multiplier <= 4) {
-        return lsfg_multiplier + 3;
     }
     return 3;
 }
@@ -54,14 +48,9 @@ bool WaitSyncFile(int fd, int timeout_ms) {
 
 } // namespace
 
-u32 Swapchain::MaxImageCount() {
-    return BufferCount(4); // Enough overlay resources for live activation through 4x.
-}
-
-Swapchain::Swapchain(const Instance& instance_, const Frontend::WindowSDL& window_, u32 lsfg_multiplier)
+Swapchain::Swapchain(const Instance& instance_, const Frontend::WindowSDL& window_)
     : instance{instance_}, window{window_} {
-    frame_generation_multiplier = lsfg_multiplier;
-    image_count = BufferCount(lsfg_multiplier);
+    image_count = BufferCount();
     const vk::PhysicalDeviceExternalSemaphoreInfo semaphore_info{
         .handleType = vk::ExternalSemaphoreHandleTypeFlagBits::eSyncFd,
     };
@@ -73,7 +62,7 @@ Swapchain::Swapchain(const Instance& instance_, const Frontend::WindowSDL& windo
         "swapchain cannot synchronize with the app");
     if (Gow3Present::Client::Configured()) {
         if (!client.Connect(window.GetWidth(), window.GetHeight(), AhbFormat, image_count,
-                            Gow3Settings::Get().vsync.load() || lsfg_multiplier >= 2)) {
+                            Gow3Settings::Get().vsync.load())) {
             std::printf("Present: no connection to the app: frames are rendered but not shown\n");
         }
     } else {
@@ -83,7 +72,7 @@ Swapchain::Swapchain(const Instance& instance_, const Frontend::WindowSDL& windo
 }
 
 void Swapchain::UpdateVsync() {
-    const bool fifo = Gow3Settings::Get().vsync.load() || frame_generation_multiplier >= 2;
+    const bool fifo = Gow3Settings::Get().vsync;
     if (client.Connected()) client.SetFifo(fifo);
 }
 
@@ -256,19 +245,6 @@ void Swapchain::CreateBuffer(u32 index) {
     buffer.view = view;
     SetObjectName(device, image, "AHB swapchain image {}", index);
     SetObjectName(device, view, "AHB swapchain view {}", index);
-}
-
-void Swapchain::SetFrameGeneration(u32 lsfg_multiplier) {
-    frame_generation_multiplier = lsfg_multiplier;
-    if (client.Connected() &&
-        !client.SetFifo(Gow3Settings::Get().vsync.load() || lsfg_multiplier >= 2)) {
-        PeerGone();
-    }
-    const u32 count = BufferCount(lsfg_multiplier);
-    if (count != image_count) {
-        image_count = count;
-        Recreate(width != 0 ? width : window.GetWidth(), height != 0 ? height : window.GetHeight());
-    }
 }
 
 void Swapchain::Recreate(u32 width_, u32 height_) {

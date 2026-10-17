@@ -12,7 +12,7 @@ cd -- "$script_dir/../../.."
 
 if [[ ${GOW3_REBUILD_DEBUG_RUNTIME:-0} == 1 || ! -f out/debug/runtime.tar.gz ]]; then
     # The debug runtime reuses the locally built Turnip/LSFG. build_release_runtime.py
-    # --profile debug reads them from .local-deps/android/{turnip,turnip-gen8,lsfg}, so stage
+    # --profile debug reads them from .local-deps/android/{turnip,turnip-gen8}, so stage
     # the out/arm64/ artifacts there first (overwrites stale copies).
     stage_local_input() { # src_dir name
         local src=$1 dst=".local-deps/android/$2"
@@ -27,7 +27,6 @@ if [[ ${GOW3_REBUILD_DEBUG_RUNTIME:-0} == 1 || ! -f out/debug/runtime.tar.gz ]];
     }
     stage_local_input out/arm64/turnip turnip
     stage_local_input out/arm64/turnip-gen8 turnip-gen8
-    stage_local_input out/arm64/lsfg lsfg
     python3 tools/android/runtime/build_release_runtime.py --profile debug
 else
     python3 tools/android/runtime/validate_runtime_archive.py out/debug/runtime.tar.gz \

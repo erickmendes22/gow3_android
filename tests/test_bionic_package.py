@@ -33,3 +33,11 @@ class BionicPackageValidation(unittest.TestCase):
         payload=self.payload('runtime-manifest.json')
         with self.assertRaisesRegex(ValueError,'Missing Bionic runtime file'):
             validator.validate_payload(payload,hashlib.sha256(payload).hexdigest())
+
+    def test_rejects_removed_frame_generation_components(self):
+        for name in ['gow3port/arm64/lib/liblsfg-gow3.so',
+                     'gow3port/arm64/lsfg/liblsfg-vk.so']:
+            with self.subTest(name=name):
+                payload=self.payload(name)
+                with self.assertRaisesRegex(ValueError,'Removed frame-generation component'):
+                    validator.validate_payload(payload,hashlib.sha256(payload).hexdigest())

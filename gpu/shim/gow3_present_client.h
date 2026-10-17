@@ -28,10 +28,7 @@ public:
     static bool Configured();
 
     /// True when GOW3_VSYNC=1 (gow3.ini vsync=1): the app is to show every frame for at least one
-    /// display refresh, in order (GOW3_PRESENT_FLAG_FIFO), instead of the newest only. Lossless Scaling
-    /// frame generation (vk_lsfg.h) needs that too while it is on, whatever the VSync setting says:
-    /// the caller passes the effective mode (VsyncRequested() || frame generation on) to Connect and
-    /// SetFifo.
+    /// display refresh, in order (GOW3_PRESENT_FLAG_FIFO), instead of the newest only.
     static bool VsyncRequested();
 
     /// Connects to GOW3_PRESENT_SOCKET (retries for a while: the app may be a moment late), says HELLO

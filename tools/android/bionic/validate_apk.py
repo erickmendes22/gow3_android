@@ -21,6 +21,8 @@ def validate_payload(payload, expected_hash):
             if name.startswith('rootfs/') or Path(name).name.lower() in {
                     'eboot.bin','eboot.elf','boot-linked.bin','content.bin','patches.bin','lossless.dll'}:
                 raise ValueError(f'Unexpected game/glibc content: {name}')
+            if any('lsfg' in part.lower() for part in Path(name).parts):
+                raise ValueError(f'Removed frame-generation component in runtime: {name}')
             if name.endswith('.pkg'):
                 raise ValueError('Player PKG must never be packaged')
         required = ['runtime-manifest.json','gow3port/run-bionic.sh',
@@ -28,7 +30,6 @@ def validate_payload(payload, expected_hash):
                     'gow3port/arm64/bin/orbis-pkg-util','gow3port/arm64/bin/kgsl-chip-id',
                     'gow3port/arm64/lib/libgow3cpu.so','gow3port/arm64/lib/libgow3gpu.so',
                     'gow3port/arm64/lib/libgow3present.so','gow3port/arm64/lib/libc++_shared.so',
-                    'gow3port/arm64/lib/liblsfg-gow3.so',
                     'gow3port/arm64/python/bin/python3.13',
                     'gow3port/arm64/python/lib/libpython3.13.so',
                     'gow3port/scripts/patches.py','gow3port/scripts/game_update.py',

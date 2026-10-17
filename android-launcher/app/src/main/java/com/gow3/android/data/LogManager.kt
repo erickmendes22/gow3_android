@@ -24,7 +24,7 @@ internal sealed class LogResult {
 internal class LogManager(private val activity: Activity) {
 
     companion object {
-        /** 区别于 GameFolderManager 的 1001/1002、LosslessDllManager 的 1003 和 SaveManager 的 1004/1005。 */
+        /** 区别于 GameFolderManager 的 1001/1002 和 SaveManager 的 1004/1005。 */
         const val REQUEST_EXPORT = 1006
         private const val DEFAULT_EXPORT_NAME = "GodOfWar3-Logs"
     }

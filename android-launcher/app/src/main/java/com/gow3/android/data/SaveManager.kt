@@ -24,7 +24,7 @@ internal sealed class SaveResult {
 internal class SaveManager(private val activity: Activity) {
 
     companion object {
-        /** 区别于 GameFolderManager 的 1001/1002 和 LosslessDllManager 的 1003。 */
+        /** 区别于 GameFolderManager 的 1001/1002。 */
         const val REQUEST_EXPORT = 1004
         const val REQUEST_IMPORT = 1005
         private const val DEFAULT_EXPORT_NAME = "GodOfWar3-Saves"

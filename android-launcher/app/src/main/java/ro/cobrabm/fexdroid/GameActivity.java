@@ -730,30 +730,9 @@ public final class GameActivity extends Activity {
         } catch (Exception ignored) {}
         return value;
     }
-    private void pickRefreshRate() {
-        int frames=1;
-        String limit=setting("fps_limit"); // 同 SettingsDialog.FPS_VALUES / 运行时 FPS_LIMITS
-        final float target=frames*("30".equals(limit) || "60".equals(limit) || "120".equals(limit)
-            || "240".equals(limit) ? Integer.parseInt(limit) : "0".equals(limit) ? 1000 : 30);
-        main.post(() -> {
-            if (destroyed) return;
-            android.view.Display display=Build.VERSION.SDK_INT>=30 ? getDisplay() : getWindowManager().getDefaultDisplay();
-            android.view.Display.Mode current=display.getMode();
-            int id=0, fastest=0; float best=0;
-            if (frames>1) for (android.view.Display.Mode mode:display.getSupportedModes()) {
-                if (mode.getPhysicalWidth()!=current.getPhysicalWidth() || mode.getPhysicalHeight()!=current.getPhysicalHeight()) continue;
-                if (Math.abs(mode.getRefreshRate()-target)<1) id=mode.getModeId();
-                if (mode.getRefreshRate()>best) { best=mode.getRefreshRate(); fastest=mode.getModeId(); }
-            }
-            if (id==0) id=fastest;
-            WindowManager.LayoutParams attrs=getWindow().getAttributes();
-            if (attrs.preferredDisplayModeId!=id) { attrs.preferredDisplayModeId=id; getWindow().setAttributes(attrs); }
-        });
-    }
     private void startGame() {
         if (destroyed) return;
         hadError=false;
-        pickRefreshRate();
         new File(BASE,"ime.request").delete(); new File(BASE,"ime.request.result").delete();
         try {
             Process launched=bionicRuntime() ? process("/system/bin/sh",BASE+"/run-bionic.sh","game")

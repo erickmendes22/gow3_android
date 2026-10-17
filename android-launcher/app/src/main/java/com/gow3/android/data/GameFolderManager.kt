@@ -22,7 +22,7 @@ internal class GameFolderManager(private val activity: Activity) {
     companion object {
         // 整个 launcher 的 Activity Result request code 必须全局唯一：MainActivity.onActivityResult
         // 依次询问各消费者，先返回 true 的会消费掉结果，因此撞码会让后到的消费者永远收不到回调。
-        // 已知占用方：1001 游戏目录、1002 存储权限、1003 Lossless.dll 导入（LosslessDllManager）、
+        // 已知占用方：1001 游戏目录、1002 存储权限、1003 已保留、
         // 1004/1005 存档导出/导入（SaveManager）、1006 日志导出（LogManager）。新增请取 1008 起的空位。
         const val REQUEST_GAME_FOLDER = 1001
         const val REQUEST_UPDATE_FOLDER = 1007

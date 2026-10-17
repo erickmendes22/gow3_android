@@ -39,20 +39,8 @@ class Instance;
 
 class Swapchain {
 public:
-    /// `lsfg_multiplier`: the Lossless Scaling frame generation multiplier at start (0: off); it
-    /// sets the buffer count and the presentation mode of the first HELLO.
-    explicit Swapchain(const Instance& instance, const Frontend::WindowSDL& window,
-                       u32 lsfg_multiplier = 0);
+    explicit Swapchain(const Instance& instance, const Frontend::WindowSDL& window);
     ~Swapchain();
-
-    /// Lossless Scaling frame generation turned on, off or to another multiplier while the game runs
-    /// (0: off). Tells the app the presentation mode (FIFO while it is on, else GOW3_VSYNC's) and, when
-    /// the buffer count changes with it (a cycle holds one buffer per frame it shows), makes the
-    /// buffers again: RESET and new BUFFERs, like a resize. Call between frames: every buffer
-    /// acquired but not sent is void afterwards (Generation() changes).
-    void SetFrameGeneration(u32 lsfg_multiplier);
-    /// The most buffers the swapchain may ever have in this run (what a pool sized per buffer needs).
-    static u32 MaxImageCount();
 
     /// Creates (or recreates) the buffers with a given size.
     void Create(u32 width, u32 height);
@@ -62,15 +50,6 @@ public:
     bool AcquireNextImage();
     /// Hands the current buffer to the app.
     bool Present();
-    /// gow3: Lossless Scaling frame generation (vk_lsfg.h) holds several buffers at once: it
-    /// acquires a buffer per frame of a cycle, renders into each and sends them one after the other.
-    /// The "current" buffer is the one Image(), ImageView() and the semaphores below are about, and the
-    /// one Present() sends; SelectImage() picks one of the acquired buffers again. A buffer set made
-    /// again meanwhile (Recreate) has a new Generation(): the held indices are void then.
-    u32 CurrentIndex() const { return image_index; }
-    void SelectImage(u32 index) { image_index = index; }
-    u32 Generation() const { return generation; }
-
     vk::Image Image() const { return buffers[image_index].image; }
     vk::ImageView ImageView() const { return buffers[image_index].view; }
     vk::SurfaceFormatKHR GetSurfaceFormat() const { return surface_format; }
@@ -137,7 +116,6 @@ private:
     u32 image_count = 3;
     u32 image_index = 0;
     u32 generation = 0;
-    u32 frame_generation_multiplier = 0;
     u64 frame_counter = 0;
     bool zero_extent = false;
     bool needs_recreation = true;

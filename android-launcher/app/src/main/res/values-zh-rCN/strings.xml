@@ -14,9 +14,6 @@
 
     <!-- Home 页 -->
     <string name="settings_save_failed">设置无法保存</string>
-    <string name="home_imported_fmt">已导入 %1$s（%2$s）</string>
-    <string name="home_removed_game_folder_copy">已移除启动器内的副本。游戏目录旁的 Lossless.dll 由你自行删除。</string>
-    <string name="home_removed_fmt">已移除 %1$s</string>
 
     <!-- 启动参数 -->
     <string name="launch_parameters_title">启动参数</string>
@@ -71,15 +68,6 @@
     <string name="param_desc_free_camera">允许你自由移动视角环游世界，用于探索或测试，而不是跟随游戏视角。仅供实验，不适合正常游玩。</string>
 
     <!-- 帧生成卡片 -->
-    <string name="frame_gen_title">帧生成</string>
-    <string name="frame_gen_not_installed">未安装</string>
-    <string name="frame_gen_needs_dll">帧生成需要你自备的 Lossless Scaling 中的 Lossless.dll。在此导入该文件，或从 Steam 获取。</string>
-    <string name="frame_gen_source_game_folder">位于游戏目录旁——请在那里自行删除</string>
-    <string name="frame_gen_source_app_private">位于启动器自己的文件夹内</string>
-    <string name="frame_gen_import_dll">导入 .DLL</string>
-    <string name="frame_gen_get_from_steam">从 Steam 获取</string>
-    <string name="frame_gen_remove">移除</string>
-    <string name="frame_gen_footer">导入的文件保存在应用私有目录内，下次启动游戏时生效。没有 Steam 时同样可以「导入 .DLL」。</string>
 
     <!-- About 页 -->
     <string name="about_title">God of War III Android</string>
@@ -155,11 +143,6 @@
     <string name="save_archive_duplicate_fmt">归档包含重复路径：%1$s</string>
     <string name="save_archive_wrong_layout_fmt">归档结构不是存档布局：%1$s</string>
     <string name="save_archive_title_fmt">归档标题与 God of War III（%2$s）不匹配：%1$s</string>
-    <string name="lossless_no_readable_name">该文件没有可读的文件名。</string>
-    <string name="lossless_wrong_file_fmt">这不是 %1$s（所选：%2$s）。</string>
-    <string name="lossless_empty_fmt">%1$s 是空文件。</string>
-    <string name="lossless_write_failed_fmt">无法写入 %1$s，未改动任何内容。</string>
-    <string name="lossless_remove_failed_fmt">无法移除 %1$s。</string>
 
     <!-- 游戏目录管理器 -->
     <string name="storage_permission_title">需要存储权限</string>
