@@ -812,7 +812,7 @@ public:
             // A guest-memory copy must not overtake an older segment's draws.
             // Never split after the first guest-memory copy in this submission.
             host_copy_this_submit = true;
-            if (active_segment != 0) {
+            if (active_segment != 0 && IsRecordingDeferred()) {
                 SyncRecording();
             }
         }
