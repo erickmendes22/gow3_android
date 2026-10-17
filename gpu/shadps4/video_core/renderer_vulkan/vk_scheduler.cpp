@@ -267,23 +267,20 @@ void Scheduler::MaybeSplitRecording() {
         Gow3Toggle::Disabled(Gow3Toggle::ThreadedRecording)) {
         return;
     }
-    // Do not permanently prohibit splitting after a guest copy or EOP.
-    // The old segment is safe to split after its copies and guest-visible
-    // signals have actually completed. Never overtake unfinished work.
-    if (host_copies_done.load(std::memory_order_acquire) < host_copies_issued ||
-        deferred_signals_done->load(std::memory_order_acquire) <
-            deferred_signals_issued.load(std::memory_order_acquire)) {
-        ++parallel_pending_work_boundaries;
-        return;
-    }
+    // Distinct command buffers may be RECORDED at once, but their GPU work
+    // stays in order in the one vkQueueSubmit below. Pending host copies do
+    // not need to finish BEFORE recording segment 1: WaitHostCopies() at the
+    // submission ensures the staging data is ready before the GPU reads it.
+    // Any guest-visible copy or fence queued AFTER the split first calls
+    // SyncRecording(), preventing it from overtaking recording of segment 0.
 #if TRACY_GPU_ENABLED
     // Tracy GPU scopes assume one command buffer for the whole submission.
     return;
 #endif
     static const size_t threshold = [] {
         const char* requested = std::getenv("GOW3_VK_SEGMENT_KB");
-        const int kb = requested ? std::atoi(requested) : 64;
-        return size_t(std::clamp(kb, 32, 512)) * 1024;
+        const int kb = requested ? std::atoi(requested) : 32;
+        return size_t(std::clamp(kb, 16, 512)) * 1024;
     }();
     if (segment0_bytes + CurrentChunk().Size() < threshold) {
         ++parallel_small_boundaries;
@@ -291,6 +288,13 @@ void Scheduler::MaybeSplitRecording() {
     }
     if (auto* profiler = GpuProfiler::Get(); profiler && profiler->Records(this)) {
         return;
+    }
+    // Information only: pending copies and deferred signals are permitted
+    // across this split; they still observe their original ordering barriers.
+    if (host_copies_done.load(std::memory_order_acquire) < host_copies_issued ||
+        deferred_signals_done->load(std::memory_order_acquire) <
+            deferred_signals_issued.load(std::memory_order_acquire)) {
+        ++parallel_pending_work_boundaries;
     }
     // Close the first worker's command buffer only after its pending draws.
     Record([](vk::CommandBuffer cmdbuf) { Check(cmdbuf.end()); });
@@ -630,7 +634,7 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
         ++parallel_submissions;
         if (parallel_submissions == 300 || parallel_submissions % 900 == 0) {
             std::printf("GOW3 Vulkan parallel stats: submissions=%llu splits=%llu "
-                        "guest-pending boundaries=%llu short boundaries=%llu\n",
+                        "pending-at-split=%llu short boundaries=%llu\n",
                         static_cast<unsigned long long>(parallel_submissions),
                         static_cast<unsigned long long>(parallel_splits),
                         static_cast<unsigned long long>(parallel_pending_work_boundaries),
