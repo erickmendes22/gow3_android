@@ -207,7 +207,7 @@ void Scheduler::SignalAfterHostCopies(std::function<void()> signal) {
         // Keep a guest-visible fence behind the draws that precede it even if
         // two distinct command buffers are being recorded concurrently.
         host_copy_this_submit = true;
-        if (active_segment != 0) {
+        if (active_segment != 0 && IsRecordingDeferred()) {
             SyncRecording();
         }
     }
