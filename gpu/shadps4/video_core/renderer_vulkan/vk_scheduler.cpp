@@ -38,7 +38,8 @@ Scheduler::Scheduler(const Instance& instance, bool threaded_recording)
         // Vulkan recording workers by default, with an explicit one-worker fallback.
 #if defined(__ANDROID__)
         const char* requested = std::getenv("GOW3_VK_RECORD_THREADS");
-        parallel_recording = !requested || std::atoi(requested) >= 2;
+        parallel_recording = requested ? std::atoi(requested) >= 2
+                                       : Gow3Threads::Available() >= 8;
 #endif
         recorder_thread = std::jthread(std::bind_front(&Scheduler::RecorderThread, this), 0);
         if (parallel_recording) {
