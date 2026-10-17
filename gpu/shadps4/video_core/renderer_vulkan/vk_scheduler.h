@@ -945,6 +945,11 @@ private:
     bool parallel_recording = false;
     std::atomic<u32> active_segment{0}; // recorder spin loop observes producer segment
     size_t segment0_bytes = 0;
+    // Small, bounded experimental telemetry: no logging on the drawing hot path.
+    u64 parallel_submissions = 0;
+    u64 parallel_splits = 0;
+    u64 parallel_pending_work_boundaries = 0;
+    u64 parallel_small_boundaries = 0;
     std::unique_ptr<CommandPool> parallel_command_pool;
     std::array<vk::CommandBuffer, 2> segment_cmdbufs{};
     // gow3: threaded recording
