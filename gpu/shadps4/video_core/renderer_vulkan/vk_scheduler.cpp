@@ -38,8 +38,12 @@ Scheduler::Scheduler(const Instance& instance, bool threaded_recording)
         // Vulkan recording workers by default, with an explicit one-worker fallback.
 #if defined(__ANDROID__)
         const char* requested = std::getenv("GOW3_VK_RECORD_THREADS");
+        const auto allowed_cpus = Gow3Threads::Available();
         parallel_recording = requested ? std::atoi(requested) >= 2
-                                       : Gow3Threads::Available() >= 8;
+                                       : allowed_cpus >= 8;
+        std::printf("GOW3 Vulkan recorder: affinity_cpus=%u workers=%u%s\n",
+                    allowed_cpus, parallel_recording ? 2u : 1u,
+                    requested ? " (override)" : "");
 #endif
         recorder_thread = std::jthread(std::bind_front(&Scheduler::RecorderThread, this), 0);
         if (parallel_recording) {
@@ -269,6 +273,7 @@ void Scheduler::MaybeSplitRecording() {
     if (host_copies_done.load(std::memory_order_acquire) < host_copies_issued ||
         deferred_signals_done->load(std::memory_order_acquire) <
             deferred_signals_issued.load(std::memory_order_acquire)) {
+        ++parallel_pending_work_boundaries;
         return;
     }
 #if TRACY_GPU_ENABLED
@@ -281,6 +286,7 @@ void Scheduler::MaybeSplitRecording() {
         return size_t(std::clamp(kb, 32, 512)) * 1024;
     }();
     if (segment0_bytes + CurrentChunk().Size() < threshold) {
+        ++parallel_small_boundaries;
         return;
     }
     if (auto* profiler = GpuProfiler::Get(); profiler && profiler->Records(this)) {
@@ -301,6 +307,7 @@ void Scheduler::MaybeSplitRecording() {
     segment_cmdbufs[1] = next;
     current_cmdbuf = next;
     active_segment = 1;
+    ++parallel_splits;
     // Optional, low-volume confirmation that the second recorder is actually
     // used. Disabled by default to avoid logging on the render hot path.
     static const bool trace_parallel = [] {
@@ -616,6 +623,20 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
         work_semaphore.Refresh();
     }
     AllocateWorkerCommandBuffers();
+
+    // A tiny amount of experimental telemetry distinguishes a working
+    // two-thread split from merely starting two workers. No per-draw logging.
+    if (parallel_recording) {
+        ++parallel_submissions;
+        if (parallel_submissions == 300 || parallel_submissions % 900 == 0) {
+            std::printf("GOW3 Vulkan parallel stats: submissions=%llu splits=%llu "
+                        "guest-pending boundaries=%llu short boundaries=%llu\n",
+                        static_cast<unsigned long long>(parallel_submissions),
+                        static_cast<unsigned long long>(parallel_splits),
+                        static_cast<unsigned long long>(parallel_pending_work_boundaries),
+                        static_cast<unsigned long long>(parallel_small_boundaries));
+        }
+    }
 
     // Apply pending operations
     PopPendingOperations();
