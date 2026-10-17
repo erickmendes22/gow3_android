@@ -259,6 +259,13 @@ if (WIN32)
 endif()
 
 if(ANDROID)
+    # Bloodborne-Android Bionic: avoid a TLS descriptor call for thread_local variables
+    # on the Vulkan recording hot path. gow3-probe links libgow3gpu at process startup,
+    # so initial-exec is suitable here. Keep an opt-out for device A/B testing.
+    option(GOW3_BIONIC_FAST_TLS "Use initial-exec TLS in the Bionic GPU library" ON)
+    if(GOW3_BIONIC_FAST_TLS)
+        target_compile_options(gow3gpu PRIVATE -ftls-model=initial-exec)
+    endif()
     target_compile_definitions(gow3gpu PRIVATE VK_USE_PLATFORM_ANDROID_KHR)
     target_include_directories(gow3gpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../tools/android/present)
     target_link_libraries(gow3gpu PRIVATE nativewindow dl)
